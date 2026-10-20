@@ -59,6 +59,21 @@ npx expo start            # Expo Go
 Kestirme bağlantıları (`harcama://ekle?tutar=125,50&kategori=market`) aynen çalışır; tutar her zaman Türkçe kurallarla okunur ve ana para
 biriminde girilir. Aynı cihazda iki uygulama kuruluysa `harcama://` şeması ikisinde de tanımlıdır.
 
+## Hesap, tanıtım ve yasal uyumluluk (Modül 1)
+
+Uygulama yerel-öncelikli kalır; **hesap isteğe bağlıdır** ("Hesap açmadan devam et"). Ayrıntılı mimari, Supabase/Apple/Google kurulumu ve güvenlik modeli: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Test sonuçları, bulunan kusurlar ve **doğrulanamayanlar**: [`docs/QA-MODULE-1.md`](docs/QA-MODULE-1.md).
+
+- İlk açılışta 3 sayfalık tanıtım (dil seçici, "Atla"); ardından Apple / Google / e-posta ile giriş ya da misafir olarak devam.
+- E-posta ile kayıtta doğrulama zorunlu; parola sıfırlama; Ayarlar → Hesap'tan çıkış ve **Hesabı sil** (yeniden kimlik doğrulama, Apple erişim izni iptali).
+- Supabase değişkenleri yoksa (`.env.example`) hesap özellikleri kapalıdır ve uygulama eskisi gibi çalışır.
+- Gizlilik Politikası ve Kullanım Koşulları uygulama içinde (TASLAK; yayından önce `src/legal/config.ts` doldurulmalı ve hukukçuya okutulmalı).
+
+```bash
+npm test                 # tip + çeviri + çekirdek + kur + tema + hesap mantığı + Edge Function mantığı
+npm run test:sql         # gerçek PostgreSQL'de migration ve RLS testleri (initdb/psql gerekir)
+npm run check:release    # yayın engelleri (yasal bilgiler, sahte servis, anahtar sızıntısı)
+```
+
 ## Testler
 
 ```bash

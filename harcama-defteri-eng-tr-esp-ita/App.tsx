@@ -21,6 +21,8 @@ import { BudgetPanel, ExpenseSheet, SettingsPanel, SubSheet } from './src/sheets
 import { merge, useAppData } from './src/store';
 import { FONTS, Theme, useTheme } from './src/theme';
 import { useRates } from './src/useRates';
+import { AccountSection } from './src/auth/AccountSection';
+import { Gate } from './src/auth/Gate';
 import { Amount, Bars, Button, CatIcon, SubTypeIcon, subTypeColor, DailyChart, InsightList, Ionicons, Label, MenuSection, Pill, Progress, SideMenu } from './src/ui';
 
 /** Web: tarayıcının kenardan "geri git" kaydırması uygulamanın kendi geri hareketiyle çakışmasın. */
@@ -41,7 +43,9 @@ export default function App() {
   if (!fontsLoaded && !fontError) return null;
   return (
     <SafeAreaProvider>
-      <Main />
+      <Gate>
+        <Main />
+      </Gate>
     </SafeAreaProvider>
   );
 }
@@ -593,6 +597,7 @@ function Main() {
           onExport={doExport}
           onBackup={doBackup}
           onRestore={doRestore}
+          account={<AccountSection t={t} />}
           ym={ym}
           monthLabel={monthOnly(ym)}
           rates={rs.rates}

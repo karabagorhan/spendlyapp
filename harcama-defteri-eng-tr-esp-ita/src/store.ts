@@ -1,16 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 import { Cur, isCur } from './currency';
-import { isLang } from './i18n';
+import { deviceLanguage, isLang } from './i18n';
+import { loadLangPref } from './auth/prefs';
 import { isAccent, isTint } from './palette';
 import { CATS, Expense, SUB_TYPES, Settings, Sub, guessSubType } from './lib';
 
 // Tüm veriler telefonda tek bir kayıt olarak tutulur (internet gerekmez).
-const KEY = 'harcama-defteri:v1';
+export const KEY = 'harcama-defteri:v1';
 
 export type Data = { items: Expense[]; subs: Sub[]; settings: Settings };
 
-export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'noir', accent: 'gold', tint: 'classic', name: 'Orhan Karabağ', language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {} };
+export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'noir', accent: 'gold', tint: 'classic', name: '', language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {} };
 const empty: Data = { items: [], subs: [], settings: defaultSettings };
 
 function num(v: unknown, d = 0) {
@@ -57,7 +58,7 @@ export function normalize(raw: any): Data {
     theme: st.theme === 'ivory' || st.theme === 'system' ? st.theme : 'noir',
     accent: isAccent(st.accent) ? st.accent : 'gold',
     tint: isTint(st.tint) ? st.tint : 'classic',
-    name: typeof st.name === 'string' ? st.name.slice(0, 40) : 'Orhan Karabağ',
+    name: typeof st.name === 'string' ? st.name.slice(0, 40) : '',
     language: isLang(st.language) ? st.language : 'tr',
     currency: isCur(st.currency) ? st.currency : 'TRY',
     budgetCur: isCur(st.budgetCur) ? st.budgetCur : 'TRY',
@@ -107,7 +108,12 @@ export function useAppData() {
 
   useEffect(() => {
     AsyncStorage.getItem(KEY)
-      .then((raw) => setData(raw ? normalize(JSON.parse(raw)) : empty))
+      .then(async (raw) => {
+        if (raw) return setData(normalize(JSON.parse(raw)));
+        // İlk kurulum: dil, tanıtımda seçilen dil ya da cihaz dili olur (eski kayıtlar 'tr' kalır)
+        const language = (await loadLangPref()) ?? deviceLanguage();
+        setData({ ...empty, settings: { ...defaultSettings, language } });
+      })
       .catch(() => setData(empty));
   }, []);
 
@@ -121,4 +127,18 @@ export function useAppData() {
   }, []);
 
   return { data, update };
+}
+
+/** Giriş/tanıtım ekranlarının dili ve görünümü: veri kaydı yükleniyorsa ondan, ilk kurulumda tercihten/cihaz dilinden. */
+export async function readLook() {
+  let raw: string | null = null;
+  try { raw = await AsyncStorage.getItem(KEY); } catch {}
+  if (raw) {
+    try {
+      const st = normalize(JSON.parse(raw)).settings;
+      return { language: st.language, theme: st.theme, tint: st.tint, accent: st.accent };
+    } catch {}
+  }
+  const language = (await loadLangPref()) ?? deviceLanguage();
+  return { language, theme: defaultSettings.theme, tint: defaultSettings.tint, accent: defaultSettings.accent };
 }

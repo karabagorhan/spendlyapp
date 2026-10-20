@@ -362,7 +362,7 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
 }
 
 /* ---------- Ayarlar ekranı: ad, görünüm, bildirimler, dışa/içe aktarma ---------- */
-export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
+export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
   settings: Settings;
   rates: Rates | null;
   refreshing: boolean;
@@ -372,6 +372,8 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
   onExport: (ym: string | null) => void;
   onBackup: () => void;
   onRestore: () => void;
+  /** Hesap ve yasal bölümleri (giriş kapısı sağlar). */
+  account?: ReactNode;
   ym: string;
   monthLabel: string;
   t: Theme;
@@ -468,6 +470,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         <Button label={tr('settings.backupMake')} kind="ghost" onPress={onBackup} t={t} />
         <Button label={tr('settings.backupRestore')} kind="ghost" onPress={onRestore} t={t} />
       </View>
+      {account}
     </View>
   );
 }
