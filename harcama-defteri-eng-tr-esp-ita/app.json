@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Harcama Defteri",
+    "slug": "harcama-defteri-eng-tr-esp-ita",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.karabag.harcamadefteri.global",
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.karabag.harcamadefteri.global"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-font"
+    ],
+    "scheme": "harcama",
+    "owner": "karabagorhans-team",
+    "extra": {
+      "eas": {
+        "projectId": "065165d8-42b7-447e-9960-e8263cf7d992"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/065165d8-42b7-447e-9960-e8263cf7d992"
+    }
+  }
+}
