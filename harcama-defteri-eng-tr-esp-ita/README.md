@@ -39,17 +39,17 @@ Eski kayıtlar para birimi taşımadığı için TRY sayılır. Aynı cihazda ay
 
 ## Bağımsız çalıştırma
 
-`app.json` bu proje için ayrıdır (slug `harcama-defteri-eng-tr-esp-ita`, paket kimliği `com.karabag.harcamadefteri.global`);
-eski projenin EAS kimliği kullanılmaz, böylece eski uygulamanın güncellemeleri etkilenmez.
+`app.json` bu proje için ayrıdır (slug `spendlyapp`, paket kimliği `com.karabag.spendlyapp`);
+`claude-efficient-usage` reposundaki projelerin EAS kimlikleri kullanılmaz, böylece onların güncellemeleri etkilenmez.
 
-Bu proje için ayrı bir EAS projesi oluşturuldu (`karabagorhans-team/harcama-defteri-eng-tr-esp-ita`) ve `main` dalına yayınlandı.
+Bu repo için ayrı bir EAS projesi oluşturuldu (`karabagorhans-team/spendlyapp`) ve `main`, `ekle`, `butce`, `ayarlar` kanallarına yayınlandı.
 Expo Go'da açmak için (iPhone'da Safari'ye ya da Notlar'a yapıştırıp dokun):
 
-`exp://u.expo.dev/065165d8-42b7-447e-9960-e8263cf7d992?runtime-version=1.0.0&channel-name=main`
+`exp://u.expo.dev/f1ee9cb0-7d8e-472c-9c74-256eb5b25bc2?runtime-version=1.0.0&channel-name=main`
 
 Diğer açılış bağlantıları: `…&channel-name=ekle` (yeni harcama formu), `…&channel-name=ayarlar` (Ayarlar), `…&channel-name=butce` (bütçe alanı).
 
-Yeniden yayınlamak: `npx eas-cli@latest update --branch main --environment production --message "..."`.
+Yeniden yayınlamak: `npx eas-cli@latest update --channel <kanal> --environment production --message "..."`.
 
 ```bash
 npm install
