@@ -7,7 +7,7 @@
  */
 import {
   CURRENCIES, Cur, PROVIDERS, RatesError, Rates, convert, excelMoneyFormat, fetchRates, fmtMoney, fromViewSettings, isStale, needsRates,
-  normalizeRates, round2, setMainCurrency, toMain, validateRates, viewData,
+  normalizeRates, round2, setMainCurrency, toMain, validateRates, viewData, setHideAmounts, amountsHidden, money,
 } from '../src/currency';
 import { LANGS, Lang, fmtNumber, parseAmount, setLanguage, t } from '../src/i18n';
 import { Expense, Settings, Sub, analyse, insights, MIN_CHANGE, sum } from '../src/lib';
@@ -255,6 +255,17 @@ const NOW = 1_800_000_000_000;
   const warns = (c: Cur) => insights(pair, '2026-10', mk(c)).filter((i) => i.kind === 'warn').length;
   eq('10 birim artış: TRY yorumsuz, EUR uyarılı', [warns('TRY'), warns('EUR')], [0, 1]);
   setMainCurrency('TRY');
+
+  /* ===== 8. Tutarları gizle ===== */
+  setLanguage('tr');
+  setHideAmounts(true);
+  eq('gizliyken tutar maskelenir (tr)', [fmtMoney(1250.5, 'TRY'), money(99)], ['₺••••', '₺••••']);
+  setLanguage('es');
+  eq('gizliyken simge dilin yerinde (es)', /^••••\s€$/.test(fmtMoney(10, 'EUR')), true);
+  eq('kur değeri reveal ile görünür', /^1,5000\s\$$/.test(fmtMoney(1.5, 'USD', 4, true)), true);
+  setLanguage('tr');
+  setHideAmounts(false);
+  eq('gizleme kapanınca tutar geri gelir', [amountsHidden(), fmtMoney(1250.5, 'TRY')], [false, '₺1.250,50']);
 
   console.log(`${pass} geçti, ${fail} başarısız`);
   process.exit(fail ? 1 : 0);

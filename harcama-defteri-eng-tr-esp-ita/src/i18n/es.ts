@@ -366,12 +366,17 @@ const es: Catalog = {
   'dash.pending': 'Pendiente',
   'dash.skipped': 'Omitido',
   'dash.thisMonthBtn': 'Volver a este mes',
-  'dash.themeToggle': 'Tema claro/oscuro',
-  'dash.paletteA11y': 'Paleta de colores: {name}',
   'palette.okyanus': 'Océano',
   'palette.indigo': 'Índigo',
   'palette.luks': 'Lujo',
   'palette.orman': 'Bosque',
+  'dash.hideAmounts': 'Ocultar importes',
+  'dash.showAmounts': 'Mostrar importes',
+  'settings.palette': 'Paleta del resumen',
+  'settings.paletteHint': 'Colores de la pantalla Resumen; el color de acento y el tono de fondo de la app la siguen.',
+  'settings.privacy': 'Privacidad',
+  'settings.hideAmounts': 'Ocultar importes',
+  'settings.hideAmountsHint': 'Si está activado, los importes se muestran como •••• y nadie a tu lado puede verlos. También puedes cambiarlo con el icono del ojo arriba.',
 };
 
 export default es;

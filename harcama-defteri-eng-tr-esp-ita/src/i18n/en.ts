@@ -365,12 +365,17 @@ const en: Catalog = {
   'dash.pending': 'Due',
   'dash.skipped': 'Skipped',
   'dash.thisMonthBtn': 'Back to this month',
-  'dash.themeToggle': 'Light/dark theme',
-  'dash.paletteA11y': 'Colour palette: {name}',
   'palette.okyanus': 'Ocean',
   'palette.indigo': 'Indigo',
   'palette.luks': 'Luxe',
   'palette.orman': 'Forest',
+  'dash.hideAmounts': 'Hide amounts',
+  'dash.showAmounts': 'Show amounts',
+  'settings.palette': 'Dashboard palette',
+  'settings.paletteHint': 'Colours of the Summary screen; the app accent and background tone follow it.',
+  'settings.privacy': 'Privacy',
+  'settings.hideAmounts': 'Hide amounts',
+  'settings.hideAmountsHint': 'When on, amounts show as ••••, so people nearby cannot see them. You can also toggle it with the eye icon at the top.',
 };
 
 export default en;

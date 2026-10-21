@@ -3,7 +3,7 @@ import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal
 import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtStamp, money, symbolOf, toMain } from './currency';
 import { LANGS, Lang, fmtTime, t as tr } from './i18n';
 import { CATS, Expense, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, guessSubType, monthName, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
-import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
+import { ACCENTS, ACCENT_COLORS, PALETTES, PALETTE_COLORS, TINTS, TINT_COLORS } from './palette';
 import { FONTS, Theme } from './theme';
 import { Button, CatIcon, Chip, IconName, Label, Swatch, catIconName, subTypeColor } from './ui';
 
@@ -97,7 +97,7 @@ function ConvertHint({ amount, cur, main, rates, t }: { amount: number; cur: Cur
   const rate = convert(1, cur, main, rates);
   return (
     <Text style={{ color: t.muted, fontSize: 13 }}>
-      {amount ? `≈ ${fmtMoney(toMain(amount, cur, main, rates) ?? 0, main)} · ` : ''}{`1 ${cur} = ${fmtMoney(rate, main, 4)}`}
+      {amount ? `≈ ${fmtMoney(toMain(amount, cur, main, rates) ?? 0, main)} · ` : ''}{`1 ${cur} = ${fmtMoney(rate, main, 4, true)}`}
     </Text>
   );
 }
@@ -409,6 +409,24 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           <Chip label={tr('settings.themeSystem')} icon="phone-portrait-outline" active={settings.theme === 'system'} onPress={() => onChange({ ...settings, theme: 'system' })} t={t} />
         </View>
       </Field>
+      <Field label={tr('settings.palette')} t={t}>
+        <View style={st.swatches}>
+          {PALETTES.map((k) => (
+            <Swatch key={k} fill={PALETTE_COLORS[k].accent} inner={t.name === 'noir' ? PALETTE_COLORS[k].ambient : PALETTE_COLORS[k].ambientLight} line={t.line}
+              selected={settings.palette === k} label={tr('palette.' + k)}
+              onPress={() => onChange({ ...settings, palette: k, accent: PALETTE_COLORS[k].appAccent, tint: PALETTE_COLORS[k].appTint })} t={t} />
+          ))}
+        </View>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18 }}>{tr('palette.' + settings.palette)} · {tr('settings.paletteHint')}</Text>
+      </Field>
+      <View style={{ gap: 0 }}>
+        <Label t={t}>{tr('settings.privacy')}</Label>
+        <View style={row}>
+          <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.hideAmounts')}</Text>
+          <Switch value={settings.hideAmounts} onValueChange={(v) => onChange({ ...settings, hideAmounts: v })} trackColor={{ true: t.accent }} />
+        </View>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18, paddingTop: 6 }}>{tr('settings.hideAmountsHint')}</Text>
+      </View>
       <Field label={tr('settings.accent')} t={t}>
         <View style={st.swatches}>
           {ACCENTS.map((a) => (
@@ -486,7 +504,7 @@ export function RatesBox({ main, rates, refreshing, failed, onRefresh, t }: {
           {CURRENCIES.filter((c) => c.code !== main).map((c) => (
             <View key={c.code} style={[st.row, { borderColor: t.line, minHeight: 40 }]}>
               <Text style={[st.rowTxt, { color: t.muted }]}>1 {c.code}</Text>
-              <Text style={{ color: t.fg, fontSize: 16, fontVariant: ['tabular-nums'] }}>{fmtMoney(convert(1, c.code, main, rates), main, 4)}</Text>
+              <Text style={{ color: t.fg, fontSize: 16, fontVariant: ['tabular-nums'] }}>{fmtMoney(convert(1, c.code, main, rates), main, 4, true)}</Text>
             </View>
           ))}
           <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18 }}>

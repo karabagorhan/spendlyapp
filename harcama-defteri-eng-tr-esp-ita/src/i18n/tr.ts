@@ -353,12 +353,17 @@ const tr: Catalog = {
   'dash.pending': 'Bekliyor',
   'dash.skipped': 'Atlandı',
   'dash.thisMonthBtn': 'Bu aya dön',
-  'dash.themeToggle': 'Açık/koyu tema',
-  'dash.paletteA11y': 'Renk kartelası: {name}',
   'palette.okyanus': 'Okyanus',
   'palette.indigo': 'İndigo',
   'palette.luks': 'Lüks',
   'palette.orman': 'Orman',
+  'dash.hideAmounts': 'Tutarları gizle',
+  'dash.showAmounts': 'Tutarları göster',
+  'settings.palette': 'Özet kartelası',
+  'settings.paletteHint': 'Özet ekranının renkleri; uygulamanın vurgu rengi ve zemin tonu da buna uyar.',
+  'settings.privacy': 'Gizlilik',
+  'settings.hideAmounts': 'Tutarları gizle',
+  'settings.hideAmountsHint': 'Açıkken tutarlar ₺•••• olarak görünür, yanındakiler göremez. Üst köşedeki göz simgesiyle de açıp kapatabilirsin.',
 };
 
 export default tr;

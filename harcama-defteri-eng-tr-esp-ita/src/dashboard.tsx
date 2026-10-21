@@ -10,7 +10,7 @@ import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
 import {
   Analysis, Expense, Insight, Settings, Sub, SubState, catIndex, catName, dayLabel, monthLabel, money, money0, pad, shortDay, subStatus, subType, sum, todayIso,
 } from './lib';
-import { Glass, PALETTES, PALETTE_COLORS, Palette, rgba } from './palette';
+import { Glass, rgba } from './palette';
 import { FONTS, Theme } from './theme';
 import { IconName, catIconName } from './ui';
 
@@ -19,7 +19,6 @@ type Screen = 'harcamalar' | 'raporlar' | 'abonelikler' | 'ayarlar';
 export type DashboardProps = {
   g: Glass;
   t: Theme;
-  palette: Palette;
   a: Analysis;
   ym: string;
   items: Expense[];
@@ -33,8 +32,9 @@ export type DashboardProps = {
   bottom: number;
   scrollRef: RefObject<ScrollView | null>;
   onMenu: () => void;
-  onToggleTheme: () => void;
-  onPalette: (p: Palette) => void;
+  /** Tutarlar gizli mi (göz simgesi). */
+  hidden: boolean;
+  onToggleHidden: () => void;
   onMonth: (n: number) => void;
   onThisMonth: () => void;
   onBudget: () => void;
@@ -218,24 +218,17 @@ export function Dashboard(p: DashboardProps) {
     <View style={{ flex: 1 }}>
       <Backdrop g={g} />
       <ScrollView ref={p.scrollRef} contentContainerStyle={[s.scroll, { paddingTop: p.top + 8, paddingBottom: p.bottom + 110 }]} keyboardShouldPersistTaps="handled">
-        {/* Başlık + tema/kartela seçici */}
+        {/* Başlık + tutarları gizle */}
         <View style={s.header}>
           <Pressable onPress={p.onMenu} style={[s.round42, glassBtn]} hitSlop={6} accessibilityRole="button" accessibilityLabel={tr('menu.open')}>
             <Ionicons name="person-outline" size={19} color={g.fg} />
             {p.alert ? <View style={[s.alertDot, { backgroundColor: g.accent, borderColor: g.bgFrom }]} /> : null}
           </Pressable>
           <Text style={[s.h1, { color: g.fg }]} numberOfLines={1}>{tr('title.ozet')}</Text>
-          <View style={[s.ctrl, glassBtn]}>
-            <Pressable onPress={p.onToggleTheme} hitSlop={6} style={s.ctrlBtn} accessibilityRole="button" accessibilityLabel={tr('dash.themeToggle')}>
-              <Ionicons name={g.dark ? 'sunny-outline' : 'moon-outline'} size={16} color={g.fg} />
-            </Pressable>
-            {PALETTES.map((k) => (
-              <Pressable key={k} onPress={() => p.onPalette(k)} hitSlop={4} accessibilityRole="button" accessibilityState={{ selected: p.palette === k }}
-                accessibilityLabel={tr('dash.paletteA11y', { name: tr('palette.' + k) })} style={[s.swatch, { borderColor: p.palette === k ? g.fg : 'transparent' }]}>
-                <View style={[s.swatchDot, { backgroundColor: PALETTE_COLORS[k].accent }]} />
-              </Pressable>
-            ))}
-          </View>
+          <Pressable onPress={p.onToggleHidden} style={[s.round42, glassBtn]} hitSlop={6} accessibilityRole="button"
+            accessibilityState={{ selected: p.hidden }} accessibilityLabel={tr(p.hidden ? 'dash.showAmounts' : 'dash.hideAmounts')}>
+            <Ionicons name={p.hidden ? 'eye-off-outline' : 'eye-outline'} size={20} color={p.hidden ? g.accentText : g.fg} />
+          </Pressable>
         </View>
 
         {/* Ay seçici */}
@@ -434,10 +427,6 @@ const s = StyleSheet.create({
   round42: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   round44: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   alertDot: { position: 'absolute', top: 6, right: 6, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },
-  ctrl: { flexDirection: 'row', alignItems: 'center', borderRadius: 99, paddingHorizontal: 6, height: 36, gap: 2 },
-  ctrlBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  swatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  swatchDot: { width: 14, height: 14, borderRadius: 7 },
   monthRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   monthPill: { flex: 1, height: 48, borderRadius: 24, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7 },
   knob: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },

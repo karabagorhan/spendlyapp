@@ -366,12 +366,17 @@ const it: Catalog = {
   'dash.pending': 'In attesa',
   'dash.skipped': 'Saltato',
   'dash.thisMonthBtn': 'Torna a questo mese',
-  'dash.themeToggle': 'Tema chiaro/scuro',
-  'dash.paletteA11y': 'Tavolozza colori: {name}',
   'palette.okyanus': 'Oceano',
   'palette.indigo': 'Indaco',
   'palette.luks': 'Lusso',
   'palette.orman': 'Foresta',
+  'dash.hideAmounts': 'Nascondi importi',
+  'dash.showAmounts': 'Mostra importi',
+  'settings.palette': 'Tavolozza del riepilogo',
+  'settings.paletteHint': 'Colori della schermata Riepilogo; il colore di accento e il tono di fondo dell’app la seguono.',
+  'settings.privacy': 'Privacy',
+  'settings.hideAmounts': 'Nascondi importi',
+  'settings.hideAmountsHint': 'Se attivo, gli importi appaiono come •••• e chi ti sta vicino non può vederli. Puoi attivarlo anche con l’icona dell’occhio in alto.',
 };
 
 export default it;

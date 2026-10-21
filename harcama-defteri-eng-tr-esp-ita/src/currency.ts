@@ -116,9 +116,19 @@ export async function fetchRates(fetcher: FetchLike, now = Date.now(), timeoutMs
 
 /* ---------- Biçimleme ---------- */
 
-/** Tutar, seçili dilin yazım kurallarıyla: tr/en "₺1.250,50" / "€1,250.50", es/it "1250,50 €". */
-export function fmtMoney(n: number, cur: Cur, decimals = 2) {
+// Tutarları gizle (yanındakiler görmesin): açıkken bütün tutarlar "₺••••" olarak yazılır; saklanan veri değişmez.
+// Ana para birimi gibi çizim sırasında ayarlanır. Kur değerleri kişisel olmadığından `reveal` ile gösterilebilir.
+let hidden = false;
+export function setHideAmounts(h: boolean) {
+  hidden = h;
+}
+export const amountsHidden = () => hidden;
+export const MASK = '••••';
+
+/** Tutar, seçili dilin yazım kurallarıyla: tr/en "₺1.250,50" / "€1,250.50", es/it "1250,50 €". Gizleme açıksa "₺••••". */
+export function fmtMoney(n: number, cur: Cur, decimals = 2, reveal = false) {
   const li = langInfo();
+  if (hidden && !reveal) return li.symbolAfter ? `${MASK} ${symbolOf(cur)}` : `${symbolOf(cur)}${MASK}`;
   const body = fmtNumber(Math.abs(n), decimals).replace('−', '');
   const neg = n < 0 && Number(Math.abs(n).toFixed(decimals)) !== 0 ? '−' : '';
   const sym = symbolOf(cur);

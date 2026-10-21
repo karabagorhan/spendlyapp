@@ -366,12 +366,17 @@ const zh: Catalog = {
   'dash.pending': '待付款',
   'dash.skipped': '已跳过',
   'dash.thisMonthBtn': '回到本月',
-  'dash.themeToggle': '浅色/深色主题',
-  'dash.paletteA11y': '配色方案：{name}',
   'palette.okyanus': '海洋',
   'palette.indigo': '靛蓝',
   'palette.luks': '奢华',
   'palette.orman': '森林',
+  'dash.hideAmounts': '隐藏金额',
+  'dash.showAmounts': '显示金额',
+  'settings.palette': '概览配色',
+  'settings.paletteHint': '概览页面的配色；应用的强调色和背景色调也会随之调整。',
+  'settings.privacy': '隐私',
+  'settings.hideAmounts': '隐藏金额',
+  'settings.hideAmountsHint': '开启后金额显示为 ••••，旁人无法看到。也可以点顶部的眼睛图标开关。',
 };
 
 export default zh;

@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
+import { fmtMoney, fmtStamp, needsRates, setHideAmounts, setMainCurrency, viewData, fromViewSettings } from './src/currency';
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
 import { LanguageProvider, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
 import {
@@ -17,7 +17,7 @@ import {
 } from './src/lib';
 import { ensurePermission, reschedule } from './src/notify';
 import { Dashboard } from './src/dashboard';
-import { PALETTE_COLORS, Palette, makeGlass } from './src/palette';
+import { makeGlass } from './src/palette';
 import { BudgetPanel, ExpenseSheet, SettingsPanel, SubSheet } from './src/sheets';
 import { merge, useAppData } from './src/store';
 import { FONTS, Theme, useTheme } from './src/theme';
@@ -105,6 +105,9 @@ function Main() {
   // Ana para birimi de aynı şekilde çizim sırasında ayarlanır; ekranlar `money()` ile bu birimde gösterir.
   const main = data?.settings.currency ?? 'TRY';
   setMainCurrency(main);
+  // Tutarları gizle (göz simgesi) de çizim sırasında ayarlanır; açıkken bütün tutarlar "₺••••" yazılır
+  const hidden = data?.settings.hideAmounts ?? false;
+  setHideAmounts(hidden);
   // Saklanan kayıtlar girildikleri para biriminde kalır; ekranlar için güncel kurla ana birime çevrilmiş görünüm üretilir.
   const view = useMemo(() => (data ? viewData(data, main, rs.rates) : null), [data, main, rs.rates]);
   const t = useTheme(data?.settings.theme, data?.settings.tint, data?.settings.accent);
@@ -312,6 +315,10 @@ function Main() {
     if (turnedOn && !(await ensurePermission())) {
       toast(tr('toast.noNotifPermission'));
     }
+  };
+  const toggleHidden = () => {
+    buzz('light');
+    update((d) => ({ ...d, settings: { ...d.settings, hideAmounts: !d.settings.hideAmounts } }));
   };
   const doExport = async (which: string | null) => {
     try {
@@ -605,11 +612,11 @@ function Main() {
       <Animated.View style={{ flex: 1, transform: [{ translateX: slide }] }} {...edgePan.panHandlers}>
       {screen === 'ozet' ? (
         <Dashboard
-          g={glass} t={t} palette={settings.palette} a={a} ym={ym} items={items} monthItems={monthItems} subs={subs} settings={settings} notes={notes}
+          g={glass} t={t} a={a} ym={ym} items={items} monthItems={monthItems} subs={subs} settings={settings} notes={notes}
           rateNote={rateNote} alert={!!(pendingSubs || limitAlerts)} top={insets.top} bottom={insets.bottom} scrollRef={scrollRef}
           onMenu={() => setMenuOpen(true)}
-          onToggleTheme={() => changeSettings({ ...settings, theme: t.name === 'noir' ? 'ivory' : 'noir' })}
-          onPalette={(k: Palette) => changeSettings({ ...settings, palette: k, accent: PALETTE_COLORS[k].appAccent, tint: PALETTE_COLORS[k].appTint })}
+          hidden={hidden}
+          onToggleHidden={toggleHidden}
           onMonth={changeMonth}
           onThisMonth={() => { setYm(todayIso().slice(0, 7)); setFilterDay(null); }}
           onBudget={() => { go('butce'); setBudgetFocusKey(Date.now()); }}
@@ -628,6 +635,10 @@ function Main() {
           {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
         </Pressable>
         <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screenTitle(screen)}</Text>
+        <Pressable onPress={toggleHidden} style={st.menuBtn} hitSlop={8} accessibilityRole="button" accessibilityState={{ selected: hidden }}
+          accessibilityLabel={tr(hidden ? 'dash.showAmounts' : 'dash.hideAmounts')}>
+          <Ionicons name={hidden ? 'eye-off-outline' : 'eye-outline'} size={22} color={hidden ? t.gold : t.fg} />
+        </Pressable>
       </View>
       <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + (showFab ? 110 : 40) }]} keyboardShouldPersistTaps="handled">
         {body}

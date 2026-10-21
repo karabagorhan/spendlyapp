@@ -41,6 +41,7 @@ export type Settings = {
   accent: Accent; // vurgu rengi (renk kartelası)
   tint: Tint; // zemin tonu
   palette: Palette; // Özet ekranının cam kartelası
+  hideAmounts: boolean; // tutarları gizle (göz simgesi)
   name: string; // menüdeki profil satırında görünen ad
   language: Lang; // arayüz dili
   currency: Cur; // ana para birimi: tüm ekranlar bu birimde gösterir (dilden bağımsız)

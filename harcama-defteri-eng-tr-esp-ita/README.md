@@ -24,8 +24,10 @@ raporlar, abonelikler, Excel/yedek, bildirimler, Noir ve Fildişi temalar) ve ta
   64 tema birleşiminin tamamı WCAG kontrast testinden geçer (yazı ≥ 7:1, vurgu ve özet kartı etiketleri ≥ 4.5:1). Varsayılan görünüm değişmedi.
 - **Özet ekranı (gösterge paneli):** Cam yüzeyler, bento ızgarası ve bağlama göre parlayan çerçeveler. Dalga biçimli bütçe çizgisi
   (bütçe yoksa ayın geçen kısmını gösterir), yatay kaydırılan **Ödemeler** kartları (ödendi / bekliyor / yaklaşan), 2×2 analiz kartları
-  (mini çizgi ve çubuk grafiklerle), öne çıkanlar, son harcamalar ve yüzen alt menü. Başlıktaki seçiciyle açık/koyu tema ve 4 kartela
-  (Okyanus, İndigo, Lüks, Orman) anında değişir; kartela seçimi uygulamanın geri kalanına en yakın vurgu rengi ve zemin tonunu da uygular.
+  (mini çizgi ve çubuk grafiklerle), öne çıkanlar, son harcamalar ve yüzen alt menü. Açık/koyu tema ve 4 kartela (Okyanus, İndigo, Lüks,
+  Orman) **Ayarlar → Görünüm**'de seçilir; kartela seçimi uygulamanın geri kalanına en yakın vurgu rengi ve zemin tonunu da uygular.
+- **Tutarları gizle:** Üst sağdaki göz simgesi (her ekranda) ya da Ayarlar → Gizlilik ile açılıp kapanır ve kalıcıdır. Açıkken bütün tutarlar
+  `₺••••` olarak yazılır, grafik eksenlerindeki tutarlar da gizlenir; saklanan veri, Excel/yedek çıktısı ve döviz kurları değişmez.
 - **Kaydırma hareketleri:** Ekranın herhangi bir yerinden sağa kaydırınca önceki ekrana dönülür (sayfa parmakla birlikte kayar, kenarda geri oku belirir);
   ana ekranda gidecek yer olmadığı için yalnızca sol kenardan sağa kaydırma yan menüyü açar. Yan menü sola kaydırılarak kapanır (panelden ya da karartılmış
   alandan); alt sayfalar (harcama/abonelik formu) sol kenardan sağa kaydırılarak kapanır. Yatay kaydırılan kategori çipleri kendi kaydırmasını korur; kısa,

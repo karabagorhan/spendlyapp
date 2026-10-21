@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
+import { amountsHidden } from './currency';
 import { contrast } from './palette';
 import { Analysis, Insight, catIndex, catName, compact, pad, subLabel, subType, subTypeIndex } from './lib';
 import { FONTS, Theme } from './theme';
@@ -109,7 +110,7 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
             ))}
             {[0, 0.5, 1].map((f) => (
               <SvgText key={'l' + f} x={L - 6} y={y(max * f) + 3} fontSize={10} fill={t.muted} textAnchor="end">
-                {compact(max * f)}
+                {amountsHidden() ? '' : compact(max * f)}
               </SvgText>
             ))}
             {vals.map((v, i) => {
@@ -352,8 +353,8 @@ export function Bars({ data, selected, onSelect, t, height = 150 }: {
         return (
           <Pressable key={d.key} disabled={!onSelect} onPress={() => onSelect?.(d.key)}
             style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 4 }}
-            accessibilityLabel={`${d.label}: ${compact(d.value)}`}>
-            <Text style={{ fontSize: 11, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.value ? compact(d.value) : ''}</Text>
+            accessibilityLabel={amountsHidden() ? d.label : `${d.label}: ${compact(d.value)}`}>
+            <Text style={{ fontSize: 11, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.value && !amountsHidden() ? compact(d.value) : ''}</Text>
             <View style={{ width: '100%', maxWidth: 34, height: d.value ? Math.max(4, (d.value / max) * barMax) : 3, borderRadius: 7, backgroundColor: on ? t.accent : t.bar }} />
             <Text style={{ fontSize: 12, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.label}</Text>
           </Pressable>

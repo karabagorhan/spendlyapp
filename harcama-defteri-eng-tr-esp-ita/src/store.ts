@@ -10,7 +10,7 @@ const KEY = 'harcama-defteri:v1';
 
 export type Data = { items: Expense[]; subs: Sub[]; settings: Settings };
 
-export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'noir', accent: 'gold', tint: 'classic', palette: 'okyanus', name: 'Orhan Karabağ', language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {} };
+export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'noir', accent: 'gold', tint: 'classic', palette: 'okyanus', hideAmounts: false, name: 'Orhan Karabağ', language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {} };
 const empty: Data = { items: [], subs: [], settings: defaultSettings };
 
 function num(v: unknown, d = 0) {
@@ -58,6 +58,7 @@ export function normalize(raw: any): Data {
     accent: isAccent(st.accent) ? st.accent : 'gold',
     tint: isTint(st.tint) ? st.tint : 'classic',
     palette: isPalette(st.palette) ? st.palette : 'okyanus',
+    hideAmounts: st.hideAmounts === true,
     name: typeof st.name === 'string' ? st.name.slice(0, 40) : 'Orhan Karabağ',
     language: isLang(st.language) ? st.language : 'tr',
     currency: isCur(st.currency) ? st.currency : 'TRY',
