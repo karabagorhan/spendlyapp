@@ -40,7 +40,9 @@ export async function loadPrefs(): Promise<Prefs> {
   try {
     const own = parsePrefs(await AsyncStorage.getItem(KEY));
     if (own) return own;
-    const hasData = (await AsyncStorage.getItem(DATA_KEY)) !== null;
+    // Veri kaydı okunamazsa (depolama hatası) kullanıcı yeni sayılmaz: mevcut kullanıcıyı tanıtım akışına sokmak yerine
+    // uygulama açılır ve veri hata ekranı (tekrar dene) gösterir
+    const hasData = await AsyncStorage.getItem(DATA_KEY).then((v) => v !== null, () => true);
     return hasData ? { onboarded: true, guest: true, consent: null, lang: null } : defaultPrefs;
   } catch {
     return defaultPrefs;

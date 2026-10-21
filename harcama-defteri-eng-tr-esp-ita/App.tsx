@@ -1,29 +1,33 @@
 import { PlayfairDisplay_600SemiBold } from '@expo-google-fonts/playfair-display/600SemiBold';
 import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700Bold';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
-import { LanguageProvider, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
+import { LanguageProvider, deviceLanguage, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
 import {
-  Analysis, Expense, SUB_TYPES, Settings, Sub, addMonths, analyse, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
-  insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
+  Analysis, Expense, Income, SUB_TYPES, Settings, Sub, addMonths, analyse, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
+  balanceFor, incomeCatName, insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, recentTransactions, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
 } from './src/lib';
 import { ensurePermission, reschedule } from './src/notify';
-import { BudgetPanel, ExpenseSheet, SettingsPanel, SubSheet } from './src/sheets';
+import { BudgetPanel, ExpenseSheet, IncomeSheet, SettingsPanel, SubSheet } from './src/sheets';
 import { merge, useAppData } from './src/store';
 import { FONTS, Theme, useTheme } from './src/theme';
 import { useRates } from './src/useRates';
 import { AccountSection } from './src/auth/AccountSection';
+import { useAccount } from './src/auth/AccountProvider';
 import { Gate } from './src/auth/Gate';
 import { Amount, Bars, Button, CatIcon, SubTypeIcon, subTypeColor, DailyChart, InsightList, Ionicons, Label, MenuSection, Pill, Progress, SideMenu } from './src/ui';
+import {
+  BalanceCard, BudgetCard, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, IncomeIcon, InlineNotice, Pair, QuickActions,
+  RecentCard, SpendingCard, SubsCard, TAB_BAR_H, TabBar,
+} from './src/dashboard';
 
 /** Web: tarayıcının kenardan "geri git" kaydırması uygulamanın kendi geri hareketiyle çakışmasın. */
 function useWebOverscroll() {
@@ -60,6 +64,7 @@ const SWIPE_DIST = 60;
 type Screen = 'ozet' | 'harcamalar' | 'raporlar' | 'abonelikler' | 'butce' | 'ayarlar';
 type ExpenseSheetState = { key: number; initial: Expense | null; prefill?: { amount?: number; cat?: string } } | null;
 type SubSheetState = { key: number; initial: Sub | null } | null;
+type IncomeSheetState = { key: number; initial: Income | null } | null;
 
 const screenTitle = (screen: Screen) => tr('title.' + screen);
 
@@ -100,10 +105,11 @@ const SLUG: Record<string, string> = {
 
 function Main() {
   const insets = useSafeAreaInsets();
-  const { data, update } = useAppData();
+  const { data, update, status, reload, recovered, saveFailed } = useAppData();
+  const { notice, setNotice } = useAccount();
   const rs = useRates();
   // Dil çizim sırasında (alt bileşenlerden önce) ayarlanır; değişince <LanguageProvider> ağacı yeniden çizdirir.
-  const lang = data?.settings.language ?? 'tr';
+  const lang = data?.settings.language ?? deviceLanguage();
   setLanguage(lang);
   // Ana para birimi de aynı şekilde çizim sırasında ayarlanır; ekranlar `money()` ile bu birimde gösterir.
   const main = data?.settings.currency ?? 'TRY';
@@ -121,6 +127,10 @@ function Main() {
   const [filterDay, setFilterDay] = useState<string | null>(null);
   const [expSheet, setExpSheet] = useState<ExpenseSheetState>(null);
   const [subSheet, setSubSheet] = useState<SubSheetState>(null);
+  const [incSheet, setIncSheet] = useState<IncomeSheetState>(null);
+  const [curMenu, setCurMenu] = useState(false);
+  const [recoveredSeen, setRecoveredSeen] = useState(false);
+  const [txnTab, setTxnTab] = useState<'expenses' | 'income'>('expenses');
   const [toastMsg, setToastMsg] = useState('');
   const [toastAction, setToastAction] = useState<{ label: string; run: () => void } | null>(null);
   const [query, setQuery] = useState('');
@@ -140,6 +150,7 @@ function Main() {
     p.catch(() => {});
   };
   const openAdd = () => setExpSheet({ key: Date.now(), initial: null });
+  const openAddIncome = () => setIncSheet({ key: Date.now(), initial: null });
 
   /* ---------- Kaydırma hareketleri ----------
    * Ekranın sol kenarından sağa kaydırma = geri (önceki ekran; ana ekranda yan menüyü açar).
@@ -147,7 +158,7 @@ function Main() {
   const slide = useRef(new Animated.Value(0)).current;
   const [swiping, setSwiping] = useState(false); // geri oku yalnızca kaydırma sırasında çizilir
   const nav = useRef({ screen, history, blocked: false, canBack: false });
-  nav.current = { screen, history, blocked: menuOpen || !!expSheet || !!subSheet, canBack: history.length > 0 || screen !== 'ozet' };
+  nav.current = { screen, history, blocked: menuOpen || curMenu || !!expSheet || !!subSheet || !!incSheet, canBack: history.length > 0 || screen !== 'ozet' };
   const swipeBack = () => {
     const { screen: cur, history: hist } = nav.current;
     if (hist.length) {
@@ -233,18 +244,24 @@ function Main() {
     return () => clearTimeout(h);
   }, [data]);
 
-  if (!data || !view) {
-    return (
-      <View style={[st.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </View>
-    );
-  }
+  // Hesap akışından gelen başarı durumları (e-posta doğrulandı, parola güncellendi) uygulamaya geçince bildirilir
+  useEffect(() => {
+    if (!data || !notice) return;
+    if (notice.kind === 'verified') toast(tr('auth.notice.verified'));
+    else if (notice.kind === 'resetDone') toast(tr('auth.notice.resetDone'));
+    else return;
+    setNotice(null);
+  }, [data, notice]);
+
+  if (status === 'error') return <LanguageProvider value={lang}><ErrorState t={t} onRetry={reload} topInset={insets.top} /></LanguageProvider>;
+  if (!data || !view) return <LanguageProvider value={lang}><DashboardSkeleton t={t} topInset={insets.top} /></LanguageProvider>;
 
   const { items, subs, settings } = view;
+  const incomes = view.incomes ?? [];
   const stored = {
     item: (id: string) => data.items.find((x) => x.id === id),
     sub: (id: string) => data.subs.find((x) => x.id === id),
+    income: (id: string) => data.incomes.find((x) => x.id === id),
   };
   const converting = needsRates(data, main);
   const a = analyse(items, ym);
@@ -285,6 +302,24 @@ function Main() {
       run: () => update((d) => ({ ...d, items: d.items.filter((x) => x.id !== removed.id).concat([removed]) })),
     } : undefined);
   };
+  const saveIncome = (x: Income) => {
+    const isNew = !data.incomes.some((i) => i.id === x.id);
+    update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== x.id).concat([x]) }));
+    setIncSheet(null);
+    setYm(x.date.slice(0, 7));
+    buzz('success');
+    toast(isNew ? tr('toast.incomeAdded', { amount: fmtMoney(x.amount, x.cur ?? main) }) : tr('toast.incomeUpdated'));
+  };
+  const deleteIncome = (id: string) => {
+    const removed = stored.income(id);
+    update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== id) }));
+    setIncSheet(null);
+    buzz('warn');
+    toast(tr('toast.incomeDeleted'), removed ? {
+      label: tr('toast.undo'),
+      run: () => update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== removed.id).concat([removed]) })),
+    } : undefined);
+  };
   const saveSub = (s: Sub) => {
     update((d) => ({ ...d, subs: d.subs.filter((x) => x.id !== s.id).concat([s]) }));
     setSubSheet(null);
@@ -318,7 +353,7 @@ function Main() {
   const doExport = async (which: string | null) => {
     try {
       const note = converting && rs.rates ? tr('xl.ratesNote', { cur: main, time: fmtStamp(rs.rates.fetchedAt, fmtTime, monthShortName) }) : null;
-      const ok = await exportExcel(items, subs, which, main, note);
+      const ok = await exportExcel(items, subs, which, main, note, incomes);
       if (!ok) toast(which ? tr('toast.exportNoMonth') : tr('toast.exportNoData'));
     } catch {
       toast(tr('toast.excelFail'));
@@ -387,28 +422,73 @@ function Main() {
     </Pressable>
   );
 
+  const curYm = todayIso().slice(0, 7);
+  const curItems = items.filter((x) => x.date.slice(0, 7) === curYm);
+  const curTotal = sum(curItems);
+  const byCat: Record<string, number> = {};
+  curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
+  const pendingSubs = subs.filter((x) => subStatus(x, items).state === 'pending').length;
+  const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
+
+  const txnToggle = (
+    <View style={[st.seg, { backgroundColor: t.surface, borderColor: t.line }]} accessibilityRole="tablist">
+      {(['expenses', 'income'] as const).map((k) => (
+        <Pressable key={k} testID={`txn-tab-${k}`} onPress={() => setTxnTab(k)} accessibilityRole="tab" aria-selected={txnTab === k}
+          style={[st.segBtn, txnTab === k && { backgroundColor: t.accent }]}>
+          <Text style={{ color: txnTab === k ? t.accentFg : t.muted, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{tr('txn.' + k)}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+  const incomeRow = (x: Income, i: number) => (
+    <Pressable
+      key={x.id}
+      testID={`income-row-${i}`}
+      onPress={() => setIncSheet({ key: Date.now(), initial: stored.income(x.id) ?? x })}
+      style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
+      accessibilityLabel={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: money(x.amount) })}
+    >
+      <IncomeIcon cat={x.cat} t={t} />
+      <View style={{ flex: 1 }}>
+        <Text style={st.itemCat} numberOfLines={1}>{x.note || incomeCatName(x.cat)}</Text>
+        <Text style={st.meta} numberOfLines={1}>{[x.note ? incomeCatName(x.cat) : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || incomeCatName(x.cat)}</Text>
+      </View>
+      <Amount text={`+${money(x.amount)}`} style={[st.itemAmt, { color: t.good }]} />
+      <Ionicons name="chevron-forward" size={16} color={t.muted} />
+    </Pressable>
+  );
+
   const ctx: Ctx = { t, st, a, ym, items, subs, monthItems, budget, settings };
   const notes = insights(items, ym, settings);
 
   let body: ReactNode = null;
   if (screen === 'ozet') {
     const pending = subs.map((s) => ({ s, x: subStatus(s, items) })).filter((r) => r.x.state === 'pending');
-    const recent = [...items].sort((p, q) => (p.date < q.date ? 1 : p.date > q.date ? -1 : q.ts - p.ts)).slice(0, 5);
+    const bal = balanceFor(items, incomes, ym);
+    const todayAmount = a.isCur ? sum(items.filter((x) => x.date === todayIso())) : null;
+    const slices = recentTransactions(items, incomes, 4);
     body = (
-      <>
+      <View style={st.dashBody}>
+        <DashHeader t={t} name={settings.name} initials={initials(settings.name)} currency={main} onCurrency={() => setCurMenu(true)} onMenu={() => setMenuOpen(true)} alertDot={!!(pendingSubs || limitAlerts)} />
         {monthSwitcher}
-        <Hero ctx={ctx} onBudget={() => { go('butce'); setBudgetFocusKey(Date.now()); }} />
-        <Tiles ctx={ctx} />
-        {rateNote}
-        {notes.length ? (
-          <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.highlights')}</Label>
-              {notes.length > 3 ? <Pressable onPress={() => go('raporlar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
-            </View>
-            <InsightList list={notes.slice(0, 3)} t={t} />
-          </View>
-        ) : null}
+        <BalanceCard t={t} bal={bal} hidden={settings.hideBalance} vsLabel={tr('bal.vsLast')} onAddIncome={openAddIncome}
+          onToggle={() => changeSettings({ ...settings, hideBalance: !settings.hideBalance })} />
+        <QuickActions t={t} onExpense={openAdd} onIncome={openAddIncome} onReports={() => go('raporlar')} onBudgets={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
+        {converting && rs.failed ? (
+          <>
+            <InlineNotice t={t} kind="warn" text={tr(rs.rates ? 'dash.ratesFailed' : 'dash.ratesNone')} action={rs.refreshing ? undefined : tr('state.retry')}
+              onAction={async () => { const ok = await rs.refresh(); toast(ok ? tr('rates.refreshed') : tr('rates.refreshFailed')); }} />
+            {rs.rates ? rateNote : null}
+          </>
+        ) : rateNote}
+        <Pair>
+          <SpendingCard t={t} a={a} ym={ym} todayAmount={todayAmount} monthTitle={monthLabel(ym)} />
+          <CategoriesCard t={t} monthItems={monthItems} monthTitle={monthLabel(ym)} />
+        </Pair>
+        <Pair>
+          <BudgetCard t={t} spent={a.total} budget={budget} periodLabel={monthLabel(ym)} onBudget={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
+          <SubsCard t={t} subs={subs} items={items} onAll={() => go('abonelikler')} onAdd={() => setSubSheet({ key: Date.now(), initial: null })} onOpen={(x) => setSubSheet({ key: Date.now(), initial: stored.sub(x.id) ?? x })} />
+        </Pair>
         {pending.length ? (
           <View style={st.card}>
             <View style={st.cardHead}>
@@ -420,13 +500,58 @@ function Main() {
             ))}
           </View>
         ) : null}
-        <View style={st.card}>
-          <View style={st.cardHead}>
-            <Label t={t}>{tr('section.recent')}</Label>
-            {recent.length ? <Pressable onPress={() => go('harcamalar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
+        {notes.length ? (
+          <View style={st.card}>
+            <View style={st.cardHead}>
+              <Label t={t}>{tr('section.highlights')}</Label>
+              {notes.length > 3 ? <Pressable onPress={() => go('raporlar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
+            </View>
+            <InsightList list={notes.slice(0, 3)} t={t} />
           </View>
-          {recent.length ? <View style={st.items}>{recent.map((x, i) => expenseRow(x, i, true))}</View> : <Text style={st.meta}>{tr('recent.empty')}</Text>}
+        ) : null}
+        <Tiles ctx={ctx} />
+        <RecentCard t={t} list={slices} onAll={() => go('harcamalar')}
+          onOpen={(r) => (r.kind === 'income' ? setIncSheet({ key: Date.now(), initial: stored.income(r.x.id) ?? r.x }) : setExpSheet({ key: Date.now(), initial: stored.item(r.x.id) ?? r.x }))} />
+      </View>
+    );
+  } else if (screen === 'harcamalar' && txnTab === 'income') {
+    const monthIncomes = incomes.filter((x) => x.date.slice(0, 7) === ym);
+    const groups: Record<string, Income[]> = {};
+    monthIncomes.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
+    const days = Object.keys(groups).sort().reverse();
+    body = (
+      <>
+        {txnToggle}
+        {monthSwitcher}
+        {rateNote}
+        <View style={st.summaryRow}>
+          <Text style={st.meta}>{tr('list.count', { n: monthIncomes.length })}</Text>
+          <Amount text={money(sum(monthIncomes))} style={st.summaryVal} symbolColor={t.gold} />
         </View>
+        {days.length ? (
+          <>
+            <Text style={[st.meta, { paddingHorizontal: 4 }]}>{tr('txn.incomeHint')}</Text>
+            {days.map((d) => {
+              const its = groups[d].sort((p, q) => q.ts - p.ts);
+              return (
+                <View key={d} style={{ gap: 6 }}>
+                  <View style={st.dayHead}>
+                    <Label t={t}>{dayLabel(d)}</Label>
+                    <Label t={t}>{money(sum(its))}</Label>
+                  </View>
+                  <View style={st.items}>{its.map((x, i) => incomeRow(x, i))}</View>
+                </View>
+              );
+            })}
+          </>
+        ) : (
+          <View style={st.empty} testID="income-empty">
+            <Ionicons name="cash-outline" size={40} color={t.muted} />
+            <Text style={st.emptyTitle}>{tr('txn.incomeEmpty')}</Text>
+            <Text style={[st.meta, { textAlign: 'center' }]}>{tr('txn.incomeEmptyHint')}</Text>
+            <Button label={tr('qa.income')} kind="ghost" onPress={openAddIncome} t={t} style={{ marginTop: 12, minWidth: 180 }} />
+          </View>
+        )}
       </>
     );
   } else if (screen === 'harcamalar') {
@@ -441,6 +566,7 @@ function Main() {
     const cats = Array.from(new Set(monthItems.map((x) => x.cat)));
     body = (
       <>
+        {txnToggle}
         <View style={st.search}>
           <Ionicons name="search" size={18} color={t.muted} />
           <TextInput value={query} onChangeText={setQuery} placeholder={tr('search.placeholder')} placeholderTextColor={t.muted}
@@ -610,16 +736,11 @@ function Main() {
     );
   }
 
-  const showFab = screen === 'ozet' || screen === 'harcamalar' || screen === 'raporlar';
+  // Hızlı "Ekle" düğmesi: panelde hızlı eylemler var; Harcamalar ekranının Gelirler sekmesinde gelir ekler
+  const showFab = screen === 'harcamalar' || screen === 'raporlar';
+  const barH = TAB_BAR_H + insets.bottom;
 
   /* ---------- Yan menü verisi (her zaman içinde bulunulan ay) ---------- */
-  const curYm = todayIso().slice(0, 7);
-  const curItems = items.filter((x) => x.date.slice(0, 7) === curYm);
-  const curTotal = sum(curItems);
-  const byCat: Record<string, number> = {};
-  curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
-  const pendingSubs = subs.filter((x) => subStatus(x, items).state === 'pending').length;
-  const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
   const menuSections: MenuSection[] = [
     { title: tr('menu.general'), items: [
       { key: 'ozet', label: tr('menu.home'), icon: 'grid-outline' },
@@ -642,23 +763,31 @@ function Main() {
     <View style={st.root}>
       <StatusBar style={t.statusBar} />
       <Animated.View style={{ flex: 1, transform: [{ translateX: slide }] }} {...edgePan.panHandlers}>
-      <View style={[st.topBar, { paddingTop: insets.top + 6 }]}>
-        <Pressable onPress={() => setMenuOpen(true)} style={st.menuBtn} hitSlop={8} accessibilityLabel={tr('menu.open')} accessibilityRole="button">
-          <Ionicons name="menu" size={24} color={t.fg} />
-          {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
-        </Pressable>
-        <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screenTitle(screen)}</Text>
-      </View>
-      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + (showFab ? 110 : 40) }]} keyboardShouldPersistTaps="handled">
-        {body}
+      {screen !== 'ozet' ? (
+        <View style={[st.topBar, { paddingTop: insets.top + 6 }]}>
+          <Pressable onPress={() => setMenuOpen(true)} style={st.menuBtn} hitSlop={8} accessibilityLabel={tr('menu.open')} accessibilityRole="button" testID="menu-open">
+            <Ionicons name="menu" size={24} color={t.fg} />
+            {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
+          </Pressable>
+          <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screen === 'harcamalar' && txnTab === 'income' ? tr('txn.income') : screenTitle(screen)}</Text>
+        </View>
+      ) : null}
+      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, screen === 'ozet' && { paddingTop: insets.top + 8 }, { paddingBottom: barH + (showFab ? 96 : 28) }]} keyboardShouldPersistTaps="handled">
+        <View style={st.wrap}>
+          {/* Veri sorunları kalıcı bandla bildirilir (kısa bir bildirim gözden kaçabilir): kurtarılan bozuk kayıt / yazılamayan değişiklik */}
+          {recovered && !recoveredSeen ? <InlineNotice t={t} kind="warn" text={tr('state.recovered')} action={tr('state.dismiss')} onAction={() => setRecoveredSeen(true)} /> : null}
+          {saveFailed ? <InlineNotice t={t} kind="warn" text={tr('state.saveFailed')} /> : null}
+          {body}
+        </View>
       </ScrollView>
 
       {showFab ? (
-        <View style={[st.fabBar, { paddingBottom: insets.bottom + 10 }]}>
-          <Button label={tr('fab.add')} kind="primary" onPress={openAdd} t={t} style={st.fab} />
+        <View style={[st.fabBar, { bottom: barH, paddingBottom: 10 }]} pointerEvents="box-none">
+          <Button label={screen === 'harcamalar' && txnTab === 'income' ? `+  ${tr('qa.income')}` : tr('fab.add')} kind="primary" onPress={screen === 'harcamalar' && txnTab === 'income' ? openAddIncome : openAdd} t={t} style={st.fab} />
         </View>
       ) : null}
       </Animated.View>
+      <TabBar t={t} current={screen} onSelect={(k) => go(k)} bottomInset={insets.bottom} />
       {/* Geri hareketi sırasında kenardan beliren ok: bırakınca ne olacağını gösterir (geri ya da ana ekranda menü) */}
       {swiping ? (
       <Animated.View pointerEvents="none" style={[st.backHint, {
@@ -670,7 +799,7 @@ function Main() {
       ) : null}
 
       {toastMsg ? (
-        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: insets.bottom + (showFab ? 82 : 24) }]}>
+        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: barH + (showFab ? 82 : 18) }]}>
           <Text style={{ color: t.fg, fontSize: 14, flexShrink: 1 }}>{toastMsg}</Text>
           {toastAction ? (
             <Pressable hitSlop={10} onPress={() => { toastAction.run(); setToastMsg(''); setToastAction(null); buzz(); }}>
@@ -704,6 +833,11 @@ function Main() {
         t={t}
       />
 
+      <CurrencyMenu visible={curMenu} t={t} current={main} rates={rs.rates} onClose={() => setCurMenu(false)}
+        onPick={(c) => { setCurMenu(false); if (c !== main) changeSettings({ ...settings, currency: c }); }} />
+      {incSheet ? (
+        <IncomeSheet key={incSheet.key} visible initial={incSheet.initial} main={main} rates={rs.rates} onSave={saveIncome} onDelete={deleteIncome} onClose={() => setIncSheet(null)} t={t} />
+      ) : null}
       {expSheet ? (
         <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
       ) : null}
@@ -718,47 +852,6 @@ function Main() {
 /* ---------- Ekran parçaları ---------- */
 type Styles = ReturnType<typeof makeStyles>;
 type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
-
-/** Özet kartı: koyu metal kart görünümü, şampanya altını ayrıntılar. */
-function Hero({ ctx, onBudget }: { ctx: Ctx; onBudget: () => void }) {
-  const { t, st, a, ym, items, budget } = ctx;
-  const left = budget - a.total;
-  return (
-    <LinearGradient colors={t.heroGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.hero}>
-      <View style={st.heroTop}>
-        <Text style={st.heroBrand}>{upper(tr('app.name'))}</Text>
-        <Text style={st.heroBrand}>{upper(monthLabel(ym))}</Text>
-      </View>
-      <View>
-        <Text style={st.heroLabel}>{a.isCur ? tr('hero.today') : tr('hero.avgDaily')}</Text>
-        <Amount text={a.isCur ? money(sum(items.filter((x) => x.date === todayIso()))) : money(a.avg)} style={st.heroBig} symbolColor={t.heroLabel} />
-      </View>
-      <View style={st.heroRule} />
-      <View style={st.heroRow}>
-        <View>
-          <Text style={st.heroLabel}>{a.isCur ? tr('hero.thisMonth') : tr('hero.monthTotal')}</Text>
-          <Amount text={money(a.total)} style={st.heroMid} symbolColor={t.heroLabel} />
-        </View>
-        <Pressable onPress={onBudget} hitSlop={8} style={st.heroBudget}>
-          <Text style={st.heroBudgetTxt}>{budget ? tr('hero.budget', { amount: money0(budget) }) : tr('hero.setBudget')}</Text>
-        </Pressable>
-      </View>
-      {budget ? (
-        <View style={{ gap: 8 }}>
-          <View style={st.track}>
-            <View style={[st.fill, { width: `${Math.min(100, (a.total / budget) * 100)}%`, backgroundColor: a.total > budget ? t.warn : t.heroFill }]} />
-          </View>
-          <View style={st.heroRow}>
-            <Text style={st.heroSmall}>{left >= 0 ? tr('hero.left', { amount: money0(left) }) : tr('hero.over', { amount: money0(-left) })}</Text>
-            <Text style={st.heroSmall}>
-              {a.isCur && left > 0 ? tr('hero.perDay', { amount: money0(left / (a.dim - a.elapsed + 1)) }) : tr('hero.used', { pct: Math.round((a.total / budget) * 100) })}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-    </LinearGradient>
-  );
-}
 
 function Tiles({ ctx }: { ctx: Ctx }) {
   const { t, st, a, monthItems, budget } = ctx;
@@ -979,7 +1072,11 @@ function makeStyles(t: Theme) {
     topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 8, backgroundColor: t.bg },
     menuDot: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: t.gold, borderWidth: 2 },
     menuBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
-    scroll: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
+    scroll: { paddingHorizontal: 16, paddingTop: 8 },
+    wrap: { width: '100%', maxWidth: DASH_MAX, alignSelf: 'center', gap: 16 },
+    dashBody: { gap: 14 },
+    seg: { flexDirection: 'row', borderWidth: 1, borderRadius: 99, padding: 4, gap: 4 },
+    segBtn: { flex: 1, minHeight: 40, borderRadius: 99, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
     h1: { fontSize: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.3 },
     link: { color: t.gold, fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
     months: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

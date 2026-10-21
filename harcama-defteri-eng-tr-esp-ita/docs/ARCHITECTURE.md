@@ -29,7 +29,7 @@ App.tsx
      │   ├─ prefs.ts             tanıtım görüldü / misafir / onay sürümü (AsyncStorage)
      │   └─ AuthService          src/auth/types.ts          arayüz; ekranlar yalnızca bunu bilir
      │        ├─ supabaseService.ts   gerçek (Supabase)
-     │        └─ mockService.ts       yalnızca arayüz testleri (EXPO_PUBLIC_AUTH_MOCK=1)
+     │        └─ mockService.ts       yalnızca arayüz testleri (EXPO_PUBLIC_AUTH_MOCK=1 + çalışma zamanı bayrağı)
      └─ <Main/>                  mevcut uygulama; Ayarlar'da <AccountSection/> (hesap, çıkış, hesabı sil, yasal)
 
 supabase/

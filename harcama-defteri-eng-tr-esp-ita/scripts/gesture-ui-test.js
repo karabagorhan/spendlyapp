@@ -61,15 +61,16 @@ const data = {
     await touch('touchEnd', x1, y1); await page.waitForTimeout(650);
   };
   const menuOpen = async () => (await page.locator('[role="menuitem"]').count()) > 0;
-  const openMenu = async () => { if (!(await menuOpen())) { await page.locator('[role="button"][aria-label]').first().click(); await page.waitForTimeout(500); } };
+  const openMenu = async () => { if (!(await menuOpen())) { await page.getByTestId('menu-open').click(); await page.waitForTimeout(500); } };
   const closeMenuByTap = async () => { await page.mouse.click(370, 400); await page.waitForTimeout(500); };
   // Üst başlık (34 px yazı)
   const title = () => page.evaluate(() => {
-    const el = Array.from(document.querySelectorAll('div')).find((e) => getComputedStyle(e).fontSize === '34px' && e.childNodes.length === 1 && e.firstChild.nodeType === 3);
+    const el = Array.from(document.querySelectorAll('div,h1,h2')).find((e) => getComputedStyle(e).fontSize === '34px' && e.childNodes.length === 1 && e.firstChild.nodeType === 3);
     return el ? el.textContent : '';
   });
   const goto = async (n) => { await openMenu(); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(600); };
-  const T = (k) => cat('title.' + k);
+  // Panelde (Özet) üst başlık markadır (Spendly); diğer ekranlarda ekran adı
+  const T = (k) => (k === 'ozet' ? cat('app.name') : cat('title.' + k));
 
   /* ---- Yan menü ---- */
   await openMenu();
@@ -143,14 +144,14 @@ const data = {
   ok('hızlı kısa kaydırma (fling) geri döner', (await title()) === T('ozet'), await title());
 
   // Özet'ten Bütçe'ye doğrudan bağlantı: geri → Özet
-  await page.getByText(new RegExp(cat('hero.budget').split('{amount}')[0].trim())).first().click();
+  await page.getByTestId('qa-budgets').click();
   await page.waitForTimeout(700);
   ok('Özet kartından bütçeye gidildi', (await title()) === T('butce'), await title());
   await drag(4, 400, 200, 400);
   ok('geri: Bütçe → Özet', (await title()) === T('ozet'), await title());
 
   /* ---- Alt sayfa ---- */
-  await page.getByText(/^\+\s+/).first().click(); await page.waitForTimeout(800);
+  await page.getByTestId('qa-expense').click(); await page.waitForTimeout(800);
   ok('yeni harcama sayfası açıldı', (await page.evaluate(() => document.body.innerText)).includes(cat('expense.newTitle')));
   await drag(4, 400, 200, 400);
   ok('alt sayfa sol kenardan kaydırarak kapanıyor', !(await page.evaluate(() => document.body.innerText)).includes(cat('expense.newTitle')));

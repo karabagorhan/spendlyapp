@@ -40,7 +40,9 @@ export const useAccount = () => {
  * `onWipeLocal`: hesap silinirken "cihazdaki verileri de sil" seçildiyse harcama verisini sıfırlar.
  */
 export function AccountProvider({ children, onWipeLocal }: { children: ReactNode; onWipeLocal: () => void }) {
-  const service = useMemo<AuthService>(() => (AUTH_MOCK ? createMockService() : createSupabaseService()), []);
+  // Sahte servis YALNIZCA geliştirme modunda ya da testin açıkça verdiği bayrakla çalışır. Derleme değişkeni (EXPO_PUBLIC_AUTH_MOCK) tek başına yetmez:
+  // Metro önbelleği değeri bir derlemeden ötekine taşıyabilir; üretim paketine sahte servisin sızması bu çalışma zamanı kontrolüyle engellenir.
+  const service = useMemo<AuthService>(() => (AUTH_MOCK && (__DEV__ || (globalThis as { __ALLOW_AUTH_MOCK__?: boolean }).__ALLOW_AUTH_MOCK__ === true) ? createMockService() : createSupabaseService()), []);
   const [state, dispatch] = useReducer(reduce, initial);
   const [notice, setNotice] = useState<Notice>(null);
   const prefs = useRef<Prefs>(defaultPrefs);

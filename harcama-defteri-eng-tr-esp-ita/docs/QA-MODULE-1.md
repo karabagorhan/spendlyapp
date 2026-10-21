@@ -8,7 +8,7 @@
 |---|---|---|
 | `npm test` | tip kontrolü, çeviri denetimi (5 dil), çekirdek/kur/tema testleri, hesap mantığı (98), Edge Function mantığı (42) | geçiyor |
 | `npm run test:sql` | **gerçek PostgreSQL 16**'da migration + RLS/yetki (34 kontrol) | geçiyor |
-| `EXPO_PUBLIC_AUTH_MOCK=1 npx expo export --platform web --output-dir /tmp/web-auth` ardından `WEB_DIR=/tmp/web-auth npx tsx scripts/auth-ui-test.ts <dil>` | tarayıcıda uçtan uca arayüz (sahte servisle), tr/en/es/it/zh | her dilde 98–104 kontrol, 0 hata |
+| `EXPO_PUBLIC_AUTH_MOCK=1 npx expo export --clear --platform web --output-dir /tmp/web-auth` (**`--clear` şart**: Metro önbelleği env değerini taşıyabilir) ardından `WEB_DIR=/tmp/web-auth npx tsx scripts/auth-ui-test.ts <dil>` | tarayıcıda uçtan uca arayüz (sahte servisle), tr/en/es/it/zh | her dilde 98–104 kontrol, 0 hata |
 | mevcut `ui-test`, `currency-ui-test`, `gesture-ui-test` | eski ekranlarda gerileme | geçiyor |
 | `npm run check:release` | yayın engelleri | **bilerek başarısız** (yasal bilgiler `REPLACE_ME`) |
 
@@ -61,6 +61,8 @@ Sahte servis yalnızca **uygulama mantığını** sınar; aşağıdakiler **ger�
 - Çevrimdışıyken çıkış: kütüphane kaynağında yerel oturumun silindiği doğrulandı, cihazda denenmedi.
 
 ## Açık riskler ve öneriler
+
+- **Sahte hesap servisi üretime sızamaz:** derleme değişkenine ek olarak çalışma zamanında yalnızca `__DEV__` iken ya da testin verdiği `__ALLOW_AUTH_MOCK__` bayrağıyla çalışır (bayraksız mock paketiyle doğrulandı).
 
 - **Yasal metinler TASLAKTIR** ve bir hukukçu tarafından okunmalıdır. Yalnızca TR/EN yazıldı. `REPLACE_ME` alanları (şirket, e-posta, adresler, veri bölgesi, uygulanacak hukuk) doldurulana dek `check:release` yayını engeller. Metin, uygulamanın **bu sürümdeki** davranışını anlatır (sunucuya harcama verisi gitmez; kur servisleri ve Expo güncelleme servisi belirtildi).
 - **Bot koruması yok:** Supabase panelinde CAPTCHA (Turnstile) ve oran sınırlarını açın.

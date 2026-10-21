@@ -4,7 +4,7 @@
 // Ekranda gösterilirken kayıtlar o anki kurla ana para birimine çevrilir ("görünüm verisi", `viewData`).
 // Kur yoksa ya da eski kayıt `cur` taşımıyorsa para birimi TRY sayılır (uygulama başlangıçta yalnızca ₺ idi).
 import { fmtNumber, langInfo, t } from './i18n';
-import type { Expense, Settings, Sub } from './lib';
+import type { Expense, Income, Settings, Sub } from './lib';
 
 export type Cur = 'TRY' | 'USD' | 'EUR' | 'GBP' | 'CNY';
 export const CURRENCIES: { code: Cur; symbol: string }[] = [
@@ -19,8 +19,6 @@ export const isCur = (v: unknown): v is Cur => typeof v === 'string' && CUR_CODE
 export const symbolOf = (c: Cur) => CURRENCIES.find((x) => x.code === c)!.symbol;
 /** Para biriminin seçili dildeki adı ("Euro", "Dólar estadounidense"...). */
 export const currencyName = (c: Cur) => t('currency.' + c);
-/** Bütün simgeler: Amount bileşeni ve tutar okuma bunları tanır. */
-export const SYMBOLS = CURRENCIES.map((c) => c.symbol);
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON * Math.sign(n)) * 100) / 100;
 
@@ -133,7 +131,6 @@ let main: Cur = 'TRY';
 export function setMainCurrency(c: Cur) {
   main = c;
 }
-export const getMainCurrency = () => main;
 export const money = (n: number, decimals = 2) => fmtMoney(n, main, decimals);
 export const money0 = (n: number) => fmtMoney(n, main, 0);
 
@@ -145,7 +142,7 @@ export function fmtStamp(ts: number, fmtTime: (d: Date) => string, monthShort: (
 
 /* ---------- Görünüm verisi: saklanan kayıtlar → ana para birimi ---------- */
 
-type DataLike = { items: Expense[]; subs: Sub[]; settings: Settings };
+type DataLike = { items: Expense[]; subs: Sub[]; incomes?: Income[]; settings: Settings };
 
 /** Bir tutarı kendi para biriminden `to`ya çevirir (2 ondalığa yuvarlar). Kur yoksa ve birimler farklıysa null. */
 export function toMain(amount: number, from: Cur, to: Cur, r: Rates | null) {
@@ -178,6 +175,7 @@ export function viewData(d: DataLike, mainCur: Cur, r: Rates | null): DataLike {
   return {
     items: d.items.map(conv),
     subs: d.subs.map(conv),
+    ...(d.incomes ? { incomes: d.incomes.map(conv) } : {}),
     settings: { ...s, currency: mainCur, budget: b ?? s.budget, budgetCur: b === null ? s.budgetCur : mainCur, catBudgets, catBudgetCur },
   };
 }
@@ -204,14 +202,11 @@ export function fromViewSettings(next: Settings, stored: Settings, view: Setting
   };
 }
 
-/** Giriş formundaki "≈ ₺…" ipucu ve benzerleri için: kaynak para biriminden ana birime çevrilmiş tutar. */
-export const approx = (amount: number, from: Cur, r: Rates | null) => toMain(amount, from, main, r);
-
 /** Saklanan veride ana birimden farklı para biriminde tutar var mı? (Varsa kur gerekir ve kur notu gösterilir.) */
 export function needsRates(d: DataLike, mainCur: Cur) {
   const s = d.settings;
   return (
-    d.items.some((x) => (x.cur ?? 'TRY') !== mainCur) || d.subs.some((x) => (x.cur ?? 'TRY') !== mainCur) ||
+    d.items.some((x) => (x.cur ?? 'TRY') !== mainCur) || d.subs.some((x) => (x.cur ?? 'TRY') !== mainCur) || (d.incomes ?? []).some((x) => (x.cur ?? 'TRY') !== mainCur) ||
     (s.budget > 0 && s.budgetCur !== mainCur) || Object.keys(s.catBudgets).some((k) => (s.catBudgetCur[k] ?? 'TRY') !== mainCur)
   );
 }

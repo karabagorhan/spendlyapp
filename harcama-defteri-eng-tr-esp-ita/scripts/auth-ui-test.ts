@@ -1,6 +1,6 @@
 /**
  * Hesap/tanıtım arayüz testi (tarayıcıda, iPhone boyutunda, SAHTE hesap servisiyle):
- *   EXPO_PUBLIC_AUTH_MOCK=1 npx expo export --platform web --output-dir /tmp/web-auth
+ *   EXPO_PUBLIC_AUTH_MOCK=1 npx expo export --clear --platform web --output-dir /tmp/web-auth   (--clear: Metro önbelleği env değerini taşımasın)
  *   WEB_DIR=/tmp/web-auth npx tsx scripts/auth-ui-test.ts <tr|en|es|it|zh>
  * Gerçek Supabase'e hiç istek gitmez. Senaryolar: tanıtım, karşılama, kayıt doğrulamaları, çifte gönderim, e-posta bağlantısı,
  * çıkış/giriş, parola sıfırlama, hesap silme, misafir, çevrimdışı, eski kullanıcı. Her ekranda taşma ve çeviri sızıntısı denetlenir.
@@ -47,6 +47,8 @@ async function open(o: Opts = {}): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: LOCALE[lang] });
   contexts.push(ctx);
   await ctx.addInitScript(([prefs, data, once]: [object | null, object | null, string]) => {
+    // Sahte hesap servisinin çalışma zamanı izni (üretim paketinde bu bayrak yoktur)
+    (window as unknown as { __ALLOW_AUTH_MOCK__: boolean }).__ALLOW_AUTH_MOCK__ = true;
     // Yalnızca tarayıcı oturumunun ilk yüklemesinde tohumla; sayfa yenilenince (e-posta bağlantısı) veriler korunur
     if (sessionStorage.getItem(once)) return;
     sessionStorage.setItem(once, '1');
@@ -206,7 +208,7 @@ const toMain = async (p: Page) => { await id(p, 'ob-skip').click(); };
     await p.goto(base + 'auth-callback?code=confirm:' + encodeURIComponent(email));
     await p.waitForTimeout(1500);
     ok('e-posta bağlantısı hesabı açar ve uygulamaya geçer', !(await has(p, T('auth.verify.title'))) && !(await has(p, T('auth.signin.title'))));
-    ok('uygulama ekranı görünür (Ayarlar menüsü)', (await p.locator('[aria-label]').count()) > 0 && await has(p, T('fab.add')));
+    ok('uygulama ekranı görünür (Ayarlar menüsü)', (await p.locator('[aria-label]').count()) > 0 && (await id(p, 'qa-expense').count()) > 0);
   }
 
   /* 5) Ayarlar: hesap bölümü, çıkış, yanlış/doğru parola */
@@ -225,10 +227,10 @@ const toMain = async (p: Page) => { await id(p, 'ob-skip').click(); };
     ok('yanlış parola hatası', await waitText(p, T('auth.err.invalid_credentials')));
     await audit(p, 'giriş-hata');
     await id(p, 'si-pw').fill(PW); await id(p, 'si-submit').click();
-    ok('doğru parola ile giriş', await waitText(p, T('fab.add')));
+    ok('doğru parola ile giriş', await waitId(p, 'qa-expense'));
     // Ayarlar'a git
     await p.getByLabel(T('menu.open')).click();
-    await p.getByText(T('title.ayarlar'), { exact: true }).first().click();
+    await p.locator('[role="menuitem"]').nth(6).click();
     await p.waitForTimeout(500);
     ok('ayarlar: hesap bölümü e-postayı gösterir', await has(p, T('acct.signedAs', { email: 'ayse@example.com' })));
     ok('ayarlar: yasal bağlantılar', (await id(p, 'legal-privacy').count()) === 1 && (await id(p, 'legal-terms').count()) === 1);
@@ -269,7 +271,7 @@ const toMain = async (p: Page) => { await id(p, 'ob-skip').click(); };
     await id(p, 'rc-pw').fill(PW); await id(p, 'rc-pw2').fill(PW); await id(p, 'rc-submit').click();
     ok('yeni parola: eskisiyle aynı olamaz', await waitText(p, T('auth.err.same_password')));
     await id(p, 'rc-pw').fill('yeni-Parola-8-xQ'); await id(p, 'rc-pw2').fill('yeni-Parola-8-xQ'); await id(p, 'rc-submit').click();
-    ok('yeni parola kaydedilince uygulamaya geçer', await waitText(p, T('fab.add'), 8000));
+    ok('yeni parola kaydedilince uygulamaya geçer', await waitId(p, 'qa-expense', 8000));
   }
 
   /* 7) Hesap silme */
@@ -283,10 +285,10 @@ const toMain = async (p: Page) => { await id(p, 'ob-skip').click(); };
     await mock(p, (m) => m.confirm('sil@example.com'));
     await id(p, 'vf-signin').click();
     await id(p, 'si-email').fill('sil@example.com'); await id(p, 'si-pw').fill(PW); await id(p, 'si-submit').click();
-    await waitText(p, T('fab.add'));
+    await waitId(p, 'qa-expense');
     await p.evaluate(() => localStorage.setItem('harcama-defteri:v1', JSON.stringify({ items: [{ id: 'a', amount: 10, cat: 'Market', note: '', date: '2026-10-01', ts: 1 }], subs: [], settings: {} })));
     await p.getByLabel(T('menu.open')).click();
-    await p.getByText(T('title.ayarlar'), { exact: true }).first().click();
+    await p.locator('[role="menuitem"]').nth(6).click();
     await id(p, 'acct-delete').scrollIntoViewIfNeeded();
     await id(p, 'acct-delete').click();
     ok('silme: uyarı metni', await waitText(p, T('del.body')));
@@ -312,17 +314,17 @@ const toMain = async (p: Page) => { await id(p, 'ob-skip').click(); };
   {
     const p = await open({ prefs });
     await id(p, 'btn-guest').click();
-    ok('misafir: uygulama açılır', await waitText(p, T('fab.add')));
+    ok('misafir: uygulama açılır', await waitId(p, 'qa-expense'));
     await p.reload(); await p.waitForTimeout(1000);
-    ok('misafir: yenilemede karşılama çıkmaz', await has(p, T('fab.add')));
+    ok('misafir: yenilemede karşılama çıkmaz', (await id(p, 'qa-expense').count()) > 0);
     await p.getByLabel(T('menu.open')).click();
-    await p.getByText(T('title.ayarlar'), { exact: true }).first().click();
+    await p.locator('[role="menuitem"]').nth(6).click();
     ok('misafir: ayarlarda hesap açma kartı', await waitText(p, T('acct.guestTitle')));
     await id(p, 'acct-open').scrollIntoViewIfNeeded();
     await id(p, 'acct-open').click();
     ok('misafir: hesap ekranı kapatılabilir', await waitText(p, T('auth.welcome.title')) && (await id(p, 'btn-guest').count()) === 0);
     await p.getByLabel(T('auth.close')).click();
-    ok('kapatınca uygulamaya dönülür', await waitText(p, T('fab.add')));
+    ok('kapatınca uygulamaya dönülür', await waitId(p, 'qa-expense'));
   }
   {
     const p = await open({ prefs });
@@ -343,7 +345,7 @@ const toMain = async (p: Page) => { await id(p, 'ob-skip').click(); };
   {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 900 }, locale: LOCALE[lang] });
     contexts.push(ctx);
-    await ctx.addInitScript((pr) => localStorage.setItem('harcama-defteri:auth:v1', JSON.stringify(pr)), prefs);
+    await ctx.addInitScript((pr) => { (window as unknown as { __ALLOW_AUTH_MOCK__: boolean }).__ALLOW_AUTH_MOCK__ = true; localStorage.setItem('harcama-defteri:auth:v1', JSON.stringify(pr)); }, prefs);
     const p = await ctx.newPage();
     await p.goto(base); await p.waitForTimeout(1200);
     await id(p, 'btn-signup').click();
@@ -356,7 +358,7 @@ const toMain = async (p: Page) => { await id(p, 'ob-skip').click(); };
   /* 9) Eski kullanıcı: tanıtım yok, misafir olarak doğrudan uygulama */
   {
     const p = await open({ data: { items: [{ id: 'z', amount: 5, cat: 'Market', note: '', date: '2026-10-01', ts: 1 }], subs: [], settings: { language: lang, budget: 0 } } });
-    ok('eski kullanıcı: tanıtım/karşılama yok, doğrudan uygulama', await waitText(p, T('fab.add')) && !(await has(p, T('ob.1.title'))));
+    ok('eski kullanıcı: tanıtım/karşılama yok, doğrudan uygulama', await waitId(p, 'qa-expense') && !(await has(p, T('ob.1.title'))));
   }
 
   await browser.close();

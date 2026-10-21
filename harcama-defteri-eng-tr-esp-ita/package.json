@@ -49,11 +49,12 @@
     "test:currency": "npx -y tsx scripts/currency-test.ts",
     "typecheck": "tsc --noEmit",
     "test:theme": "npx -y tsx scripts/theme-test.ts",
-    "test": "npm run typecheck && npm run check:i18n && npm run test:core && npm run test:currency && npm run test:theme && npm run test:auth && npm run test:functions",
+    "test": "npm run typecheck && npm run check:i18n && npm run test:core && npm run test:currency && npm run test:theme && npm run test:dashboard && npm run test:auth && npm run test:functions",
     "test:auth": "npx -y tsx scripts/auth-test.ts",
     "test:functions": "npx -y tsx supabase/tests/functions.test.ts",
     "test:sql": "bash supabase/tests/run-sql-tests.sh",
-    "check:release": "npx -y tsx scripts/release-check.ts"
+    "check:release": "npx -y tsx scripts/release-check.ts",
+    "test:dashboard": "npx -y tsx scripts/dashboard-test.ts"
   },
   "private": true
 }
