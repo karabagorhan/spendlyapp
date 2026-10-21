@@ -1,7 +1,7 @@
 // Veri tipleri, tarih/para yardımcıları ve analiz hesapları.
 // Web sürümüyle (harcama-defteri.html) aynı veri biçimini kullanır; yedekler iki yönde de taşınabilir.
 import { Cur, money, money0 } from './currency';
-import type { Accent, Tint } from './palette';
+import type { Accent, Palette, Tint } from './palette';
 import { Lang, decimalText, fmtCompact, has, lower, parseAmount as parseAmountI18n, t } from './i18n';
 
 export type Expense = {
@@ -40,6 +40,7 @@ export type Settings = {
   theme: 'noir' | 'ivory' | 'system';
   accent: Accent; // vurgu rengi (renk kartelası)
   tint: Tint; // zemin tonu
+  palette: Palette; // Özet ekranının cam kartelası
   name: string; // menüdeki profil satırında görünen ad
   language: Lang; // arayüz dili
   currency: Cur; // ana para birimi: tüm ekranlar bu birimde gösterir (dilden bağımsız)

@@ -22,6 +22,10 @@ raporlar, abonelikler, Excel/yedek, bildirimler, Noir ve Fildişi temalar) ve ta
 - **Renk kartelaları:** Ayarlar → Görünüm'de 8 vurgu rengi (şampanya, zümrüt, safir, ametist, gül, bakır, turkuaz, gümüş) ve 4 zemin tonu
   (klasik, mavi, yeşil, erik). Seçim hem koyu (Noir) hem açık (Fildişi) temada ve "Telefona göre" modunda geçerlidir; ekran anında yeniden boyanır.
   64 tema birleşiminin tamamı WCAG kontrast testinden geçer (yazı ≥ 7:1, vurgu ve özet kartı etiketleri ≥ 4.5:1). Varsayılan görünüm değişmedi.
+- **Özet ekranı (gösterge paneli):** Cam yüzeyler, bento ızgarası ve bağlama göre parlayan çerçeveler. Dalga biçimli bütçe çizgisi
+  (bütçe yoksa ayın geçen kısmını gösterir), yatay kaydırılan **Ödemeler** kartları (ödendi / bekliyor / yaklaşan), 2×2 analiz kartları
+  (mini çizgi ve çubuk grafiklerle), öne çıkanlar, son harcamalar ve yüzen alt menü. Başlıktaki seçiciyle açık/koyu tema ve 4 kartela
+  (Okyanus, İndigo, Lüks, Orman) anında değişir; kartela seçimi uygulamanın geri kalanına en yakın vurgu rengi ve zemin tonunu da uygular.
 - **Kaydırma hareketleri:** Ekranın herhangi bir yerinden sağa kaydırınca önceki ekrana dönülür (sayfa parmakla birlikte kayar, kenarda geri oku belirir);
   ana ekranda gidecek yer olmadığı için yalnızca sol kenardan sağa kaydırma yan menüyü açar. Yan menü sola kaydırılarak kapanır (panelden ya da karartılmış
   alandan); alt sayfalar (harcama/abonelik formu) sol kenardan sağa kaydırılarak kapanır. Yatay kaydırılan kategori çipleri kendi kaydırmasını korur; kısa,
@@ -73,5 +77,5 @@ node scripts/gesture-ui-test.js <tr|en|es|it|zh>    # kaydırma hareketleri (ger
 Testlerdeki kur değerleri yalnızca test verisidir; canlı API çağrısı testlerde taklit edilir.
 
 Kod yapısı: `App.tsx` ana ekran; `src/currency.ts` para birimi/kur/dönüşüm; `src/useRates.ts` kur çekme ve önbellek;
-`src/i18n/` katalogları (`tr`, `en`, `es`, `it`, `zh`); `src/palette.ts` renkler ve kartelalar; `src/lib.ts` hesaplar; `src/store.ts` kayıt ve eski veri uyumu; `src/sheets.tsx` formlar;
+`src/i18n/` katalogları (`tr`, `en`, `es`, `it`, `zh`); `src/palette.ts` renkler ve kartelalar; `src/dashboard.tsx` Özet ekranı; `src/lib.ts` hesaplar; `src/store.ts` kayıt ve eski veri uyumu; `src/sheets.tsx` formlar;
 `src/ui.tsx` grafik ve düğmeler; `src/files.ts` Excel/yedek; `src/notify.ts` bildirimler.

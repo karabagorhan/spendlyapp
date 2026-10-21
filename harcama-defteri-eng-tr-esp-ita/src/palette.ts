@@ -158,3 +158,42 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
     heroTrack: accent === 'gold' ? base.heroTrack : rgba(heroA, 0.18),
   };
 }
+
+/* ---------- Özet (gösterge paneli) kartelaları ----------
+ * Özet ekranının cam görünümü için 4 kartela. Her biri vurgu (bekleyen işlem / grafik), tehlike (bütçe aşımı),
+ * başarı (ödendi) ve arka plan ambiyans ışığını taşır. Seçilince uygulamanın geri kalanı için en yakın vurgu ve zemin tonu da seçilir.
+ */
+export type Palette = 'okyanus' | 'indigo' | 'luks' | 'orman';
+export const PALETTES: Palette[] = ['okyanus', 'indigo', 'luks', 'orman'];
+export const isPalette = (v: unknown): v is Palette => typeof v === 'string' && PALETTES.includes(v as Palette);
+export const PALETTE_COLORS: Record<Palette, { accent: string; danger: string; success: string; ambient: string; ambientLight: string; appAccent: Accent; appTint: Tint }> = {
+  okyanus: { accent: '#FF7A2F', danger: '#FF4B55', success: '#10B981', ambient: '#0D262A', ambientLight: '#E2F1F0', appAccent: 'copper', appTint: 'blue' },
+  indigo:  { accent: '#8B5CF6', danger: '#F43F5E', success: '#06B6D4', ambient: '#1E1B4B', ambientLight: '#E8E6FA', appAccent: 'amethyst', appTint: 'plum' },
+  luks:    { accent: '#D4AF37', danger: '#FB7185', success: '#A3E635', ambient: '#171717', ambientLight: '#F2EEE2', appAccent: 'gold', appTint: 'classic' },
+  orman:   { accent: '#E07A5F', danger: '#E63946', success: '#2A9D8F', ambient: '#0B1F17', ambientLight: '#E1EFE7', appAccent: 'copper', appTint: 'green' },
+};
+
+/** Özet ekranının cam teması: koyu/açık mod + kartela. Açık modda vurgu yazıları okunur kalsın diye koyulaştırılır. */
+export function makeGlass(dark: boolean, palette: Palette) {
+  const c = PALETTE_COLORS[palette];
+  const ink = (h: string) => (dark ? h : mix(h, '#000000', 0.32));
+  return {
+    dark,
+    accent: c.accent,
+    danger: c.danger,
+    success: c.success,
+    accentText: ink(c.accent),
+    dangerText: ink(c.danger),
+    successText: ink(c.success),
+    bgFrom: dark ? c.ambient : c.ambientLight, // sağ üst
+    bgTo: dark ? '#070B0E' : '#F4F7F9', // sol alt
+    card: dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.75)',
+    cardLine: dark ? 'rgba(255,255,255,0.10)' : 'rgba(226,232,240,0.8)',
+    dock: dark ? 'rgba(14,20,24,0.9)' : 'rgba(255,255,255,0.92)',
+    fg: dark ? '#F8FAFC' : '#0F172A',
+    muted: dark ? '#8A99A4' : '#64748B',
+    faint: dark ? 'rgba(138,153,164,0.28)' : 'rgba(100,116,139,0.22)',
+    statusBar: (dark ? 'light' : 'dark') as 'light' | 'dark',
+  };
+}
+export type Glass = ReturnType<typeof makeGlass>;

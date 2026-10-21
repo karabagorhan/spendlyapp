@@ -357,6 +357,20 @@ const en: Catalog = {
   'tint.blue': 'Blue',
   'tint.green': 'Green',
   'tint.plum': 'Plum',
+
+  // Özet (gösterge paneli)
+  'dash.budgetStatus': 'Budget status',
+  'dash.payments': 'Payments',
+  'dash.paid': 'Paid',
+  'dash.pending': 'Due',
+  'dash.skipped': 'Skipped',
+  'dash.thisMonthBtn': 'Back to this month',
+  'dash.themeToggle': 'Light/dark theme',
+  'dash.paletteA11y': 'Colour palette: {name}',
+  'palette.okyanus': 'Ocean',
+  'palette.indigo': 'Indigo',
+  'palette.luks': 'Luxe',
+  'palette.orman': 'Forest',
 };
 
 export default en;

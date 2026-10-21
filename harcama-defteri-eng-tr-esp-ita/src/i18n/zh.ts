@@ -358,6 +358,20 @@ const zh: Catalog = {
   'tint.blue': '蓝调',
   'tint.green': '森绿',
   'tint.plum': '梅紫',
+
+  // Özet (gösterge paneli)
+  'dash.budgetStatus': '预算状况',
+  'dash.payments': '付款',
+  'dash.paid': '已付款',
+  'dash.pending': '待付款',
+  'dash.skipped': '已跳过',
+  'dash.thisMonthBtn': '回到本月',
+  'dash.themeToggle': '浅色/深色主题',
+  'dash.paletteA11y': '配色方案：{name}',
+  'palette.okyanus': '海洋',
+  'palette.indigo': '靛蓝',
+  'palette.luks': '奢华',
+  'palette.orman': '森林',
 };
 
 export default zh;

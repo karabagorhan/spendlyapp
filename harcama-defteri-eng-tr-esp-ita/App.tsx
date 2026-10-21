@@ -1,6 +1,5 @@
 import { PlayfairDisplay_600SemiBold } from '@expo-google-fonts/playfair-display/600SemiBold';
 import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700Bold';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +16,8 @@ import {
   insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
 } from './src/lib';
 import { ensurePermission, reschedule } from './src/notify';
+import { Dashboard } from './src/dashboard';
+import { PALETTE_COLORS, Palette, makeGlass } from './src/palette';
 import { BudgetPanel, ExpenseSheet, SettingsPanel, SubSheet } from './src/sheets';
 import { merge, useAppData } from './src/store';
 import { FONTS, Theme, useTheme } from './src/theme';
@@ -108,6 +109,7 @@ function Main() {
   const view = useMemo(() => (data ? viewData(data, main, rs.rates) : null), [data, main, rs.rates]);
   const t = useTheme(data?.settings.theme, data?.settings.tint, data?.settings.accent);
   const st = useMemo(() => makeStyles(t), [t]);
+  const glass = useMemo(() => makeGlass(t.name === 'noir', data?.settings.palette ?? 'okyanus'), [t.name, data?.settings.palette]);
   const [screen, setScreen] = useState<Screen>('ozet');
   const [history, setHistory] = useState<Screen[]>([]); // geri gitmek için önceki ekranlar
   const [budgetFocusKey, setBudgetFocusKey] = useState(0);
@@ -388,43 +390,7 @@ function Main() {
 
   let body: ReactNode = null;
   if (screen === 'ozet') {
-    const pending = subs.map((s) => ({ s, x: subStatus(s, items) })).filter((r) => r.x.state === 'pending');
-    const recent = [...items].sort((p, q) => (p.date < q.date ? 1 : p.date > q.date ? -1 : q.ts - p.ts)).slice(0, 5);
-    body = (
-      <>
-        {monthSwitcher}
-        <Hero ctx={ctx} onBudget={() => { go('butce'); setBudgetFocusKey(Date.now()); }} />
-        <Tiles ctx={ctx} />
-        {rateNote}
-        {notes.length ? (
-          <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.highlights')}</Label>
-              {notes.length > 3 ? <Pressable onPress={() => go('raporlar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
-            </View>
-            <InsightList list={notes.slice(0, 3)} t={t} />
-          </View>
-        ) : null}
-        {pending.length ? (
-          <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.pendingSubs')}</Label>
-              <Pressable onPress={() => go('abonelikler')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable>
-            </View>
-            {pending.map(({ s }, i) => (
-              <SubRow key={s.id} s={s} ctx={ctx} first={i === 0} onEdit={() => setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s })} onPay={() => paySub(s)} onSkip={() => skipSub(s)} />
-            ))}
-          </View>
-        ) : null}
-        <View style={st.card}>
-          <View style={st.cardHead}>
-            <Label t={t}>{tr('section.recent')}</Label>
-            {recent.length ? <Pressable onPress={() => go('harcamalar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
-          </View>
-          {recent.length ? <View style={st.items}>{recent.map((x, i) => expenseRow(x, i, true))}</View> : <Text style={st.meta}>{tr('recent.empty')}</Text>}
-        </View>
-      </>
-    );
+    body = null; // Özet ekranı kendi düzeniyle aşağıda <Dashboard> olarak çizilir
   } else if (screen === 'harcamalar') {
     const q = lower(query.trim());
     // Arama tüm aylarda yapılır; arama yokken seçili ay listelenir
@@ -605,7 +571,7 @@ function Main() {
     );
   }
 
-  const showFab = screen === 'ozet' || screen === 'harcamalar' || screen === 'raporlar';
+  const showFab = screen === 'harcamalar' || screen === 'raporlar';
 
   /* ---------- Yan menü verisi (her zaman içinde bulunulan ay) ---------- */
   const curYm = todayIso().slice(0, 7);
@@ -637,6 +603,25 @@ function Main() {
     <View style={st.root}>
       <StatusBar style={t.statusBar} />
       <Animated.View style={{ flex: 1, transform: [{ translateX: slide }] }} {...edgePan.panHandlers}>
+      {screen === 'ozet' ? (
+        <Dashboard
+          g={glass} t={t} palette={settings.palette} a={a} ym={ym} items={items} monthItems={monthItems} subs={subs} settings={settings} notes={notes}
+          rateNote={rateNote} alert={!!(pendingSubs || limitAlerts)} top={insets.top} bottom={insets.bottom} scrollRef={scrollRef}
+          onMenu={() => setMenuOpen(true)}
+          onToggleTheme={() => changeSettings({ ...settings, theme: t.name === 'noir' ? 'ivory' : 'noir' })}
+          onPalette={(k: Palette) => changeSettings({ ...settings, palette: k, accent: PALETTE_COLORS[k].appAccent, tint: PALETTE_COLORS[k].appTint })}
+          onMonth={changeMonth}
+          onThisMonth={() => { setYm(todayIso().slice(0, 7)); setFilterDay(null); }}
+          onBudget={() => { go('butce'); setBudgetFocusKey(Date.now()); }}
+          onGo={go}
+          onAdd={openAdd}
+          onAddSub={() => setSubSheet({ key: Date.now(), initial: null })}
+          onSub={(s, state) => (state === 'pending' ? go('abonelikler') : setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s }))}
+          onExpense={(x) => setExpSheet({ key: Date.now(), initial: stored.item(x.id) ?? x })}
+          lockSwipe={() => { touchX.current.start = 99999; }}
+        />
+      ) : (
+      <>
       <View style={[st.topBar, { paddingTop: insets.top + 6 }]}>
         <Pressable onPress={() => setMenuOpen(true)} style={st.menuBtn} hitSlop={8} accessibilityLabel={tr('menu.open')} accessibilityRole="button">
           <Ionicons name="menu" size={24} color={t.fg} />
@@ -653,6 +638,8 @@ function Main() {
           <Button label={tr('fab.add')} kind="primary" onPress={openAdd} t={t} style={st.fab} />
         </View>
       ) : null}
+      </>
+      )}
       </Animated.View>
       {/* Geri hareketi sırasında kenardan beliren ok: bırakınca ne olacağını gösterir (geri ya da ana ekranda menü) */}
       {swiping ? (
@@ -665,7 +652,7 @@ function Main() {
       ) : null}
 
       {toastMsg ? (
-        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: insets.bottom + (showFab ? 82 : 24) }]}>
+        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: insets.bottom + (showFab || screen === 'ozet' ? 82 : 24) }]}>
           <Text style={{ color: t.fg, fontSize: 14, flexShrink: 1 }}>{toastMsg}</Text>
           {toastAction ? (
             <Pressable hitSlop={10} onPress={() => { toastAction.run(); setToastMsg(''); setToastAction(null); buzz(); }}>
@@ -713,88 +700,6 @@ function Main() {
 /* ---------- Ekran parçaları ---------- */
 type Styles = ReturnType<typeof makeStyles>;
 type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
-
-/** Özet kartı: koyu metal kart görünümü, şampanya altını ayrıntılar. */
-function Hero({ ctx, onBudget }: { ctx: Ctx; onBudget: () => void }) {
-  const { t, st, a, ym, items, budget } = ctx;
-  const left = budget - a.total;
-  return (
-    <LinearGradient colors={t.heroGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.hero}>
-      <View style={st.heroTop}>
-        <Text style={st.heroBrand}>{upper(tr('app.name'))}</Text>
-        <Text style={st.heroBrand}>{upper(monthLabel(ym))}</Text>
-      </View>
-      <View>
-        <Text style={st.heroLabel}>{a.isCur ? tr('hero.today') : tr('hero.avgDaily')}</Text>
-        <Amount text={a.isCur ? money(sum(items.filter((x) => x.date === todayIso()))) : money(a.avg)} style={st.heroBig} symbolColor={t.heroLabel} />
-      </View>
-      <View style={st.heroRule} />
-      <View style={st.heroRow}>
-        <View>
-          <Text style={st.heroLabel}>{a.isCur ? tr('hero.thisMonth') : tr('hero.monthTotal')}</Text>
-          <Amount text={money(a.total)} style={st.heroMid} symbolColor={t.heroLabel} />
-        </View>
-        <Pressable onPress={onBudget} hitSlop={8} style={st.heroBudget}>
-          <Text style={st.heroBudgetTxt}>{budget ? tr('hero.budget', { amount: money0(budget) }) : tr('hero.setBudget')}</Text>
-        </Pressable>
-      </View>
-      {budget ? (
-        <View style={{ gap: 8 }}>
-          <View style={st.track}>
-            <View style={[st.fill, { width: `${Math.min(100, (a.total / budget) * 100)}%`, backgroundColor: a.total > budget ? t.warn : t.heroFill }]} />
-          </View>
-          <View style={st.heroRow}>
-            <Text style={st.heroSmall}>{left >= 0 ? tr('hero.left', { amount: money0(left) }) : tr('hero.over', { amount: money0(-left) })}</Text>
-            <Text style={st.heroSmall}>
-              {a.isCur && left > 0 ? tr('hero.perDay', { amount: money0(left / (a.dim - a.elapsed + 1)) }) : tr('hero.used', { pct: Math.round((a.total / budget) * 100) })}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-    </LinearGradient>
-  );
-}
-
-function Tiles({ ctx }: { ctx: Ctx }) {
-  const { t, st, a, monthItems, budget } = ctx;
-  const tiles: { label: string; value: string; sub?: ReactNode }[] = [];
-  if (!monthItems.length) {
-    [tr('tile.avg'), tr('tile.vsLast'), tr('tile.busiest'), a.isCur ? tr('tile.projection') : tr('tile.count')].forEach((l) => tiles.push({ label: l, value: '—' }));
-  } else {
-    tiles.push({ label: tr('tile.avg'), value: money0(a.avg), sub: <Text style={st.tileSub}>{tr('tile.avgSub', { n: a.elapsed })}</Text> });
-    if (a.prevSame > 0) {
-      const r = Math.round(((a.curSame - a.prevSame) / a.prevSame) * 100);
-      tiles.push({
-        label: tr('tile.vsLast'),
-        value: `${r > 0 ? '+' : r < 0 ? '−' : ''}${fmtPercent(Math.abs(r))}`,
-        sub: <Pill kind={r > 0 ? 'up' : r < 0 ? 'down' : 'flat'} label={r > 0 ? tr('tile.more') : r < 0 ? tr('tile.less') : tr('tile.same')} t={t} />,
-      });
-    } else {
-      tiles.push({ label: tr('tile.vsLast'), value: '—', sub: <Text style={st.tileSub}>{tr('tile.noLast')}</Text> });
-    }
-    tiles.push({ label: tr('tile.busiest'), value: money0(a.perDay[a.topDay!]), sub: <Text style={st.tileSub}>{shortDay(a.topDay!)}</Text> });
-    if (a.isCur) {
-      tiles.push({
-        label: tr('tile.projection'),
-        value: money0(a.projection),
-        sub: budget ? <Pill kind={a.projection > budget ? 'up' : 'down'} label={a.projection > budget ? tr('tile.willExceed') : tr('tile.withinBudget')} t={t} /> : <Text style={st.tileSub}>{tr('tile.pace')}</Text>,
-      });
-    } else {
-      tiles.push({ label: tr('tile.count'), value: String(monthItems.length), sub: <Text style={st.tileSub}>{tr('tile.average', { amount: money0(a.total / monthItems.length) })}</Text> });
-    }
-  }
-  return (
-    <View style={st.tiles}>
-      {tiles.map((x) => (
-        <View key={x.label} style={st.tile}>
-          <Label t={t}>{x.label}</Label>
-          <Amount text={x.value} style={st.tileVal} symbolColor={t.gold} />
-          {x.sub}
-        </View>
-      ))}
-    </View>
-  );
-}
 
 function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; first: boolean; onEdit: () => void; onPay: () => void; onSkip: () => void }) {
   const { t, st, items } = ctx;

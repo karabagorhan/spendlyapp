@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 import { Cur, isCur } from './currency';
 import { isLang } from './i18n';
-import { isAccent, isTint } from './palette';
+import { isAccent, isPalette, isTint } from './palette';
 import { CATS, Expense, SUB_TYPES, Settings, Sub, guessSubType } from './lib';
 
 // Tüm veriler telefonda tek bir kayıt olarak tutulur (internet gerekmez).
@@ -10,7 +10,7 @@ const KEY = 'harcama-defteri:v1';
 
 export type Data = { items: Expense[]; subs: Sub[]; settings: Settings };
 
-export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'noir', accent: 'gold', tint: 'classic', name: 'Orhan Karabağ', language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {} };
+export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'noir', accent: 'gold', tint: 'classic', palette: 'okyanus', name: 'Orhan Karabağ', language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {} };
 const empty: Data = { items: [], subs: [], settings: defaultSettings };
 
 function num(v: unknown, d = 0) {
@@ -57,6 +57,7 @@ export function normalize(raw: any): Data {
     theme: st.theme === 'ivory' || st.theme === 'system' ? st.theme : 'noir',
     accent: isAccent(st.accent) ? st.accent : 'gold',
     tint: isTint(st.tint) ? st.tint : 'classic',
+    palette: isPalette(st.palette) ? st.palette : 'okyanus',
     name: typeof st.name === 'string' ? st.name.slice(0, 40) : 'Orhan Karabağ',
     language: isLang(st.language) ? st.language : 'tr',
     currency: isCur(st.currency) ? st.currency : 'TRY',

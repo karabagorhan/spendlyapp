@@ -345,6 +345,20 @@ const tr: Catalog = {
   'tint.blue': 'Mavi',
   'tint.green': 'Yeşil',
   'tint.plum': 'Erik',
+
+  // Özet (gösterge paneli)
+  'dash.budgetStatus': 'Bütçe durumu',
+  'dash.payments': 'Ödemeler',
+  'dash.paid': 'Ödendi',
+  'dash.pending': 'Bekliyor',
+  'dash.skipped': 'Atlandı',
+  'dash.thisMonthBtn': 'Bu aya dön',
+  'dash.themeToggle': 'Açık/koyu tema',
+  'dash.paletteA11y': 'Renk kartelası: {name}',
+  'palette.okyanus': 'Okyanus',
+  'palette.indigo': 'İndigo',
+  'palette.luks': 'Lüks',
+  'palette.orman': 'Orman',
 };
 
 export default tr;
