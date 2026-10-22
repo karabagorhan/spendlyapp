@@ -2,9 +2,10 @@ import { ReactNode, useRef, useState } from 'react';
 import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtStamp, money, symbolOf, toMain } from './currency';
 import { LANGS, Lang, fmtTime, t as tr } from './i18n';
-import { CATS, Expense, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, guessSubType, monthName, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
+import { CATS, Expense, INCOME_CATS, Income, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
 import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
 import { FONTS, Theme } from './theme';
+import { incomeIcon } from './dashboard';
 import { Button, CatIcon, Chip, IconName, Label, Swatch, catIconName, subTypeColor } from './ui';
 
 type SheetAction = { label: string; onPress: () => void; disabled?: boolean };
@@ -229,6 +230,67 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
   );
 }
 
+/* ---------- Gelir ekle / düzenle ---------- */
+export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, onClose, t }: {
+  visible: boolean; initial: Income | null; main: Cur; rates: Rates | null; onSave: (x: Income) => void; onDelete: (id: string) => void; onClose: () => void; t: Theme;
+}) {
+  const [amount, setAmount] = useState(initial ? amountText(initial.amount) : '');
+  const [cat, setCat] = useState(initial?.cat ?? INCOME_CATS[0]);
+  const [note, setNote] = useState(initial?.note ?? '');
+  const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
+  const value = parseAmount(amount);
+  const isToday = date >= todayIso();
+
+  const save = () => {
+    if (!value) return;
+    onSave({ id: initial?.id ?? uid(), amount: value, cat, note: note.trim().slice(0, 80), date, ts: initial?.ts ?? Date.now(), cur });
+  };
+
+  return (
+    <Sheet visible={visible} title={initial ? tr('income.editTitle') : tr('income.newTitle')} onClose={onClose} t={t}
+      accessoryId="income-save" action={{ label: value ? tr('income.saveAmount', { amount: fmtMoney(value, cur) }) : tr('common.save'), onPress: save, disabled: !value }}>
+      <Field label={tr('common.amountField', { sym: symbolOf(cur) })} t={t}>
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted}
+          autoFocus={!initial} inputAccessoryViewID="income-save" style={inputStyle(t, true)} accessibilityLabel={tr('income.amountA11y')} testID="income-amount" />
+        <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
+        <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
+      </Field>
+      <Field label={tr('common.category')} t={t}>
+        <View style={st.chips}>
+          {INCOME_CATS.map((c) => (
+            <Chip key={c} label={incomeCatName(c)} active={cat === c} color={t.cats[incomeCatIndex(c)]} icon={incomeIcon(c)} onPress={() => setCat(c)} t={t} />
+          ))}
+        </View>
+      </Field>
+      <Field label={tr('expense.note')} t={t}>
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('income.notePlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t)} maxLength={80}
+          inputAccessoryViewID="income-save" returnKeyType="done" onSubmitEditing={save} />
+      </Field>
+      <Field label={tr('expense.date')} t={t}>
+        <View style={st.chips}>
+          <Chip label={tr('date.today')} active={date === todayIso()} onPress={() => setDate(todayIso())} t={t} />
+          <Chip label={tr('date.yesterday')} active={date === addDays(todayIso(), -1)} onPress={() => setDate(addDays(todayIso(), -1))} t={t} />
+          <Chip label={tr('date.twoDaysAgo')} active={date === addDays(todayIso(), -2)} onPress={() => setDate(addDays(todayIso(), -2))} t={t} />
+        </View>
+        <View style={[st.stepper, { backgroundColor: t.bg, borderColor: t.line }]}>
+          <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={8} style={st.stepBtn} accessibilityLabel={tr('date.prevDay')}>
+            <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
+          </Pressable>
+          <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+          <Pressable onPress={() => !isToday && setDate(addDays(date, 1))} hitSlop={8} style={[st.stepBtn, { opacity: isToday ? 0.3 : 1 }]} accessibilityLabel={tr('date.nextDay')}>
+            <Text style={[st.stepTxt, { color: t.fg }]}>›</Text>
+          </Pressable>
+        </View>
+      </Field>
+      <View style={st.actions}>
+        {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
+        <Button label={tr('common.save')} onPress={save} disabled={!value} t={t} style={{ flex: 1 }} />
+      </View>
+    </Sheet>
+  );
+}
+
 /* ---------- Abonelik ekle / düzenle ---------- */
 export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onClose, t }: {
   visible: boolean; initial: Sub | null; main: Cur; rates: Rates | null; onSave: (s: Sub) => void; onDelete: (id: string) => void; onClose: () => void; t: Theme;
@@ -362,7 +424,7 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
 }
 
 /* ---------- Ayarlar ekranı: ad, görünüm, bildirimler, dışa/içe aktarma ---------- */
-export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
+export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
   settings: Settings;
   rates: Rates | null;
   refreshing: boolean;
@@ -372,6 +434,8 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
   onExport: (ym: string | null) => void;
   onBackup: () => void;
   onRestore: () => void;
+  /** Hesap ve yasal bölümleri (giriş kapısı sağlar). */
+  account?: ReactNode;
   ym: string;
   monthLabel: string;
   t: Theme;
@@ -468,6 +532,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         <Button label={tr('settings.backupMake')} kind="ghost" onPress={onBackup} t={t} />
         <Button label={tr('settings.backupRestore')} kind="ghost" onPress={onRestore} t={t} />
       </View>
+      {account}
     </View>
   );
 }

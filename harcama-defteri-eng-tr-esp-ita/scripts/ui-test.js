@@ -118,7 +118,7 @@ const KEY_LEAK = /\b(?:app|common|sheet|fab|title|fmt|date|month|monthShort|week
     return r.text;
   }
 
-  const menuBtn = () => page.locator('[role="button"][aria-label]').first();
+  const menuBtn = () => page.getByTestId('menu-open');
   const goTo = async (n) => { await menuBtn().click(); await page.waitForTimeout(450); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(500); };
 
   const screens = ['Özet', 'Harcama ekle', 'Harcamalar', 'Raporlar', 'Abonelikler', 'Bütçe ve limitler', 'Ayarlar'];
@@ -131,7 +131,7 @@ const KEY_LEAK = /\b(?:app|common|sheet|fab|title|fmt|date|month|monthShort|week
   }
   // Harcama formu ve abonelik formu
   await goTo(0);
-  await page.getByText(/^\+\s+/).first().click(); await page.waitForTimeout(700);
+  await page.getByTestId('qa-expense').click(); await page.waitForTimeout(700);
   await audit('harcama formu'); await shot('4-harcama-formu');
   await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   // Abonelik formu (Abonelikler ekranındaki "+ ..." düğmesi)

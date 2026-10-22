@@ -80,7 +80,7 @@ const baseData = (extra = {}) => ({
     await page.waitForTimeout(1800);
     const text = () => page.evaluate(() => document.body.innerText.replace(/[  ]/g, ' '));
     const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('harcama-defteri:v1')));
-    const menuBtn = () => page.locator('[role="button"][aria-label]').first();
+    const menuBtn = () => page.getByTestId('menu-open');
     const goTo = async (n) => { await menuBtn().click(); await page.waitForTimeout(450); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(600); };
     const chip = (label) => page.getByText(label, { exact: true }).first();
     return { ctx, page, pageErrors, hits, text, stored, goTo, chip, scenario };
@@ -162,7 +162,7 @@ const baseData = (extra = {}) => ({
   {
     const s = await open('giriş', { data: baseData(), rates: true });
     const { page } = s;
-    await page.getByText(/^\+\s+/).first().click(); await page.waitForTimeout(800);
+    await page.getByTestId('qa-expense').click(); await page.waitForTimeout(800);
     await s.chip('$ USD').click(); await page.waitForTimeout(300);
     await page.locator('input').first().fill(lang === 'en' ? '10' : '10');
     await page.waitForTimeout(400);
