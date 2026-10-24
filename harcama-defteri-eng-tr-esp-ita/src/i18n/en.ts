@@ -232,6 +232,12 @@ const en: Catalog = {
   'budget.limitsTotal': 'Your limits add up to {amount}.',
   'budget.limitNone': 'No limit',
   'budget.limitA11y': '{cat} monthly limit',
+  'budget.editTitle': 'Edit budget',
+  'budget.ov.empty': 'Set a monthly budget to see this month here.',
+  'budget.ov.perDay': 'You can spend {amount} a day',
+  'budget.ov.daysLeft': { one: '{n} day left', other: '{n} days left' },
+  'budget.ov.rowA11y': '{cat}: {spent} of {limit}, {pct}',
+  'budget.ov.noLimits': 'No category limits yet. Set one below to track it here.',
 
   // Settings
   'settings.name': 'Your name (shown in the menu)',

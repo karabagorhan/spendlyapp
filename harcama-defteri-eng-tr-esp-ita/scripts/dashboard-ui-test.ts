@@ -355,6 +355,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await id(p, 'txn-tab-expenses').click();
     await id(p, 'tab-butce').click(); await p.waitForTimeout(500);
     ok('sekme: Bütçe', (await title()) === T('title.butce'), String(await title()));
+    ok('Bütçe ekranı: bu ay ilerleme kartı ve limit listesi üstte', (await id(p, 'budget-overview').count()) === 1 && (await id(p, 'budget-limits').count()) === 1);
     await id(p, 'tab-raporlar').click(); await p.waitForTimeout(500);
     ok('sekme: Raporlar', (await title()) === T('title.raporlar'), String(await title()));
     await id(p, 'tab-ayarlar').click(); await p.waitForTimeout(500);

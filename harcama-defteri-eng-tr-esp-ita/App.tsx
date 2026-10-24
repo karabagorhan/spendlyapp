@@ -12,7 +12,7 @@ import { Cur, fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromVie
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
 import { LanguageProvider, deviceLanguage, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
 import {
-  Analysis, Expense, Income, SUB_TYPES, Settings, Sub, addMonths, analyse, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
+  Analysis, Expense, Income, SUB_TYPES, Settings, Sub, addMonths, analyse, budgetProgress, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
   MAX_AMOUNT, balanceFor, incomeCatName, insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, recentTransactions, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
 } from './src/lib';
 import { PermInfo, ensurePermission, permissionInfo, reschedule } from './src/notify';
@@ -25,7 +25,7 @@ import { useAccount } from './src/auth/AccountProvider';
 import { Gate } from './src/auth/Gate';
 import { Amount, Bars, Button, CatIcon, SubTypeIcon, subTypeColor, DailyChart, InsightList, Ionicons, Label, MenuSection, Pill, Progress, SideMenu } from './src/ui';
 import {
-  BalanceCard, BudgetCard, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, IncomeIcon, InlineNotice, Pair, QuickActions,
+  BalanceCard, BudgetCard, BudgetOverview, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, IncomeIcon, InlineNotice, Pair, QuickActions,
   RecentCard, SpendingCard, SubsCard, TAB_BAR_H, TabBar,
 } from './src/dashboard';
 
@@ -765,6 +765,9 @@ function Main() {
     body = (
       <View style={{ gap: 14 }}>
       {rateNote}
+      {/* Üstte bu ayın ilerlemesi (görünüm verisi: ana para biriminde, çevrilemeyenler yok); altta form */}
+      <BudgetOverview t={t} p={budgetProgress(items, settings, todayIso().slice(0, 7))} periodLabel={monthLabel(todayIso().slice(0, 7))} />
+      <Label t={t}>{tr('budget.editTitle')}</Label>
       <View style={st.card}>
         <BudgetPanel key={budgetFocusKey} focusBudget={budgetFocusKey > 0} settings={settings} onChange={changeSettings} t={t} />
       </View>

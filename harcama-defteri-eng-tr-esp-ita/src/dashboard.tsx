@@ -5,10 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, G } from 'react-native-svg';
 import { CURRENCIES, Cur, Rates, currencyName, fmtMoney, money, money0, symbolOf } from './currency';
 import { fmtPercent, t as tr } from './i18n';
-import { Analysis, Balance, Expense, Sub, Txn, catIndex, catName, categorySlices, dayLabelShort, greetingKey, incomeCatName, iso, pad, shortDay, subStatus } from './lib';
+import { Analysis, Balance, BudgetProgress, Expense, Sub, Txn, catIndex, catName, categorySlices, dayLabelShort, greetingKey, incomeCatName, iso, pad, shortDay, subStatus } from './lib';
 import { rgba } from './palette';
 import { FONTS, Theme } from './theme';
-import { Amount, Button, CatIcon, IconName, Ionicons, SubTypeIcon, fitFont } from './ui';
+import { Amount, Button, CatIcon, IconName, Ionicons, Progress, SubTypeIcon, fitFont } from './ui';
 
 /** Geniş ekranlarda (tablet, web) içerik bu genişlikte ortalanır. */
 export const DASH_MAX = 920;
@@ -308,6 +308,9 @@ export function CategoriesCard({ t, monthItems, monthTitle }: { t: Theme; monthI
   );
 }
 
+/** Bütçe/limit kullanım rengi: %80'e kadar vurgu, %80–100 ikincil uyarı, %100'ün üstü aşım. */
+const budgetColor = (ratio: number, t: Theme) => (ratio > 1 ? t.warn : ratio >= 0.8 ? t.cats[1] : t.accent);
+
 /* ---------- Aylık bütçe: ilerleme halkası ---------- */
 export function BudgetCard({ t, spent, budget, onBudget, periodLabel }: { t: Theme; spent: number; budget: number; onBudget: () => void; periodLabel: string }) {
   const SIZE = 88;
@@ -315,7 +318,7 @@ export function BudgetCard({ t, spent, budget, onBudget, periodLabel }: { t: The
   const C = 2 * Math.PI * R;
   const pct = budget > 0 ? spent / budget : 0;
   const left = budget - spent;
-  const color = pct > 1 ? t.warn : pct >= 0.8 ? t.cats[1] : t.accent;
+  const color = budgetColor(pct, t);
   return (
     <Card t={t} style={s.half} testID="card-budget" onPress={onBudget} a11y={tr('card.budget')}>
       <CardHead t={t} title={tr('card.budget')} sub={periodLabel} />
@@ -353,6 +356,71 @@ export function BudgetCard({ t, spent, budget, onBudget, periodLabel }: { t: The
         </View>
       )}
     </Card>
+  );
+}
+
+/* ---------- Bütçe ekranı: bu ayın ilerlemesi ve kategori limitleri ---------- */
+export function BudgetOverview({ t, p, periodLabel }: { t: Theme; p: BudgetProgress; periodLabel: string }) {
+  const over = p.budget > 0 && p.remaining < 0;
+  return (
+    <View style={{ gap: 14 }}>
+      <Card t={t} testID="budget-overview">
+        <CardHead t={t} title={tr('card.budget')} sub={periodLabel} />
+        {p.budget > 0 ? (
+          <View style={{ gap: 12, marginTop: 10 }}>
+            <View style={{ gap: 2 }}>
+              <Amount fit text={money0(p.spent)} style={{ color: t.fg, fontSize: fitFont(money0(p.spent), 24, 10), fontWeight: '800' }} symbolColor={t.accent} />
+              <Text style={{ color: t.muted, fontSize: 12 }} numberOfLines={1}>{tr('dash.budgetOf', { total: money0(p.budget) })}</Text>
+            </View>
+            <Progress value={p.spent} max={p.budget} color={budgetColor(p.ratio, t)} t={t} />
+            <View style={[s.leftRow, { backgroundColor: over ? t.warnSoft : t.goodSoft }]}>
+              <Ionicons name={over ? 'alert-circle-outline' : 'wallet-outline'} size={16} color={over ? t.warn : t.good} />
+              <View style={{ flex: 1 }}>
+                <Amount fit text={money0(Math.abs(p.remaining))} style={{ color: t.fg, fontSize: fitFont(money0(Math.abs(p.remaining)), 13, 8), fontWeight: '700' }} symbolColor={t.accent} />
+                <Text style={{ color: t.muted, fontSize: 10 }} numberOfLines={1}>{tr(over ? 'dash.budgetOver' : 'dash.budgetLeft')}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <Text style={{ color: t.fg, fontSize: 13, flexShrink: 1 }}>
+                {p.perDay !== null ? tr('budget.ov.perDay', { amount: money0(p.perDay) }) : ''}
+              </Text>
+              <Text style={{ color: t.muted, fontSize: 12 }}>{tr('budget.ov.daysLeft', { n: p.daysLeft })}</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={s.cardEmpty}>
+            <Ionicons name="wallet-outline" size={26} color={t.muted} />
+            <Text style={{ color: t.muted, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>{tr('budget.ov.empty')}</Text>
+          </View>
+        )}
+      </Card>
+
+      <Card t={t} testID="budget-limits">
+        <CardHead t={t} title={tr('budget.limitsTitle')} sub={periodLabel} />
+        {p.limits.length ? (
+          <View style={{ gap: 14, marginTop: 12 }}>
+            {p.limits.map((r) => {
+              const color = budgetColor(r.ratio, t);
+              return (
+                <View key={r.cat} style={{ gap: 6 }} accessible accessibilityLabel={tr('budget.ov.rowA11y', { cat: catName(r.cat), spent: money0(r.spent), limit: money0(r.limit), pct: fmtPercent(Math.round(r.ratio * 100)) })}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <CatIcon cat={r.cat} t={t} size={32} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={{ color: t.fg, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{catName(r.cat)}</Text>
+                      <Text style={{ color: t.muted, fontSize: 12 }} numberOfLines={1}>{`${money0(r.spent)} / ${money0(r.limit)}`}</Text>
+                    </View>
+                    <Text style={{ color, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{fmtPercent(Math.round(r.ratio * 100))}</Text>
+                  </View>
+                  <Progress value={r.spent} max={r.limit} color={color} t={t} />
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18, marginTop: 10 }}>{tr('budget.ov.noLimits')}</Text>
+        )}
+      </Card>
+    </View>
   );
 }
 

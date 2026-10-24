@@ -429,12 +429,13 @@ export function InsightList({ list, t }: { list: Insight[]; t: Theme }) {
 }
 
 /** İnce ilerleme çubuğu (kategori limitleri). */
-export function Progress({ value, max, t }: { value: number; max: number; t: Theme }) {
+/** Çubuk: varsayılan renk %80'e kadar vurgu, sonrası uyarı rengi; `color` verilirse onu kullanır (ör. üç kademeli bütçe çubuğu). */
+export function Progress({ value, max, t, color }: { value: number; max: number; t: Theme; color?: string }) {
   const over = value > max;
   const near = !over && value >= max * 0.8;
   return (
     <View style={{ height: 6, borderRadius: 99, backgroundColor: t.bg, overflow: 'hidden' }}>
-      <View style={{ width: `${Math.min(100, (value / max) * 100)}%`, height: '100%', borderRadius: 99, backgroundColor: over || near ? t.warn : t.accent }} />
+      <View style={{ width: `${Math.min(100, (value / max) * 100)}%`, height: '100%', borderRadius: 99, backgroundColor: color ?? (over || near ? t.warn : t.accent) }} />
     </View>
   );
 }

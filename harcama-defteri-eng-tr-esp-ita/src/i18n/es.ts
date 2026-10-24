@@ -233,6 +233,12 @@ const es: Catalog = {
   'budget.limitsTotal': 'Suma de los límites: {amount}.',
   'budget.limitNone': 'Sin límite',
   'budget.limitA11y': 'Límite mensual de {cat}',
+  'budget.editTitle': 'Editar presupuesto',
+  'budget.ov.empty': 'Fija un presupuesto mensual para ver el mes aquí.',
+  'budget.ov.perDay': 'Puedes gastar {amount} al día',
+  'budget.ov.daysLeft': { one: 'queda {n} día', other: 'quedan {n} días' },
+  'budget.ov.rowA11y': '{cat}: {spent} de {limit}, {pct}',
+  'budget.ov.noLimits': 'Sin límites por categoría. Define uno abajo.',
 
   // Ajustes
   'settings.name': 'Tu nombre (aparece en el menú)',

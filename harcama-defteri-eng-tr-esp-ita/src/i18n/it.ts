@@ -233,6 +233,12 @@ const it: Catalog = {
   'budget.limitsTotal': 'Totale dei limiti: {amount}.',
   'budget.limitNone': 'Nessuno',
   'budget.limitA11y': 'Limite mensile di {cat}',
+  'budget.editTitle': 'Modifica budget',
+  'budget.ov.empty': 'Imposta un budget mensile per vedere il mese qui.',
+  'budget.ov.perDay': 'Puoi spendere {amount} al giorno',
+  'budget.ov.daysLeft': { one: 'manca {n} giorno', other: 'mancano {n} giorni' },
+  'budget.ov.rowA11y': '{cat}: {spent} di {limit}, {pct}',
+  'budget.ov.noLimits': 'Nessun limite per categoria. Impostane uno qui sotto.',
 
   // Impostazioni
   'settings.name': 'Il tuo nome (appare nel menu)',

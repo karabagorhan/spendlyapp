@@ -220,6 +220,12 @@ const tr: Catalog = {
   'budget.limitsTotal': 'Limitlerin toplamı {amount}.',
   'budget.limitNone': 'Limit yok',
   'budget.limitA11y': '{cat} aylık limiti',
+  'budget.editTitle': 'Bütçeyi düzenle',
+  'budget.ov.empty': 'Aylık bütçeni belirlersen bu ayın durumu burada görünür.',
+  'budget.ov.perDay': 'Günde {amount} harcayabilirsin',
+  'budget.ov.daysLeft': '{n} gün kaldı',
+  'budget.ov.rowA11y': '{cat}: {spent} / {limit}, {pct}',
+  'budget.ov.noLimits': 'Henüz kategori limiti yok. Aşağıdan bir kategoriye limit koyarsan ilerlemesi burada görünür.',
 
   // Ayarlar
   'settings.name': 'Adın (menüde görünür)',

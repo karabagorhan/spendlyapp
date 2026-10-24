@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
 import { buildExcel } from '../src/excel';
 import { CATALOGS, LANGS, Lang, setLanguage } from '../src/i18n';
 import { Cur, Rates, needsRates, setMainCurrency, viewData } from '../src/currency';
-import { Expense, INCOME_CATS, Income, balanceFor, categorySlices, dayLabel, dayLabelShort, greetingKey, recentTransactions, shortDay, todayIso, addDays } from '../src/lib';
+import { Expense, INCOME_CATS, Income, balanceFor, budgetProgress, categorySlices, dayLabel, dayLabelShort, greetingKey, recentTransactions, shortDay, todayIso, addDays } from '../src/lib';
 import { Data, defaultSettings, merge, normalize } from '../src/store';
 
 let pass = 0, fail = 0;
@@ -139,6 +139,30 @@ eq('dilimler: üst 4 + kalanı "diğer"', [many.rows.length, many.other !== null
 truthy('dilimler: yüzdeler toplamı 1', Math.abs(many.rows.reduce((p, r) => p + r.pct, 0) + (many.other?.pct ?? 0) - 1) < 1e-9);
 eq('dilimler: üst+1 kategoride birleştirme yok (tek kalan "diğer" olmaz)', categorySlices(['Market', 'Fatura', 'Ulaşım', 'Sağlık', 'Eğlence'].map((c, i) => exp('y' + i, '2026-10-01', 10, c)), 4).other, null);
 eq('dilimler: boş', categorySlices([], 4), { total: 0, rows: [], other: null });
+
+/* ---------- Bütçe ilerlemesi (Bütçe ekranı) ---------- */
+const bset = (budget: number, catBudgets: Record<string, number> = {}) => ({ ...defaultSettings, budget, catBudgets });
+const bItems: Expense[] = [exp('b1', '2026-10-03', 200, 'Market'), exp('b2', '2026-10-20', 50, 'Eğlence'), exp('b3', '2026-09-30', 999, 'Market')];
+const bp = budgetProgress(bItems, bset(1000, { Market: 300, Eğlence: 100, Ulaşım: 0 }), '2026-10', '2026-10-24');
+eq('bütçe: harcama yalnızca seçili ayda (eylül kaydı yok)', [bp.spent, bp.budget], [250, 1000]);
+eq('bütçe: oran yüzde 25', Math.round(bp.ratio * 100), 25);
+eq('bütçe: kalan = bütçe − harcama', bp.remaining, 750);
+eq('bütçe: 24 Ekim, ay sonuna 8 gün (bugün dahil): günde 750/8 = 93,75', [bp.daysLeft, bp.perDay], [8, 93.75]);
+const bOver = budgetProgress(bItems, bset(200), '2026-10', '2026-10-24');
+eq('bütçe aşımı: kalan negatif, günlük kalan yok', [bOver.remaining, bOver.perDay], [-50, null]);
+eq('bütçe tam tükendi: kalan 0, günlük kalan yok', [budgetProgress(bItems, bset(250), '2026-10', '2026-10-24').perDay], [null]);
+eq('bütçe son gün (31 Ekim): kalan gün 1, günlük = kalan', [budgetProgress(bItems, bset(1000), '2026-10', '2026-10-31').daysLeft, budgetProgress(bItems, bset(1000), '2026-10', '2026-10-31').perDay], [1, 750]);
+eq('bütçe ayın ilk günü: kalan gün 31', budgetProgress(bItems, bset(1000), '2026-10', '2026-10-01').daysLeft, 31);
+eq('bütçe geçmiş ay: kalan gün 0, günlük yok', [budgetProgress(bItems, bset(1000), '2026-09', '2026-10-24').daysLeft, budgetProgress(bItems, bset(1000), '2026-09', '2026-10-24').perDay], [0, null]);
+eq('bütçe gelecek ay: tüm ay kalan', budgetProgress([], bset(1000), '2026-11', '2026-10-24').daysLeft, 30);
+const bNo = budgetProgress(bItems, bset(0), '2026-10', '2026-10-24');
+eq('bütçe yok: oran 0, kalan 0, günlük yok (sıfıra bölme yok)', [bNo.ratio, bNo.remaining, bNo.perDay], [0, 0, null]);
+eq('kategori limiti yok: liste boş (limit 0 olanlar da girmez)', [budgetProgress(bItems, bset(1000), '2026-10', '2026-10-24').limits, budgetProgress(bItems, bset(1000, { Market: 0 }), '2026-10', '2026-10-24').limits], [[], []]);
+eq('kategori limitleri: yüzde ve harcama, yalnızca limiti olanlar', bp.limits.map((r) => [r.cat, r.spent, r.limit, Math.round(r.ratio * 100)]), [['Market', 200, 300, 67], ['Eğlence', 50, 100, 50]]);
+const bSorted = budgetProgress([exp('s1', '2026-10-02', 90, 'Fatura'), exp('s2', '2026-10-02', 30, 'Market'), exp('s3', '2026-10-02', 150, 'Sağlık')], bset(0, { Market: 100, Fatura: 100, Sağlık: 100 }), '2026-10', '2026-10-24');
+eq('kategori limitleri: kullanım yüzdesine göre azalan sıra (%150, %90, %30)', bSorted.limits.map((r) => r.cat), ['Sağlık', 'Fatura', 'Market']);
+eq('kategori limitleri: aşan kategori aşım oranını gösterir', Math.round(bSorted.limits[0].ratio * 100), 150);
+eq('bütçe boş veri: sıfırlar', budgetProgress([], bset(500), '2026-10', '2026-10-24'), { budget: 500, spent: 0, remaining: 500, ratio: 0, daysLeft: 8, perDay: 62.5, limits: [] });
 
 /* ---------- Son işlemler ---------- */
 const rt = recentTransactions(

@@ -233,6 +233,12 @@ const zh: Catalog = {
   'budget.limitsTotal': '限额合计 {amount}。',
   'budget.limitNone': '无限额',
   'budget.limitA11y': '{cat}月限额',
+  'budget.editTitle': '编辑预算',
+  'budget.ov.empty': '设置月度预算后，这里会显示本月情况。',
+  'budget.ov.perDay': '每天可花 {amount}',
+  'budget.ov.daysLeft': '剩余 {n} 天',
+  'budget.ov.rowA11y': '{cat}：{spent} / {limit}，{pct}',
+  'budget.ov.noLimits': '还没有类别限额。在下方设置后，这里会显示进度。',
 
   // 设置
   'settings.name': '你的名字（显示在菜单中）',

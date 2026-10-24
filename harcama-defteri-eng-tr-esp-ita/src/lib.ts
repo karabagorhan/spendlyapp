@@ -193,6 +193,46 @@ export function analyse(items: Expense[], ym: string): Analysis {
   };
 }
 
+/* ---------- Bütçe ilerlemesi (Bütçe ekranı) ---------- */
+export type LimitRow = { cat: string; spent: number; limit: number; ratio: number };
+export type BudgetProgress = {
+  budget: number; // 0: bütçe yok
+  spent: number;
+  remaining: number; // bütçe − harcama; negatifse aşım (bütçe yoksa 0)
+  ratio: number; // harcama / bütçe (bütçe yoksa 0)
+  daysLeft: number; // bugün dahil ay sonuna kalan gün (geçmiş ay 0, gelecek ay tüm ay)
+  perDay: number | null; // kalan / gün; yalnızca kalan > 0 ve gün > 0 iken
+  limits: LimitRow[]; // limiti olan kategoriler, kullanım oranına göre büyükten küçüğe
+};
+
+/**
+ * Seçili ayın bütçe ilerlemesi. `items` ve `settings` ana para biriminde görünüm verisinden gelmelidir
+ * (çevrilemeyen kayıtlar zaten `items` içinde yoktur, toplamlara girmez).
+ */
+export function budgetProgress(items: Expense[], settings: Settings, ym: string, today = todayIso()): BudgetProgress {
+  const monthItems = items.filter((x) => x.date.slice(0, 7) === ym);
+  const spent = sum(monthItems);
+  const budget = settings.budget > 0 ? settings.budget : 0;
+  const remaining = budget ? budget - spent : 0;
+  const curYm = today.slice(0, 7);
+  const daysLeft = ym < curYm ? 0 : ym > curYm ? daysIn(ym) : daysIn(ym) - +today.slice(8) + 1;
+  const by: Record<string, number> = {};
+  monthItems.forEach((x) => (by[x.cat] = (by[x.cat] || 0) + x.amount));
+  const limits = Object.keys(settings.catBudgets)
+    .filter((c) => settings.catBudgets[c] > 0)
+    .map((c) => ({ cat: c, spent: by[c] || 0, limit: settings.catBudgets[c], ratio: (by[c] || 0) / settings.catBudgets[c] }))
+    .sort((p, q) => q.ratio - p.ratio);
+  return {
+    budget,
+    spent,
+    remaining,
+    ratio: budget ? spent / budget : 0,
+    daysLeft,
+    perDay: budget && remaining > 0 && daysLeft > 0 ? remaining / daysLeft : null,
+    limits,
+  };
+}
+
 /* ---------- Panel: gelir, gider ve net durum ---------- */
 export type Balance = {
   spent: number;
