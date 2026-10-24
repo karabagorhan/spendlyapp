@@ -576,6 +576,14 @@ const es: Catalog = {
   'amount.tooLarge': 'El importe es demasiado grande (máximo {max}).',
   'dash.unconverted': { one: '{n} registro queda fuera de los totales por falta de tipos de cambio; sigue apareciendo en las listas con su importe original. Revisa tu conexión e inténtalo de nuevo.', other: '{n} registros quedan fuera de los totales por falta de tipos de cambio; siguen apareciendo en las listas con su importe original. Revisa tu conexión e inténtalo de nuevo.' },
   'dash.limitsUnavailable': { one: '{n} presupuesto/límite en otra moneda no está disponible hasta que haya tipos de cambio.', other: '{n} presupuestos/límites en otra moneda no están disponibles hasta que haya tipos de cambio.' },
+  'settings.lock': 'Bloqueo de app',
+  'settings.notifAmounts': 'Importes en notificaciones',
+  'notif.subBodyPrivate': 'Hoy vence una suscripción. Confírmala en la app.',
+  'lock.unlock': 'Desbloquear',
+  'lock.locked': 'Bloqueada',
+  'lock.reason': 'Desbloquear Spendly',
+  'toast.lockFailed': 'No se verificó. Bloqueo sin activar.',
+  'lock.hint': 'Bloqueada para proteger tus datos.',
 };
 
 export default es;

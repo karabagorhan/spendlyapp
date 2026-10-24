@@ -61,6 +61,8 @@ export type Settings = {
   currency: Cur; // ana para birimi: tüm ekranlar bu birimde gösterir (dilden bağımsız)
   budgetCur: Cur; // `budget` tutarının para birimi
   catBudgetCur: Record<string, Cur>; // kategori limitlerinin para birimleri (yoksa TRY)
+  lock: boolean; // uygulama kilidi (Face ID / parmak izi / cihaz parolası)
+  notifAmounts: boolean; // abonelik bildirimlerinde tutar görünsün (kapalıysa genel metin)
 };
 
 /** Kategori kimlikleri veride bu sabit adlarla saklanır (yedekler uyumlu kalsın); ekranda `catName` ile çevrilir. */

@@ -575,6 +575,14 @@ const en: Catalog = {
   'amount.tooLarge': 'Amount is too large (max {max}).',
   'dash.unconverted': { one: '{n} record is left out of the totals because there are no exchange rates; it still appears in lists with its original amount. Check your connection and try again.', other: '{n} records are left out of the totals because there are no exchange rates; they still appear in lists with their original amounts. Check your connection and try again.' },
   'dash.limitsUnavailable': { one: '{n} budget/limit in another currency is unavailable until rates load.', other: '{n} budgets/limits in another currency are unavailable until rates load.' },
+  'settings.lock': 'App lock',
+  'settings.notifAmounts': 'Show amounts in notifications',
+  'notif.subBodyPrivate': 'You have a subscription payment today. Remember to confirm it in the app.',
+  'lock.unlock': 'Unlock',
+  'lock.locked': 'Locked',
+  'lock.reason': 'Unlock Spendly',
+  'toast.lockFailed': 'Couldn\'t verify. App lock stays off.',
+  'lock.hint': 'Locked to protect your data.',
 };
 
 export default en;

@@ -1,12 +1,12 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as XLSX from 'xlsx';
 import { Cur } from './currency';
 import { buildExcel } from './excel';
 import { t } from './i18n';
 import { Expense, Income, Sub, iso } from './lib';
 import { Data, normalize } from './store';
+import { writeXlsx } from './xlsxWriter';
 
 /** Seçilen dosya bir Spendly yedeği değilse. */
 export class BackupFormatError extends Error {}
@@ -26,9 +26,8 @@ async function share(name: string, content: string | Uint8Array, mimeType: strin
 export async function exportExcel(items: Expense[], subs: Sub[], ym: string | null, cur: Cur, ratesNote: string | null, incomes: Income[] = []) {
   const wb = buildExcel(items, subs, ym, cur, ratesNote, incomes);
   if (!wb) return false;
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
   const name = ym ? t('file.excelMonth', { ym }) : t('file.excelAll', { date: iso(new Date()) });
-  await share(name, new Uint8Array(out), XLSX_MIME, 'org.openxmlformats.spreadsheetml.sheet');
+  await share(name, writeXlsx(wb), XLSX_MIME, 'org.openxmlformats.spreadsheetml.sheet');
   return true;
 }
 

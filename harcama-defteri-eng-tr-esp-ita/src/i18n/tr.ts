@@ -563,6 +563,14 @@ const tr: Catalog = {
   'amount.tooLarge': 'Tutar çok büyük (en fazla {max}).',
   'dash.unconverted': { other: 'Kur olmadığı için {n} kayıt toplamlara dahil edilmedi; listelerde özgün tutarıyla görünür. Bağlantını kontrol edip tekrar dene.' },
   'dash.limitsUnavailable': { other: 'Başka para birimindeki {n} bütçe/limit kur gelene kadar kullanılamıyor.' },
+  'settings.lock': 'Uygulama kilidi',
+  'settings.notifAmounts': 'Bildirimlerde tutarı göster',
+  'notif.subBodyPrivate': 'Bugün bir abonelik ödemen var. Uygulamada onaylamayı unutma.',
+  'lock.unlock': 'Kilidi aç',
+  'lock.locked': 'Kilitli',
+  'lock.reason': 'Spendly kilidini aç',
+  'toast.lockFailed': 'Doğrulanamadı. Uygulama kilidi açılmadı.',
+  'lock.hint': 'Verilerini korumak için kilitli.',
 };
 
 export default tr;

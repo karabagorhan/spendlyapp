@@ -576,6 +576,14 @@ const it: Catalog = {
   'amount.tooLarge': 'Importo troppo grande (massimo {max}).',
   'dash.unconverted': { one: '{n} voce è esclusa dai totali perché mancano i tassi di cambio; resta visibile negli elenchi con l\'importo originale. Controlla la connessione e riprova.', other: '{n} voci sono escluse dai totali perché mancano i tassi di cambio; restano visibili negli elenchi con l\'importo originale. Controlla la connessione e riprova.' },
   'dash.limitsUnavailable': { one: '{n} budget/limite in un\'altra valuta non è disponibile finché non arrivano i tassi.', other: '{n} budget/limiti in un\'altra valuta non sono disponibili finché non arrivano i tassi.' },
+  'settings.lock': 'Blocco app',
+  'settings.notifAmounts': 'Importi nelle notifiche',
+  'notif.subBodyPrivate': 'Oggi scade un abbonamento. Confermalo nell’app.',
+  'lock.unlock': 'Sblocca',
+  'lock.locked': 'Bloccata',
+  'lock.reason': 'Sblocca Spendly',
+  'toast.lockFailed': 'Verifica non riuscita. Blocco non attivato.',
+  'lock.hint': 'Bloccata per proteggere i tuoi dati.',
 };
 
 export default it;

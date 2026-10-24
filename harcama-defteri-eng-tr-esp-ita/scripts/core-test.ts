@@ -3,6 +3,7 @@
  * Tutar okuma/biçimleme, tarih adları, çoğul biçimleri ve abonelik türü tahmini; her dil için çalışır.
  */
 import * as XLSX from 'xlsx';
+import { writeXlsx } from '../src/xlsxWriter';
 import { CATALOGS, LANGS, Lang, fmtPercent, parseAmount, setLanguage, t } from '../src/i18n';
 import { setMainCurrency } from '../src/currency';
 import { normalize } from '../src/store';
@@ -127,16 +128,16 @@ eq('tr list.count 21', t('list.count', { n: 21 }), '21 işlem');
 // Excel: sayfa adları ≤31 karakter, yasak karakter yok ve xlsx kütüphanesi kabul ediyor; dosya adları geçerli
 for (const li of LANGS) {
   setLanguage(li.code as Lang);
-  const wb = XLSX.utils.book_new();
+  const names = ['xl.sheet.expenses', 'xl.sheet.categories', 'xl.sheet.months', 'xl.sheet.subscriptions'].map((k) => t(k));
   for (const k of ['xl.sheet.expenses', 'xl.sheet.categories', 'xl.sheet.months', 'xl.sheet.subscriptions']) {
     const name = t(k);
     truthy(`${li.code} ${k} geçerli sayfa adı (${name})`, name.length >= 1 && name.length <= 31 && !/[\\/?*[\]:]/.test(name));
-    let okAppend = true;
-    try { XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[t('xl.date'), t('xl.amount')]]), name); } catch { okAppend = false; }
-    truthy(`${li.code} ${k} xlsx kabul etti`, okAppend);
   }
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
-  truthy(`${li.code} xlsx yazıldı`, buf.byteLength > 1000);
+  // Yazıcıdan geçir, xlsx ile geri oku: sayfa adları aynen korunmalı
+  const bytes = writeXlsx({ sheets: names.map((name) => ({ name, rows: [[t('xl.date'), t('xl.amount')], [1, 2]] })) });
+  const back = XLSX.read(bytes, { type: 'array' });
+  eq(`${li.code} xlsx sayfa adları gidiş-dönüş`, back.SheetNames, names);
+  truthy(`${li.code} xlsx yazıldı`, bytes.byteLength > 500);
   for (const [k, p] of [['file.excelMonth', { ym: '2026-10' }], ['file.excelAll', { date: '2026-10-18' }], ['file.backup', { date: '2026-10-18' }]] as const) {
     const f = t(k, p);
     truthy(`${li.code} ${k} dosya adı geçerli (${f})`, /^[^\\/:*?"<>|\s]+$/.test(f) && f.length < 80);

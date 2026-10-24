@@ -456,7 +456,7 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
 }
 
 /* ---------- Ayarlar ekranı: ad, görünüm, bildirimler, dışa/içe aktarma ---------- */
-export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, notifWarn, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
+export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, lockAvailable, notifWarn, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
   settings: Settings;
   rates: Rates | null;
   refreshing: boolean;
@@ -467,6 +467,8 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
   onBackup: () => void;
   onRestore: () => void;
   /** Hatırlatma anahtarı açık ama bildirim izni yok: uyarı satırı ve düzeltme düğmesi (sorulamıyorsa sistem ayarlarını açar). */
+  /** Uygulama kilidi anahtarı görünsün mü (cihazda biyometri/parola varsa; web'de hayır). */
+  lockAvailable?: boolean;
   notifWarn?: { canAskAgain: boolean; onFix: () => void } | null;
   /** Hesap ve yasal bölümleri (giriş kapısı sağlar). */
   account?: ReactNode;
@@ -550,6 +552,10 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.subReminder')}</Text>
           <Switch value={settings.subRemind} onValueChange={(v) => onChange({ ...settings, subRemind: v })} trackColor={{ true: t.accent }} />
         </View>
+        <View style={row}>
+          <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.notifAmounts')}</Text>
+          <Switch value={settings.notifAmounts} onValueChange={(v) => onChange({ ...settings, notifAmounts: v })} trackColor={{ true: t.accent }} />
+        </View>
         {notifWarn ? (
           <View style={{ gap: 8, paddingTop: 10 }} testID="notif-warn">
             <Text style={{ color: t.warn, fontSize: 13, lineHeight: 18 }}>{tr(notifWarn.canAskAgain ? 'settings.notifOff' : 'settings.notifOffSystem')}</Text>
@@ -557,6 +563,15 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           </View>
         ) : null}
       </View>
+
+      {lockAvailable ? (
+        <View style={{ gap: 0 }}>
+          <View style={row}>
+            <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.lock')}</Text>
+            <Switch value={settings.lock} onValueChange={(v) => onChange({ ...settings, lock: v })} trackColor={{ true: t.accent }} accessibilityLabel={tr('settings.lock')} />
+          </View>
+        </View>
+      ) : null}
 
       <View style={{ gap: 10 }}>
         <Label t={t}>{tr('settings.excel')}</Label>

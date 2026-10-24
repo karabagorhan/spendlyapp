@@ -11,7 +11,7 @@ export const KEY = 'harcama-defteri:v1';
 
 export type Data = { items: Expense[]; subs: Sub[]; incomes: Income[]; settings: Settings };
 
-export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'system', accent: 'sapphire', tint: 'blue', name: '', hideBalance: false, language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {} };
+export const defaultSettings: Settings = { budget: 0, remind: false, remindHour: 21, subRemind: true, catBudgets: {}, theme: 'system', accent: 'sapphire', tint: 'blue', name: '', hideBalance: false, language: 'tr', currency: 'TRY', budgetCur: 'TRY', catBudgetCur: {}, lock: false, notifAmounts: true };
 const empty: Data = { items: [], subs: [], incomes: [], settings: defaultSettings };
 
 function num(v: unknown, d = 0) {
@@ -66,6 +66,8 @@ export function normalize(raw: any): Data {
     remind: st.remind === true,
     remindHour: Math.min(23, Math.max(0, num(st.remindHour, 21))),
     subRemind: st.subRemind !== false,
+    lock: st.lock === true,
+    notifAmounts: st.notifAmounts !== false,
     theme: st.theme === 'ivory' || st.theme === 'system' ? st.theme : 'noir',
     accent: isAccent(st.accent) ? st.accent : 'gold',
     tint: isTint(st.tint) ? st.tint : 'classic',

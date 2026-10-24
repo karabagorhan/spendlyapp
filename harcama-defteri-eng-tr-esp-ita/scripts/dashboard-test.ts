@@ -4,7 +4,8 @@
  * para birimi dönüşümü ve kodda dinamik üretilen çeviri anahtarlarının tüm dillerde varlığı.
  */
 import * as XLSX from 'xlsx';
-import { buildExcel } from '../src/excel';
+import { buildExcel as buildDesc } from '../src/excel';
+import { XlWorkbook, writeXlsx } from '../src/xlsxWriter';
 import { CATALOGS, LANGS, Lang, setLanguage } from '../src/i18n';
 import { Cur, Rates, needsRates, setMainCurrency, viewData } from '../src/currency';
 import { Expense, INCOME_CATS, Income, balanceFor, budgetProgress, categorySlices, dayLabel, dayLabelShort, greetingKey, recentTransactions, shortDay, todayIso, addDays } from '../src/lib';
@@ -180,6 +181,9 @@ eq('kompakt tarih: dün adıyla', dayLabelShort(addDays(todayIso(), -1)), dayLab
 eq('kompakt tarih: eski tarih kısa biçimde', dayLabelShort('2026-01-05'), shortDay('2026-01-05'));
 
 /* ---------- Excel çalışma kitabı (gelir sayfası, yalnızca gelir olan ay) ---------- */
+// Çalışma kitabı tarifi yazıcıdan geçirilip xlsx kütüphanesiyle GERİ OKUNUR (kendi çıktımızı okumak güvenlidir)
+const readBack = (d: XlWorkbook | null) => (d ? XLSX.read(writeXlsx(d), { type: 'array', cellNF: true, cellStyles: true }) : null);
+const buildExcel = (...a: Parameters<typeof buildDesc>) => readBack(buildDesc(...a));
 const rowsOf = (wb: XLSX.WorkBook, name: string) => XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1 });
 // Kayıt satırları: ilk hücre tarih seri numarasıdır (toplam satırında yoktur)
 const records = (wb: XLSX.WorkBook, name: string) => rowsOf(wb, name).filter((r) => typeof r[0] === 'number');
@@ -197,6 +201,32 @@ eq('excel: o ay ne harcama ne gelir varsa null', buildExcel(xe, [], '2026-01', '
 eq('excel: gelir parametresi verilmezse eski davranış (gelir sayfası yok)', buildExcel(xe, [], '2026-10', 'TRY', null)!.SheetNames, ['Expenses', 'Categories']);
 const wbEvery = buildExcel(xe, [], null, 'TRY', null, xi)!;
 eq('excel: tüm kayıtlar: aylar sayfası + gelir (2 kayıt)', [wbEvery.SheetNames.includes('Months'), records(wbEvery, 'Income').length], [true, 2]);
+
+// Sayı biçimleri (cell.z) yazıcıdan sonra da korunur
+eq('excel: tarih biçimi korunur', wbAll.Sheets['Expenses'].A2.z, CATALOGS.en['xl.dateFormat']);
+eq('excel: para biçimi korunur', wbAll.Sheets['Expenses'].D2.z, '#,##0.00 "₺"');
+eq('excel: yüzde biçimi korunur', wbAll.Sheets['Categories'].C2.z, '0.0%');
+eq('excel: başlık hücresi biçimsiz', wbAll.Sheets['Expenses'].A1.z, 'General');
+eq('excel: sütun genişlikleri', wbAll.Sheets['Expenses']['!cols']?.slice(0, 3).map((c) => Math.round(c.width ?? 0)), [13, 17, 35]);
+// Not: <&>"' ve XML'de geçersiz kontrol karakteri
+const nasty = `<&>"' ünï 😀`;
+const wbNasty = buildExcel([exp('n1', '2026-10-05', 5, 'Market', { note: nasty + '\u0001\u0008' })], [], '2026-10', 'TRY', null)!;
+eq('excel: özel karakterli not gidiş-dönüş', records(wbNasty, 'Expenses').map((r) => r[2]), [nasty]);
+// Yazıcı: sayfa adı temizliği ve benzersizlik, boş/sonlu olmayan hücreler
+const wbNames = readBack({ sheets: [
+  { name: 'A[1]:b*?/\\', rows: [['x', 1]] }, { name: 'a[1]:b*?/\\', rows: [['y']] }, { name: 'x'.repeat(40), rows: [] }, { name: '', rows: [[null, 'a', undefined, NaN, 2]] },
+] })!;
+eq('yazıcı: sayfa adları temiz, ≤31 ve benzersiz', wbNames.SheetNames.every((n) => n.length <= 31 && !/[[\]:*?/\\]/.test(n)) && new Set(wbNames.SheetNames.map((n) => n.toLowerCase())).size === 4, true);
+const sh4 = wbNames.Sheets[wbNames.SheetNames[3]];
+eq('yazıcı: boş ve sonlu olmayan hücreler atlanır', [sh4.A1, sh4.B1?.v, sh4.C1, sh4.D1, sh4.E1?.v], [undefined, 'a', undefined, undefined, 2]);
+
+/* ---------- Kilit ve bildirim gizliliği ayarları ---------- */
+eq('varsayılan ayar: lock=false, notifAmounts=true', [defaultSettings.lock, defaultSettings.notifAmounts], [false, true]);
+eq('eski veri (alanlar yok): lock=false, notifAmounts=true', [normalize(legacy).settings.lock, normalize(legacy).settings.notifAmounts], [false, true]);
+eq('boş veri: lock=false, notifAmounts=true', [normalize({}).settings.lock, normalize({}).settings.notifAmounts], [false, true]);
+eq('lock yalnızca true ise açık', [normalize({ settings: { lock: true } }).settings.lock, normalize({ settings: { lock: 'true' } }).settings.lock, normalize({ settings: { lock: 1 } }).settings.lock], [true, false, false]);
+eq('notifAmounts yalnızca false ise kapalı', [normalize({ settings: { notifAmounts: false } }).settings.notifAmounts, normalize({ settings: { notifAmounts: 0 } }).settings.notifAmounts, normalize({ settings: { notifAmounts: 'x' } }).settings.notifAmounts], [false, true, true]);
+eq('yedekte lock/notifAmounts korunur', (({ lock, notifAmounts }) => [lock, notifAmounts])(normalize(JSON.parse(JSON.stringify({ settings: { lock: true, notifAmounts: false } }))).settings), [true, false]);
 
 /* ---------- Dinamik çeviri anahtarları her dilde var ---------- */
 const dyn = [

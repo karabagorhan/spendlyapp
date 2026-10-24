@@ -37,6 +37,7 @@
       "expo-web-browser",
       "expo-secure-store",
       "expo-apple-authentication",
+      ["expo-local-authentication", { "faceIDPermission": "Allow Spendly to use Face ID to unlock your data." }],
       [
         "expo-splash-screen",
         {

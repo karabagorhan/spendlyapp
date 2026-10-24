@@ -43,6 +43,7 @@ export async function ensurePermission() {
 }
 
 /**
+ * (Gizlilik: `notifAmounts` kapalıysa gövdede tutar yazmaz.)
  * (Ödeme bildirimi tutarı, aboneliğin gerçekten ödendiği para biriminde yazılır; ana para birimine çevrilmez.)
  * Bütün yerel bildirimleri baştan kurar: her akşam hatırlatma ve
  * her aboneliğin bir sonraki ödeme günü sabahı 10:00'da uyarı.
@@ -69,7 +70,7 @@ export async function reschedule(settings: Settings, subs: Sub[], items: Expense
         const when = new Date(target.getFullYear(), target.getMonth(), target.getDate(), 10, 0);
         if (when.getTime() <= now) continue;
         await Notifications.scheduleNotificationAsync({
-          content: { title: t('notif.subTitle', { name: s.name }), body: t('notif.subBody', { amount: fmtMoney(s.amount, s.cur ?? 'TRY') }) },
+          content: { title: t('notif.subTitle', { name: s.name }), body: settings.notifAmounts === false ? t('notif.subBodyPrivate') : t('notif.subBody', { amount: fmtMoney(s.amount, s.cur ?? 'TRY') }) },
           trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when },
         });
       }

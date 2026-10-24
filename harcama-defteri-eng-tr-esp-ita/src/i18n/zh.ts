@@ -576,6 +576,14 @@ const zh: Catalog = {
   'amount.tooLarge': '金额过大（最多 {max}）。',
   'dash.unconverted': { other: '由于没有汇率，有 {n} 条记录未计入合计；它们仍会以原始金额显示在列表中。请检查网络后重试。' },
   'dash.limitsUnavailable': { other: '有 {n} 个其他货币的预算/限额在获取汇率前无法使用。' },
+  'settings.lock': '应用锁',
+  'settings.notifAmounts': '通知中显示金额',
+  'notif.subBodyPrivate': '今天有一笔订阅要扣款。别忘了在应用里确认。',
+  'lock.unlock': '解锁',
+  'lock.locked': '已锁定',
+  'lock.reason': '解锁 Spendly',
+  'toast.lockFailed': '验证失败，应用锁未开启。',
+  'lock.hint': '已锁定以保护你的数据。',
 };
 
 export default zh;

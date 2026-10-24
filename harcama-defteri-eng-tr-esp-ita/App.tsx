@@ -15,6 +15,7 @@ import {
   Analysis, Expense, Income, SUB_TYPES, Settings, Sub, addMonths, analyse, budgetProgress, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
   MAX_AMOUNT, balanceFor, incomeCatName, insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, recentTransactions, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
 } from './src/lib';
+import { LockLayer, authenticate, useAppLock, useLockSupported } from './src/lock';
 import { PermInfo, ensurePermission, permissionInfo, reschedule } from './src/notify';
 import { BudgetPanel, ExpenseSheet, IncomeSheet, SettingsPanel, SubSheet } from './src/sheets';
 import { merge, useAppData } from './src/store';
@@ -108,6 +109,8 @@ function Main() {
   const { data, update, status, reload, recovered, saveFailed } = useAppData();
   const { notice, setNotice } = useAccount();
   const rs = useRates();
+  const lock = useAppLock(!!data?.settings.lock);
+  const lockSupported = useLockSupported();
   // Dil çizim sırasında (alt bileşenlerden önce) ayarlanır; değişince <LanguageProvider> ağacı yeniden çizdirir.
   const lang = data?.settings.language ?? deviceLanguage();
   setLanguage(lang);
@@ -283,6 +286,13 @@ function Main() {
     setNotice(null);
   }, [data, notice]);
 
+  // Kilitlenince açık sayfa/menüler kapanır (yerel Modal'lar kilit katmanının üstünde kalmasın)
+  useEffect(() => {
+    if (!lock.locked) return;
+    setExpSheet(null); setSubSheet(null); setIncSheet(null); setCurMenu(false); setMenuOpen(false);
+  }, [lock.locked]);
+
+  const lockLayer = <LockLayer locked={lock.locked} covered={lock.covered} onUnlock={lock.unlock} t={t} />;
   if (status === 'error') return <LanguageProvider value={lang}><ErrorState t={t} onRetry={reload} topInset={insets.top} /></LanguageProvider>;
   if (!data || !view) return <LanguageProvider value={lang}><DashboardSkeleton t={t} topInset={insets.top} /></LanguageProvider>;
 
@@ -386,6 +396,11 @@ function Main() {
     update((d) => ({ ...d, subs: d.subs.map((x) => (x.id === s.id ? { ...x, skip: period } : x)) }));
   };
   const changeSettings = async (next: Settings) => {
+    // Uygulama kilidi açılmadan önce doğrulama başarılı olmalı (kilitli kalıp çıkamama riskine karşı)
+    if (next.lock && !settings.lock) {
+      if ((await authenticate()) !== 'ok') { toast(tr('toast.lockFailed')); return; }
+      lock.markUnlocked();
+    }
     const turnedOn = (next.remind && !settings.remind) || (next.subRemind && !settings.subRemind);
     update((d) => ({ ...d, settings: fromViewSettings(next, d.settings, settings) }));
     if (next.budget !== settings.budget) toast(next.budget ? tr('toast.budgetSaved') : tr('toast.budgetRemoved'));
@@ -782,6 +797,7 @@ function Main() {
           onExport={doExport}
           onBackup={doBackup}
           onRestore={doRestore}
+          lockAvailable={lockSupported || settings.lock}
           notifWarn={perm && perm.state !== 'granted' && (settings.remind || settings.subRemind) ? { canAskAgain: perm.canAskAgain, onFix: fixNotifPermission } : null}
           account={<AccountSection t={t} />}
           ym={ym}
@@ -904,6 +920,7 @@ function Main() {
       {subSheet ? (
         <SubSheet key={subSheet.key} visible initial={subSheet.initial} main={main} rates={rs.rates} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubSheet(null)} t={t} />
       ) : null}
+      {lockLayer}
     </View>
     </LanguageProvider>
   );
