@@ -12,6 +12,20 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
+function findChromium() {
+  if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
+  try {
+    const hits = [];
+    for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => n.startsWith('chromium-')).sort())
+      for (const s of fs.readdirSync(`/opt/pw-browsers/${d}`).filter((n) => n.startsWith('chrome-linux')).sort())
+        if (fs.existsSync(`/opt/pw-browsers/${d}/${s}/chrome`)) hits.push(`/opt/pw-browsers/${d}/${s}/chrome`);
+    return hits.pop();
+  } catch {
+    return undefined;
+  }
+}
+
 const lang = process.argv[2] || 'en';
 const WEB_DIR = process.env.WEB_DIR || '/tmp/web-out';
 const PORT = 8900 + Math.floor(Math.random() * 100);
@@ -56,7 +70,7 @@ const baseData = (extra = {}) => ({
 (async () => {
   await new Promise((r) => server.listen(PORT, r));
   const base = `http://127.0.0.1:${PORT}/`;
-  const exe = process.env.PW_CHROMIUM || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
+  const exe = findChromium();
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   let pass = 0; const errors = [];
   const ok = (name, cond, detail = '') => { if (cond) { pass++; console.log('OK    ' + name); } else { errors.push(name); console.log('HATA  ' + name + (detail ? ' — ' + String(detail).slice(0, 300) : '')); } };

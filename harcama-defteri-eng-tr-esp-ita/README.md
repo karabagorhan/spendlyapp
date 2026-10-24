@@ -68,6 +68,9 @@ Expo Go'da açmak için (iPhone'da Safari'ye ya da Notlar'a yapıştırıp dokun
 Diğer açılış bağlantıları: `…&channel-name=ekle` (yeni harcama formu), `…&channel-name=ayarlar` (Ayarlar), `…&channel-name=butce` (bütçe alanı).
 
 Yeniden yayınlamak: `npx eas-cli@latest update --branch main --environment production --message "..."`.
+Mağaza derlemeleri (`eas build --profile production`) ise `production` kanalına bağlıdır (`eas.json`).
+
+Supabase değişkenleri (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) repoda tutulmaz; EAS ortamlarında (`eas env:create`) tanımlanır.
 
 ```bash
 npm install
@@ -91,6 +94,12 @@ npm test                 # tip + çeviri + çekirdek + kur + tema + hesap mantı
 npm run test:sql         # gerçek PostgreSQL'de migration ve RLS testleri (initdb/psql gerekir)
 npm run check:release    # yayın engelleri (yasal bilgiler, sahte servis, anahtar sızıntısı)
 ```
+
+## Marka görselleri (geçici)
+
+`assets/` klasöründeki simge, Android uyarlanabilir simge, açılış ekranı ve favicon görselleri **geçici olarak üretilmiş** ara görsellerdir
+(beyaz "S" harfi, mavi gradyan). Mağaza gönderiminden önce tasarımcının son görselleriyle **mutlaka değiştirilmelidir**;
+`npm run check:release` bu görsellerin varsayılan Expo şablonu olmadığını denetler ama tasarım onayının yerini tutmaz.
 
 ## Testler
 
