@@ -5,7 +5,7 @@ import { Animated, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, T
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
 import { contrast } from './palette';
-import { Analysis, Insight, catIndex, catName, compact, pad, subLabel, subType, subTypeIndex } from './lib';
+import { Analysis, Insight, catIndex, catName, compact, pad, subType, subTypeIndex } from './lib';
 import { FONTS, Theme } from './theme';
 
 export function Chip({ label, active, color, icon, onPress, t, disabled }: { label: string; active: boolean; color?: string; icon?: IconName; onPress: () => void; t: Theme; disabled?: boolean }) {
@@ -152,12 +152,15 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
  * Tutar metni: rakamlar serif yazı tipinde, para simgesi (₺ $ € £ ¥; yazı tipinde ₺ bulunmadığı için) sistem yazı tipinde
  * ve daha küçük yazılır. Simge sayının önünde (₺1.250) ya da sonunda (1250 €) olabilir.
  */
-export function Amount({ text, style, symbolColor }: { text: string; style: StyleProp<TextStyle>; symbolColor?: string }) {
+/** Uzun tutar tek satırda kalsın diye yazı boyutunu metin uzunluğuna göre küçültür (web'de `adjustsFontSizeToFit` çalışmaz). `max`: bu uzunluğa kadar tam boyut. */
+export const fitFont = (text: string, base: number, max: number) => (text.length <= max ? base : Math.max(base * 0.55, (base * max) / text.length));
+
+export function Amount({ text, style, symbolColor, fit }: { text: string; style: StyleProp<TextStyle>; symbolColor?: string; fit?: boolean }) {
   const flat = StyleSheet.flatten(style) || {};
   const size = (flat.fontSize ?? 16) * 0.6;
   const parts = text.split(/([₺$€£¥])/);
   return (
-    <Text style={[style, { fontVariant: ['lining-nums'] }]}>
+    <Text style={[style, { fontVariant: ['lining-nums'] }]} {...(fit ? { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 } : {})}>
       {parts.map((p, i) =>
         SYMBOL_SET.includes(p) ? (
           <Text key={i} style={{ fontFamily: 'System', fontSize: size, fontWeight: '400', color: symbolColor ?? flat.color, letterSpacing: 0 }}>{p}</Text>

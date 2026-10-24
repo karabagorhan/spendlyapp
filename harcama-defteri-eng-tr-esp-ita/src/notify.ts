@@ -55,3 +55,9 @@ export async function reschedule(settings: Settings, subs: Sub[], items: Expense
     // Bildirim kurulamazsa uygulamanın geri kalanı etkilenmesin.
   }
 }
+
+export async function cancelAllReminders() {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {}
+}

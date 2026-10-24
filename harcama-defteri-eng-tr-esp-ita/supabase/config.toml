@@ -1,0 +1,38 @@
+# Supabase CLI yapılandırması (yerel geliştirme: `supabase start`; bulut: panelden aynı ayarlar elle yapılır, docs/ARCHITECTURE.md).
+project_id = "harcama-defteri"
+
+[auth]
+site_url = "harcama://auth-callback"
+# Uygulama bağlantıları + geliştirmede Expo Go (exp://) için joker
+additional_redirect_urls = ["harcama://auth-callback", "harcama://reset-callback", "exp://**"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+# İstemci doğrulamasıyla (src/auth/validation.ts) aynı: en az 8 karakter, bileşim şartı yok (uzunluk + yaygın parola denetimi)
+minimum_password_length = 8
+
+[auth.email]
+enable_signup = true
+# Zorunlu e-posta doğrulaması: doğrulanmayan hesap giriş yapamaz
+enable_confirmations = true
+double_confirm_changes = true
+secure_password_change = true
+
+[auth.external.apple]
+enabled = true
+client_id = "com.karabag.harcamadefteri.global"
+secret = "env(APPLE_OAUTH_SECRET)"
+skip_nonce_check = false
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+skip_nonce_check = false
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.apple-link]
+verify_jwt = true

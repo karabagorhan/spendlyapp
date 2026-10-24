@@ -52,6 +52,14 @@ export const LANGS: LangInfo[] = [
 export const CATALOGS: Record<Lang, Catalog> = { tr, en, es, it, zh };
 export const isLang = (v: unknown): v is Lang => typeof v === 'string' && LANGS.some((l) => l.code === v);
 
+/** Cihazın diline en yakın desteklenen dil; tanınmazsa İngilizce. Yalnızca ilk kurulumda varsayılan olarak kullanılır. */
+export function deviceLanguage(): Lang {
+  let loc = '';
+  try { loc = Intl.DateTimeFormat().resolvedOptions().locale || ''; } catch {}
+  const code = loc.toLowerCase().split(/[-_]/)[0];
+  return isLang(code) ? code : 'en';
+}
+
 let current: Lang = 'tr';
 export function setLanguage(l: Lang) {
   current = l;

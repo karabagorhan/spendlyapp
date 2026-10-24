@@ -64,7 +64,7 @@ const data = (extra: Record<string, unknown> = {}) => ({
     await page.waitForTimeout(1200);
   };
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('harcama-defteri:v1') as string));
-  const menuBtn = () => page.locator('[role="button"][aria-label]').first();
+  const menuBtn = () => page.getByTestId('menu-open');
   const goSettings = async () => { await menuBtn().click(); await page.waitForTimeout(450); await page.locator('[role="menuitem"]').nth(6).click(); await page.waitForTimeout(600); };
   // Ekranın arka plan rengi: en büyük (ekranı kaplayan) arka planlı öğe
   const pageBg = () => page.evaluate(() => {
