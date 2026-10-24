@@ -1,0 +1,73 @@
+name: Spendly CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: harcama-defteri-eng-tr-esp-ita
+
+jobs:
+  test:
+    name: Birim testleri (npm test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: harcama-defteri-eng-tr-esp-ita/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  release-check:
+    name: Yayın denetimi (görünür, geçici olarak hata verebilir)
+    runs-on: ubuntu-latest
+    # Yasal alanlar (REPLACE_ME) doldurulana kadar beklenen sonuç hata; adım görünür kalsın diye engellemez
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: harcama-defteri-eng-tr-esp-ita/package-lock.json
+      - run: npm ci
+      - run: npm run check:release
+
+  sql:
+    name: PostgreSQL migration ve RLS testleri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: harcama-defteri-eng-tr-esp-ita/package-lock.json
+      # ubuntu-latest üzerinde PostgreSQL önceden kurulu; script /usr/lib/postgresql/*/bin altını arar
+      - run: npm ci
+      - run: npm run test:sql
+
+  web-ui:
+    name: Web arayüzü testleri (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: harcama-defteri-eng-tr-esp-ita/package-lock.json
+      - run: npm ci
+      - name: Tarayıcıyı kur
+        run: npx playwright-core install --with-deps chromium
+      - name: Web paketini al
+        run: npx expo export --platform web --output-dir /tmp/web-out
+      - name: Spendly paneli testi
+        run: WEB_DIR=/tmp/web-out npx tsx scripts/dashboard-ui-test.ts tr
+      - name: Tüm ekranlar testi
+        run: WEB_DIR=/tmp/web-out node scripts/ui-test.js tr

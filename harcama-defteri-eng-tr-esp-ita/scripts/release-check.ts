@@ -5,9 +5,11 @@
  *   - Hesap özellikleri için Supabase değişkenleri ayarlı mı; sahte hesap servisi KAPALI mı
  *   - Apple ile giriş yeteneği ve gerekli eklentiler app.json'da var mı
  *   - Hizmet anahtarı (service_role) uygulama koduna sızmış mı
+ *   - Marka görselleri Expo şablonu mu, simge boyutu/alfa kanalı doğru mu, eas.json production profili var mı
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
+import { createHash } from 'node:crypto';
 
 const root = join(__dirname, '..');
 const fails: string[] = [];
@@ -30,6 +32,31 @@ const app = JSON.parse(read('app.json')).expo;
 if (app.ios?.usesAppleSignIn !== true) fails.push('app.json: ios.usesAppleSignIn true olmalı (Apple ile giriş)');
 for (const p of ['expo-apple-authentication', 'expo-secure-store', 'expo-web-browser']) if (!app.plugins?.includes(p)) fails.push(`app.json: "${p}" eklentisi eksik`);
 if (!app.scheme) fails.push('app.json: scheme yok (e-posta doğrulama bağlantıları uygulamayı açamaz)');
+const splashPlugin = (app.plugins ?? []).find((p: unknown) => Array.isArray(p) && p[0] === 'expo-splash-screen');
+if (!splashPlugin || typeof splashPlugin[1] !== 'object') fails.push('app.json: "expo-splash-screen" eklenti ayarı (image, backgroundColor) yok');
+if (app.ios?.infoPlist?.ITSAppUsesNonExemptEncryption === undefined) warns.push('app.json: ios.infoPlist.ITSAppUsesNonExemptEncryption ayarlı değil (App Store Connect her derlemede şifreleme sorusu sorar)');
+
+// 3b) Marka görselleri ve EAS yapılandırması
+const TEMPLATE_MD5: Record<string, string> = {
+  'assets/icon.png': 'cb975bba2216ce10a60e6c0ffe9941a2',
+  'assets/android-icon-foreground.png': '72e71a9c846c6aa4ae32476641a00e18',
+  'assets/splash-icon.png': '97dae5a0e62ad8551d8a31897b425e63',
+};
+for (const [p, sum] of Object.entries(TEMPLATE_MD5)) {
+  const md5 = createHash('md5').update(readFileSync(join(root, p))).digest('hex');
+  if (md5 === sum) fails.push(`${p}: Expo şablon görseli (varsayılan "A" logosu); mağaza reddi riski, marka görseliyle değiştirin`);
+}
+// PNG IHDR: genişlik 16-19, yükseklik 20-23, renk tipi 25 (4 ve 6 alfa kanallı)
+const iconBuf = readFileSync(join(root, 'assets/icon.png'));
+const iconW = iconBuf.readUInt32BE(16);
+const iconH = iconBuf.readUInt32BE(20);
+const iconColorType = iconBuf[25];
+if (iconW !== 1024 || iconH !== 1024) fails.push(`assets/icon.png: 1024x1024 olmalı (şu an ${iconW}x${iconH})`);
+if (iconColorType === 4 || iconColorType === 6) fails.push('assets/icon.png: alfa kanalı içeriyor; App Store simgesi şeffaflık içermemeli');
+let eas: any = null;
+try { eas = JSON.parse(read('eas.json')); } catch { /* aşağıda işaretlenir */ }
+if (!eas?.build?.production) fails.push('eas.json: yok ya da "build.production" profili tanımlı değil');
+if (read('README.md').includes('Marka görselleri (geçici)')) warns.push('README.md: "Marka görselleri (geçici)" bölümü var; son marka görselleri gelince bölümü kaldırın');
 
 // 4) Kaynak kodda sızıntı
 const files: string[] = [];

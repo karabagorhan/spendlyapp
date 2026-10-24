@@ -14,6 +14,20 @@ import { CATALOGS, Lang, fmtPercent, setLanguage, t as tr } from '../src/i18n';
 import { fmtMoney, setMainCurrency } from '../src/currency';
 import { catName, greetingKey } from '../src/lib';
 
+// Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
+function findChromium(): string | undefined {
+  if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
+  try {
+    const hits: string[] = [];
+    for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => n.startsWith('chromium-')).sort())
+      for (const s of fs.readdirSync(`/opt/pw-browsers/${d}`).filter((n) => n.startsWith('chrome-linux')).sort())
+        if (fs.existsSync(`/opt/pw-browsers/${d}/${s}/chrome`)) hits.push(`/opt/pw-browsers/${d}/${s}/chrome`);
+    return hits.pop();
+  } catch {
+    return undefined;
+  }
+}
+
 const lang = (process.argv[2] || 'en') as Lang;
 const WEB_DIR = process.env.WEB_DIR || '/tmp/web-dash';
 const PORT = 9000 + Math.floor(Math.random() * 90);
@@ -161,7 +175,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
 
 (async () => {
   await new Promise<void>((r) => server.listen(PORT, r));
-  const exe = process.env.PW_CHROMIUM || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((x) => fs.existsSync(x));
+  const exe = findChromium();
   browser = await chromium.launch(exe ? { executablePath: exe } : {});
 
   /* 1) Panel: gerçek veri üzerinde hesaplar */

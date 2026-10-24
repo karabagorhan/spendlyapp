@@ -82,6 +82,8 @@ export function createMockService(): AuthService {
     resendVerification: (email) => call('resend', () => { void email; }),
     sendPasswordReset: (email) => call('reset', () => { void email; }),
     handleLink: (url) => call('link', () => {
+      // Gerçek servisle aynı: yalnızca hesap dönüş bağlantıları işlenir, diğer adresler (açılış vb.) yok sayılır
+      if (!url.includes('auth-callback') && !url.includes('reset-callback')) return { kind: 'ignored' as const };
       const code = new URLSearchParams(url.split('?')[1] ?? '').get('code') ?? '';
       const [kind, email] = code.split(':');
       const r = db.find((x) => x.email === email);
