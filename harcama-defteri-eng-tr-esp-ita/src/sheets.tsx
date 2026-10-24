@@ -466,9 +466,9 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
   onExport: (ym: string | null) => void;
   onBackup: () => void;
   onRestore: () => void;
-  /** Hatırlatma anahtarı açık ama bildirim izni yok: uyarı satırı ve düzeltme düğmesi (sorulamıyorsa sistem ayarlarını açar). */
   /** Uygulama kilidi anahtarı görünsün mü (cihazda biyometri/parola varsa; web'de hayır). */
   lockAvailable?: boolean;
+  /** Hatırlatma anahtarı açık ama bildirim izni yok: uyarı satırı ve düzeltme düğmesi (sorulamıyorsa sistem ayarlarını açar). */
   notifWarn?: { canAskAgain: boolean; onFix: () => void } | null;
   /** Hesap ve yasal bölümleri (giriş kapısı sağlar). */
   account?: ReactNode;

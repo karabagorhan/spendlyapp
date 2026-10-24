@@ -580,7 +580,6 @@ const zh: Catalog = {
   'settings.notifAmounts': '通知中显示金额',
   'notif.subBodyPrivate': '今天有一笔订阅要扣款。别忘了在应用里确认。',
   'lock.unlock': '解锁',
-  'lock.locked': '已锁定',
   'lock.reason': '解锁 Spendly',
   'toast.lockFailed': '验证失败，应用锁未开启。',
   'lock.hint': '已锁定以保护你的数据。',

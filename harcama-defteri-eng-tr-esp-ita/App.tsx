@@ -497,7 +497,7 @@ function Main() {
   const curTotal = sum(curItems);
   const byCat: Record<string, number> = {};
   curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
-  const pendingSubs = subs.filter((x) => subStatus(x, payItems).state === 'pending').length;
+  const pendingSubs = subs.concat(un.subs).filter((x) => subStatus(x, payItems).state === 'pending').length; // rozet: çevrilemeyen abonelikler de ödeme bekler
   const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
 
   const txnToggle = (
@@ -831,7 +831,7 @@ function Main() {
     ] },
   ];
   const menuPins = Object.keys(byCat).sort((p, q) => byCat[q] - byCat[p]).slice(0, 3).map((c) => ({ cat: c, amount: money0(byCat[c]) }));
-  const lastTs = items.reduce((m, x) => Math.max(m, x.ts || 0), 0);
+  const lastTs = payItems.reduce((m, x) => Math.max(m, x.ts || 0), 0);
   const curMonthName = monthOnly(curYm);
 
   return (
@@ -909,15 +909,16 @@ function Main() {
         t={t}
       />
 
-      <CurrencyMenu visible={curMenu} t={t} current={main} rates={rs.rates} onClose={() => setCurMenu(false)}
+      <CurrencyMenu visible={curMenu && !lock.locked} t={t} current={main} rates={rs.rates} onClose={() => setCurMenu(false)}
         onPick={(c) => { setCurMenu(false); if (c !== main) changeSettings({ ...settings, currency: c }); }} />
-      {incSheet ? (
+      {/* Kilitliyken yerel Modal sayfaları çizilmez (kilit katmanının üstünde açılıp veriyi göstermesinler; ör. kilitliyken gelen derin bağlantı) */}
+      {incSheet && !lock.locked ? (
         <IncomeSheet key={incSheet.key} visible initial={incSheet.initial} main={main} rates={rs.rates} onSave={saveIncome} onDelete={deleteIncome} onClose={() => setIncSheet(null)} t={t} />
       ) : null}
-      {expSheet ? (
+      {expSheet && !lock.locked ? (
         <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} lastCat={items.reduce<Expense | null>((a, e) => (!a || e.ts > a.ts ? e : a), null)?.cat} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
       ) : null}
-      {subSheet ? (
+      {subSheet && !lock.locked ? (
         <SubSheet key={subSheet.key} visible initial={subSheet.initial} main={main} rates={rs.rates} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubSheet(null)} t={t} />
       ) : null}
       {lockLayer}

@@ -567,7 +567,6 @@ const tr: Catalog = {
   'settings.notifAmounts': 'Bildirimlerde tutarı göster',
   'notif.subBodyPrivate': 'Bugün bir abonelik ödemen var. Uygulamada onaylamayı unutma.',
   'lock.unlock': 'Kilidi aç',
-  'lock.locked': 'Kilitli',
   'lock.reason': 'Spendly kilidini aç',
   'toast.lockFailed': 'Doğrulanamadı. Uygulama kilidi açılmadı.',
   'lock.hint': 'Verilerini korumak için kilitli.',

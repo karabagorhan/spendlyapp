@@ -579,7 +579,6 @@ const en: Catalog = {
   'settings.notifAmounts': 'Show amounts in notifications',
   'notif.subBodyPrivate': 'You have a subscription payment today. Remember to confirm it in the app.',
   'lock.unlock': 'Unlock',
-  'lock.locked': 'Locked',
   'lock.reason': 'Unlock Spendly',
   'toast.lockFailed': 'Couldn\'t verify. App lock stays off.',
   'lock.hint': 'Locked to protect your data.',

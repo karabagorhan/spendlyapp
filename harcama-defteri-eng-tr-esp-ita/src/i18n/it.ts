@@ -580,7 +580,6 @@ const it: Catalog = {
   'settings.notifAmounts': 'Importi nelle notifiche',
   'notif.subBodyPrivate': 'Oggi scade un abbonamento. Confermalo nell’app.',
   'lock.unlock': 'Sblocca',
-  'lock.locked': 'Bloccata',
   'lock.reason': 'Sblocca Spendly',
   'toast.lockFailed': 'Verifica non riuscita. Blocco non attivato.',
   'lock.hint': 'Bloccata per proteggere i tuoi dati.',

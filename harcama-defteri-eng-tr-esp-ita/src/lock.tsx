@@ -85,7 +85,7 @@ export function useAppLock(enabled: boolean) {
 export function LockLayer({ locked, covered, onUnlock, t }: { locked: boolean; covered: boolean; onUnlock: () => void; t: Theme }) {
   if (!locked && !covered) return null;
   return (
-    <View style={[StyleSheet.absoluteFill, st.wrap, { backgroundColor: t.bg }]} testID={locked ? 'lock-screen' : 'lock-cover'}>
+    <View style={[StyleSheet.absoluteFill, st.wrap, { backgroundColor: t.bg }]} testID={locked ? 'lock-screen' : 'lock-cover'} accessibilityViewIsModal>
       <Text style={{ color: t.fg, fontSize: 34, fontFamily: FONTS.display }}>{tr('app.name')}</Text>
       {locked ? (
         <>
