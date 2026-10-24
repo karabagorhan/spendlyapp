@@ -299,10 +299,10 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     ok('kur yokken açıklama gösterilir', await has(p, T('dash.currencyNeedRates')));
   }
   {
-    // Hiç kur yok + yabancı para birimli kayıt: doğru uyarı ("çevrilmeden gösteriliyor"), "son kayıtlı kurlar" denmez
+    // Hiç kur yok + yabancı para birimli kayıt: kayıt toplamlara dahil edilmedi uyarısı (kaç kayıt olduğuyla), "son kayıtlı kurlar" denmez
     const foreign = { ...full(), items: [{ ...E('f1', today, 10, 'Market', 'Euro', NOW - 500), cur: 'EUR' }, ...items] };
     const p = await open({ data: foreign, rates: false });
-    ok('kur hiç yok: uyarı bandı doğru metinle görünür', await waitId(p, 'inline-notice') && (await tid(p, 'inline-notice')).includes(T('dash.ratesNone')), await tid(p, 'inline-notice'));
+    ok('kur hiç yok: uyarı bandı doğru metinle görünür', await waitId(p, 'inline-notice') && (await tid(p, 'inline-notice')).includes(T('dash.unconverted', { n: 1 })), await tid(p, 'inline-notice'));
     ok('kur hiç yok: "son kayıtlı kurlar" yanlış bilgisi verilmez', !(await has(p, T('dash.ratesFailed'))));
     ok('kur hiç yok: yeniden dene eylemi', (await id(p, 'notice-action').count()) === 1);
     await audit(p, 'kur-yok');

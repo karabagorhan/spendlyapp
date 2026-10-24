@@ -125,7 +125,9 @@ const HIDDEN = '••••••';
 export function BalanceCard({ t, bal, hidden, onToggle, onAddIncome, vsLabel }: { t: Theme; bal: Balance; hidden: boolean; onToggle: () => void; onAddIncome: () => void; vsLabel: string }) {
   const showNet = bal.hasIncome;
   const big = showNet ? bal.net : bal.spent;
-  const delta = bal.deltaPct;
+  // Geçen ay gelir yoksa ya da net işaret değiştiyse yüzde anlamsızdır: tutar farkı gösterilir ("+₺44.579")
+  const delta = bal.deltaKind === 'pct' ? bal.deltaPct : bal.deltaKind === 'amount' ? bal.deltaAmount : null;
+  const deltaText = delta === null ? '' : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${bal.deltaKind === 'pct' ? fmtPercent(Math.abs(delta) > 999 ? '999+' : Math.abs(delta)) : money0(Math.abs(delta))}`;
   return (
     <LinearGradient colors={t.heroGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.hero, { borderColor: rgba(t.heroFill, 0.4) }]} testID="balance-card">
       <View pointerEvents="none" style={[s.orb, { right: -50, top: -60, width: 190, height: 190, backgroundColor: rgba(t.heroFill, 0.1) }]} />
@@ -146,7 +148,7 @@ export function BalanceCard({ t, bal, hidden, onToggle, onAddIncome, vsLabel }: 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <View style={[s.delta, { backgroundColor: delta >= 0 ? rgba(t.good, 0.22) : rgba(t.warn, 0.22) }]}>
                 <Ionicons name={delta >= 0 ? 'trending-up' : 'trending-down'} size={13} color={delta >= 0 ? t.good : t.warn} />
-                <Text style={{ color: delta >= 0 ? t.good : t.warn, fontSize: 12, fontWeight: '700' }} testID="bal-delta">{`${delta > 0 ? '+' : delta < 0 ? '−' : ''}${fmtPercent(Math.abs(delta) > 999 ? '999+' : Math.abs(delta))}`}</Text>
+                <Text style={{ color: delta >= 0 ? t.good : t.warn, fontSize: 12, fontWeight: '700' }} testID="bal-delta">{deltaText}</Text>
               </View>
               <Text style={{ color: t.heroMuted, fontSize: 12 }}>{vsLabel}</Text>
             </View>

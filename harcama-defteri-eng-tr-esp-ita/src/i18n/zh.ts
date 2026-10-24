@@ -327,7 +327,7 @@ const zh: Catalog = {
   'rates.refreshed': '汇率已更新。',
   'rates.refreshFailed': '汇率更新失败。',
   'rates.note': '汇率更新：{time}',
-  'rates.noteNone': '没有汇率：其他货币的金额无法换算',
+  'rates.noteNone': '没有汇率：其他货币的记录未计入合计',
   'fmt.dateTime': '{year}年{month}{day}日 {time}',
   'fmt.dateFull': '{year}年{month}{day}日',
   'xl.ratesNote': '金额以{cur}计；汇率更新于 {time}。',
@@ -560,8 +560,15 @@ const zh: Catalog = {
   'state.saveFailed': '无法保存。设备存储空间可能已满。',
   'xl.sheet.income': '收入',
   'bal.addShort': '添加',
-  'dash.ratesNone': '无法获取汇率：其他货币的金额将按原值显示、不作换算。请检查网络后重试。',
+  'dash.ratesNone': '无法获取汇率：其他货币的金额无法换算，也不会计入合计。请检查网络后重试。',
   'state.dismiss': '知道了',
+  'settings.notifOff': '通知权限已关闭，将收不到提醒。',
+  'settings.notifOffSystem': '通知权限已关闭，将收不到提醒。请在手机「设置」中开启本应用的通知。',
+  'settings.notifAllow': '允许通知',
+  'settings.notifOpenSettings': '打开系统设置',
+  'amount.tooLarge': '金额过大（最多 {max}）。',
+  'dash.unconverted': { other: '由于没有汇率，有 {n} 条记录未计入合计；它们仍会以原始金额显示在列表中。请检查网络后重试。' },
+  'dash.limitsUnavailable': { other: '有 {n} 个其他货币的预算/限额在获取汇率前无法使用。' },
 };
 
 export default zh;

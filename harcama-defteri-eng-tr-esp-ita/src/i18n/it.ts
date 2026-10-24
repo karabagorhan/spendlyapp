@@ -327,7 +327,7 @@ const it: Catalog = {
   'rates.refreshed': 'Tassi aggiornati.',
   'rates.refreshFailed': 'Impossibile aggiornare i tassi.',
   'rates.note': 'Tassi aggiornati: {time}',
-  'rates.noteNone': 'Nessun tasso: gli importi in altre valute non sono stati convertiti',
+  'rates.noteNone': 'Nessun tasso: le voci in altre valute sono escluse dai totali',
   'fmt.dateTime': '{day} {month} {year}, {time}',
   'fmt.dateFull': '{day} {month} {year}',
   'xl.ratesNote': 'Importi in {cur}; tassi aggiornati il {time}.',
@@ -560,8 +560,15 @@ const it: Catalog = {
   'state.saveFailed': 'Impossibile salvare. Il dispositivo potrebbe non avere spazio.',
   'xl.sheet.income': 'Entrate',
   'bal.addShort': 'Aggiungi',
-  'dash.ratesNone': 'Tassi non disponibili: gli importi in altre valute sono mostrati senza conversione. Controlla la connessione e riprova.',
+  'dash.ratesNone': 'Tassi non disponibili: gli importi in altre valute non possono essere convertiti e sono esclusi dai totali. Controlla la connessione e riprova.',
   'state.dismiss': 'Ho capito',
+  'settings.notifOff': 'Il permesso per le notifiche è disattivato: i promemoria non arriveranno.',
+  'settings.notifOffSystem': 'Il permesso per le notifiche è disattivato: i promemoria non arriveranno. Attiva le notifiche di questa app nelle Impostazioni del telefono.',
+  'settings.notifAllow': 'Consenti le notifiche',
+  'settings.notifOpenSettings': 'Apri le impostazioni di sistema',
+  'amount.tooLarge': 'Importo troppo grande (massimo {max}).',
+  'dash.unconverted': { one: '{n} voce è esclusa dai totali perché mancano i tassi di cambio; resta visibile negli elenchi con l\'importo originale. Controlla la connessione e riprova.', other: '{n} voci sono escluse dai totali perché mancano i tassi di cambio; restano visibili negli elenchi con l\'importo originale. Controlla la connessione e riprova.' },
+  'dash.limitsUnavailable': { one: '{n} budget/limite in un\'altra valuta non è disponibile finché non arrivano i tassi.', other: '{n} budget/limiti in un\'altra valuta non sono disponibili finché non arrivano i tassi.' },
 };
 
 export default it;

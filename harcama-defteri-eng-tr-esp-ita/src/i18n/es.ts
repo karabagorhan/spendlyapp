@@ -327,7 +327,7 @@ const es: Catalog = {
   'rates.refreshed': 'Cotizaciones actualizadas.',
   'rates.refreshFailed': 'No se pudieron actualizar las cotizaciones.',
   'rates.note': 'Cotizaciones: {time}',
-  'rates.noteNone': 'Sin cotizaciones: no se pudieron convertir los importes en otras monedas',
+  'rates.noteNone': 'Sin cotizaciones: los registros en otras monedas quedan fuera de los totales',
   'fmt.dateTime': '{day} {month} {year}, {time}',
   'fmt.dateFull': '{day} {month} {year}',
   'xl.ratesNote': 'Importes en {cur}; cotizaciones actualizadas el {time}.',
@@ -560,8 +560,15 @@ const es: Catalog = {
   'state.saveFailed': 'No se pudo guardar. Puede que el dispositivo no tenga espacio.',
   'xl.sheet.income': 'Ingresos',
   'bal.addShort': 'Añadir',
-  'dash.ratesNone': 'Sin tipos de cambio: los importes en otras monedas se muestran sin convertir. Revisa tu conexión e inténtalo de nuevo.',
+  'dash.ratesNone': 'Sin tipos de cambio: los importes en otras monedas no se pueden convertir y quedan fuera de los totales. Revisa tu conexión e inténtalo de nuevo.',
   'state.dismiss': 'Entendido',
+  'settings.notifOff': 'El permiso de notificaciones está desactivado; no llegarán los recordatorios.',
+  'settings.notifOffSystem': 'El permiso de notificaciones está desactivado; no llegarán los recordatorios. Activa las notificaciones de esta app en los Ajustes del teléfono.',
+  'settings.notifAllow': 'Permitir notificaciones',
+  'settings.notifOpenSettings': 'Abrir ajustes del sistema',
+  'amount.tooLarge': 'El importe es demasiado grande (máximo {max}).',
+  'dash.unconverted': { one: '{n} registro queda fuera de los totales por falta de tipos de cambio; sigue apareciendo en las listas con su importe original. Revisa tu conexión e inténtalo de nuevo.', other: '{n} registros quedan fuera de los totales por falta de tipos de cambio; siguen apareciendo en las listas con su importe original. Revisa tu conexión e inténtalo de nuevo.' },
+  'dash.limitsUnavailable': { one: '{n} presupuesto/límite en otra moneda no está disponible hasta que haya tipos de cambio.', other: '{n} presupuestos/límites en otra moneda no están disponibles hasta que haya tipos de cambio.' },
 };
 
 export default es;

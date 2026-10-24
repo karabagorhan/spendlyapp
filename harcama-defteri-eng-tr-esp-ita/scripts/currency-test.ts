@@ -166,10 +166,25 @@ const NOW = 1_800_000_000_000;
   // Ay analizi dönüştürülmüş veriyle tutarlı
   const a = analyse(viewData(stored, 'TRY', R).items, '2026-10');
   near('analiz: ay toplamı', a.total, 400 + 4000 * 3);
-  // Kur yokken: ana birimdeki kayıtlar aynen, diğerleri özgün birimiyle işaretli kalır
+  // Kur yokken (F-06): ana birimdeki kayıtlar aynen; diğerleri toplamlara GİRMEZ, `unconverted` altında özgün tutar/birimle kalır
   const nr = viewData(stored, 'TRY', null);
-  eq('kur yok: ₺ kayıtlar aynı', [nr.items[0].amount, nr.items[4].amount, nr.items[0].cur], [400, 12.34, 'TRY']);
-  eq('kur yok: USD kayıt çevrilmez, birimi korunur', [nr.items[1].amount, nr.items[1].cur, nr.items[1].orig ?? null], [100, 'USD', null]);
+  eq('kur yok: yalnız ₺ kayıtlar items içinde', nr.items.map((x) => [x.id, x.amount, x.cur]), [['a', 400, 'TRY'], ['e', 12.34, 'TRY']]);
+  eq('kur yok: USD/EUR/GBP kayıtlar unconverted altında özgün tutar ve birimle', nr.unconverted.items.map((x) => [x.id, x.amount, x.cur, x.unconv]), [['b', 100, 'USD', true], ['c', 90, 'EUR', true], ['d', 80, 'GBP', true]]);
+  eq('kur yok: abonelik s2 (USD) unconverted', [nr.subs.map((x) => x.id), nr.unconverted.subs.map((x) => [x.id, x.amount, x.cur])], [['s1'], [['s2', 9.99, 'USD']]]);
+  eq('kur yok: unconverted sayısı (3 harcama + 1 abonelik)', nr.unconverted.count, 4);
+  near('kur yok: toplam yalnız ₺ kayıtları (35 € gibi kayıtlar ₺35 diye eklenmez)', sum(nr.items), 400 + 12.34);
+  eq('kur yok: ay analizi yabancı kayıtları saymaz', analyse(nr.items, '2026-10').total, 400);
+  eq('kur yok: ₺ bütçe korunur, ₺ olmayan limit (Eğlence USD) görünümde yok, sayılır', [nr.settings.budget, nr.settings.catBudgets, nr.unconverted.limits], [10000, { Market: 3000 }, 1]);
+  const nrE = viewData(stored, 'EUR', null);
+  eq('kur yok, ana birim EUR: ₺ bütçe ve limitler kullanılamaz (0 / yok)', [nrE.settings.budget, nrE.settings.catBudgets, nrE.unconverted.limits], [0, {}, 3]);
+  eq('kur yok, EUR: yalnız EUR kayıt items içinde', nrE.items.map((x) => x.id), ['c']);
+  eq('kur varken unconverted boş', [v.unconverted.count, v.unconverted.limits], [0, 0]);
+  // Kullanılamayan limit ayar yazılırken kaybolmaz
+  const nrView = nrE.settings;
+  let kept = fromViewSettings({ ...nrView, name: 'x' }, stored.settings, nrView);
+  eq('kur yok: ayar değişince çevrilemeyen bütçe/limitler saklı kalır', [kept.budget, kept.budgetCur, kept.catBudgets, kept.catBudgetCur], [10000, 'TRY', { Market: 3000, Eğlence: 50 }, { Market: 'TRY', Eğlence: 'USD' }]);
+  kept = fromViewSettings({ ...nrView, catBudgets: { Market: 70 } }, stored.settings, nrView);
+  eq('kur yok: kullanıcı yeni limit girerse o kategori yeni birimde, diğeri saklı', [kept.catBudgets, kept.catBudgetCur], [{ Market: 70, Eğlence: 50 }, { Market: 'EUR', Eğlence: 'USD' }]);
   truthy('kur gerekli mi: evet', needsRates(stored, 'TRY'));
   truthy('kur gerekli mi: yalnız ₺ veri → hayır', !needsRates({ items: [ex('x', 1, 'Market', '2026-10-01')], subs: [], settings: { ...defaultSettings } }, 'TRY'));
   truthy('kur gerekli mi: ₺ veri + EUR ana birim → evet', needsRates({ items: [ex('x', 1, 'Market', '2026-10-01')], subs: [], settings: { ...defaultSettings } }, 'EUR'));

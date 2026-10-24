@@ -1,8 +1,8 @@
 import { ReactNode, useRef, useState } from 'react';
 import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtStamp, money, symbolOf, toMain } from './currency';
-import { LANGS, Lang, fmtTime, t as tr } from './i18n';
-import { CATS, Expense, INCOME_CATS, Income, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
+import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
+import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
 import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
 import { FONTS, Theme } from './theme';
 import { incomeIcon } from './dashboard';
@@ -39,13 +39,13 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.surface }} {...edge.panHandlers}>
         <View style={st.topRow}>
-          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" style={{ flexShrink: 0 }}>
             <Text style={{ color: t.muted, fontSize: 17 }}>{tr('common.cancel')}</Text>
           </Pressable>
           {action ? (
             <Pressable onPress={action.onPress} disabled={action.disabled} hitSlop={12} accessibilityRole="button"
               style={[st.topSave, { backgroundColor: action.disabled ? 'transparent' : t.accent, borderColor: action.disabled ? t.line : t.accent }]}>
-              <Text style={{ color: action.disabled ? t.muted : t.accentFg, fontSize: 16, fontWeight: '700' }}>{action.label}</Text>
+              <Text numberOfLines={1} style={{ color: action.disabled ? t.muted : t.accentFg, fontSize: 16, fontWeight: '700' }}>{action.label}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -103,6 +103,15 @@ function ConvertHint({ amount, cur, main, rates, t }: { amount: number; cur: Cur
   );
 }
 
+/** Tutar alanı en çok bu kadar karakter alır (MAX_AMOUNT, binlik ayraçları ve ondalıklarla birlikte sığar). */
+const AMOUNT_MAXLEN = 18;
+
+/** Tutar çok büyükse alanın altında görünen satır içi hata. */
+function AmountError({ value, t }: { value: number; t: Theme }) {
+  if (value <= MAX_AMOUNT) return null;
+  return <Text style={{ color: t.warn, fontSize: 13 }} testID="amount-too-large" accessibilityRole="alert">{tr('amount.tooLarge', { max: fmtNumber(MAX_AMOUNT, 0) })}</Text>;
+}
+
 function inputStyle(t: Theme, big = false) {
   return [st.input, big && st.big, { backgroundColor: t.bg, borderColor: t.line, color: t.fg }];
 }
@@ -149,7 +158,8 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
   const [date, setDate] = useState(initial?.date ?? todayIso());
   // Kayıt girildiği para biriminde gösterilir ve saklanır; yeni kayıt ana para biriminde başlar
   const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
-  const value = parseAmount(amount);
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw; // çok büyük tutar geçersiz sayılır; alanın altında satır içi hata gösterilir
   const isToday = date >= todayIso();
 
   const save = () => {
@@ -194,8 +204,10 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
           autoFocus={!initial}
           inputAccessoryViewID="expense-save"
           style={inputStyle(t, true)}
+          maxLength={AMOUNT_MAXLEN}
           accessibilityLabel={tr('expense.amountA11y')}
         />
+        <AmountError value={raw} t={t} />
         <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
         <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
       </Field>
@@ -203,7 +215,7 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
         <CatChips value={cat} onChange={setCat} t={t} />
       </Field>
       <Field label={tr('expense.note')} t={t}>
-        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t)}
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t)} maxLength={80}
           inputAccessoryViewID="expense-save" returnKeyType="done" onSubmitEditing={save} />
       </Field>
       <Field label={tr('expense.date')} t={t}>
@@ -239,7 +251,8 @@ export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, o
   const [note, setNote] = useState(initial?.note ?? '');
   const [date, setDate] = useState(initial?.date ?? todayIso());
   const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
-  const value = parseAmount(amount);
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw;
   const isToday = date >= todayIso();
 
   const save = () => {
@@ -252,7 +265,8 @@ export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, o
       accessoryId="income-save" action={{ label: value ? tr('income.saveAmount', { amount: fmtMoney(value, cur) }) : tr('common.save'), onPress: save, disabled: !value }}>
       <Field label={tr('common.amountField', { sym: symbolOf(cur) })} t={t}>
         <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted}
-          autoFocus={!initial} inputAccessoryViewID="income-save" style={inputStyle(t, true)} accessibilityLabel={tr('income.amountA11y')} testID="income-amount" />
+          autoFocus={!initial} inputAccessoryViewID="income-save" style={inputStyle(t, true)} maxLength={AMOUNT_MAXLEN} accessibilityLabel={tr('income.amountA11y')} testID="income-amount" />
+        <AmountError value={raw} t={t} />
         <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
         <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
       </Field>
@@ -306,7 +320,8 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
   // Kullanıcı türü/kategoriyi kendisi seçtiyse addan tahmin edilen değer onun yerine geçmez
   const [typeTouched, setTypeTouched] = useState(!!initial);
   const [catTouched, setCatTouched] = useState(!!initial);
-  const value = parseAmount(amount);
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw;
   const d = parseInt(day, 10);
   const valid = !!name.trim() && !!value && d >= 1 && d <= 31;
 
@@ -341,7 +356,8 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
         </View>
       </Field>
       <Field label={tr('common.amountField', { sym: symbolOf(cur) })} t={t}>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t, true)} inputAccessoryViewID="sub-save" />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t, true)} maxLength={AMOUNT_MAXLEN} inputAccessoryViewID="sub-save" />
+        <AmountError value={raw} t={t} />
         <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
         <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
       </Field>
@@ -382,6 +398,8 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
   settings: Settings; focusBudget?: boolean; onChange: (s: Settings) => void; t: Theme;
 }) {
   const [budget, setBudget] = useState(settings.budget ? amountText(settings.budget) : '');
+  const budgetRaw = parseAmount(budget);
+  const saveBudget = () => { if (budgetRaw <= MAX_AMOUNT) onChange({ ...settings, budget: budgetRaw }); };
   const limitTotal = Object.values(settings.catBudgets).reduce((a, b) => a + b, 0);
   return (
     <View style={{ gap: 22 }}>
@@ -396,12 +414,14 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
             autoFocus={focusBudget}
             selectTextOnFocus
             returnKeyType="done"
-            onSubmitEditing={() => onChange({ ...settings, budget: parseAmount(budget) })}
+            onSubmitEditing={saveBudget}
+            maxLength={AMOUNT_MAXLEN}
             style={[...inputStyle(t), { flex: 1, minWidth: 0 }]}
             accessibilityLabel={tr('budget.a11y')}
           />
-          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); onChange({ ...settings, budget: parseAmount(budget) }); }} t={t} style={{ height: 48 }} />
+          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); saveBudget(); }} t={t} style={{ height: 48 }} />
         </View>
+        <AmountError value={budgetRaw} t={t} />
       </Field>
 
       <View style={{ gap: 0 }}>
@@ -424,7 +444,7 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
 }
 
 /* ---------- Ayarlar ekranı: ad, görünüm, bildirimler, dışa/içe aktarma ---------- */
-export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
+export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, notifWarn, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
   settings: Settings;
   rates: Rates | null;
   refreshing: boolean;
@@ -434,6 +454,8 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
   onExport: (ym: string | null) => void;
   onBackup: () => void;
   onRestore: () => void;
+  /** Hatırlatma anahtarı açık ama bildirim izni yok: uyarı satırı ve düzeltme düğmesi (sorulamıyorsa sistem ayarlarını açar). */
+  notifWarn?: { canAskAgain: boolean; onFix: () => void } | null;
   /** Hesap ve yasal bölümleri (giriş kapısı sağlar). */
   account?: ReactNode;
   ym: string;
@@ -516,6 +538,12 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.subReminder')}</Text>
           <Switch value={settings.subRemind} onValueChange={(v) => onChange({ ...settings, subRemind: v })} trackColor={{ true: t.accent }} />
         </View>
+        {notifWarn ? (
+          <View style={{ gap: 8, paddingTop: 10 }} testID="notif-warn">
+            <Text style={{ color: t.warn, fontSize: 13, lineHeight: 18 }}>{tr(notifWarn.canAskAgain ? 'settings.notifOff' : 'settings.notifOffSystem')}</Text>
+            <Button label={tr(notifWarn.canAskAgain ? 'settings.notifAllow' : 'settings.notifOpenSettings')} kind="ghost" onPress={notifWarn.onFix} t={t} />
+          </View>
+        ) : null}
       </View>
 
       <View style={{ gap: 10 }}>
@@ -572,11 +600,13 @@ export function RatesBox({ main, rates, refreshing, failed, onRefresh, t }: {
 
 function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; onChange: (v: number) => void; t: Theme }) {
   const [text, setText] = useState(value ? amountText(value) : '');
+  const raw = parseAmount(text);
   const commit = () => {
-    const v = parseAmount(text);
-    if (v !== value) onChange(v);
+    if (raw > MAX_AMOUNT) return; // çok büyük limit kaydedilmez; satırın altında hata görünür
+    if (raw !== value) onChange(raw);
   };
   return (
+    <View>
     <View style={[st.row, { borderColor: t.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
         <CatIcon cat={cat} t={t} size={30} />
@@ -590,8 +620,11 @@ function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; 
         placeholder={tr('budget.limitNone')}
         placeholderTextColor={t.muted}
         style={[st.limitInput, { backgroundColor: t.bg, borderColor: t.line, color: t.fg }]}
+        maxLength={AMOUNT_MAXLEN}
         accessibilityLabel={tr('budget.limitA11y', { cat: catName(cat) })}
       />
+    </View>
+    <AmountError value={raw} t={t} />
     </View>
   );
 }
@@ -600,7 +633,7 @@ const st = StyleSheet.create({
   freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 10, maxWidth: 200 },
   limitInput: { width: 110, height: 40, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, fontSize: 16, textAlign: 'right' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, minHeight: 56 },
-  topSave: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 18 },
+  topSave: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 18, flexShrink: 1, marginLeft: 12 },
   accessory: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
   accessorySave: { flex: 1, maxWidth: 260, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 28, fontFamily: FONTS.display, paddingHorizontal: 20, paddingTop: 4 },

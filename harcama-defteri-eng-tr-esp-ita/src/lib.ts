@@ -15,6 +15,7 @@ export type Expense = {
   period?: string; // abonelik dönemi: "2026-10" (aylık) ya da "2026" (yıllık)
   cur?: Cur; // girildiği para birimi (yoksa TRY: eski kayıtlar)
   orig?: { amount: number; cur: Cur }; // yalnızca ekran verisinde: çevrilmeden önceki özgün tutar
+  unconv?: true; // yalnızca ekran verisinde: kur yok, çevrilemedi (toplamlara girmez; özgün tutar/birimle listelenir)
 };
 
 /** Gelir kaydı. Harcamalardan ayrı tutulur: eski veri ve yedekler etkilenmez (yoksa boş liste). */
@@ -27,6 +28,7 @@ export type Income = {
   ts: number;
   cur?: Cur; // girildiği para birimi (yoksa TRY)
   orig?: { amount: number; cur: Cur }; // yalnızca ekran verisinde
+  unconv?: true; // yalnızca ekran verisinde: kur yok, çevrilemedi
 };
 
 export type Sub = {
@@ -41,6 +43,7 @@ export type Sub = {
   type: string; // abonelik türü (SUB_TYPES anahtarı)
   cur?: Cur; // girildiği para birimi (yoksa TRY)
   orig?: { amount: number; cur: Cur }; // yalnızca ekran verisinde
+  unconv?: true; // yalnızca ekran verisinde: kur yok, çevrilemedi
 };
 
 export type Settings = {
@@ -90,6 +93,11 @@ export function parseIso(s: string) {
   return new Date(y, m - 1, d);
 }
 export const todayIso = () => iso(new Date());
+/** YYYY-MM-DD biçiminde ve takvimde gerçekten var olan bir gün mü? (2026-02-31 geçersiz.) */
+export function isRealDate(s: unknown): s is string {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  return iso(parseIso(s)) === s;
+}
 export const today0 = () => parseIso(todayIso());
 export function daysIn(ym: string) {
   const d = parseIso(ym + '-01');
@@ -135,6 +143,11 @@ export const compact = fmtCompact;
 export const parseAmount = parseAmountI18n;
 /** Giriş alanına yazılacak tutar metni (seçili dilin ondalık ayracıyla). */
 export const amountText = decimalText;
+
+/** Tek bir kaydın/limitin kabul edilen en büyük tutarı (kendi para biriminde); girişte ve yedek içe aktarmada geçerlidir. */
+export const MAX_AMOUNT = 1e10;
+/** Geçerli bir kayıt tutarı: sonlu, 0'dan büyük ve en çok MAX_AMOUNT. */
+export const validAmount = (v: unknown): v is number => typeof v === 'number' && isFinite(v) && v > 0 && v <= MAX_AMOUNT;
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 export const sum = (arr: { amount: number }[]) => arr.reduce((s, x) => s + x.amount, 0);
@@ -188,8 +201,12 @@ export type Balance = {
   hasIncome: boolean;
   /** Bu ayki net durum: gelir − gider. */
   net: number;
-  /** Geçen ayın aynı dönemine göre net değişim (%); karşılaştırılacak veri yoksa null. */
+  /** Geçen ayın aynı dönemine göre net değişim (%); yalnızca `deltaKind === 'pct'` iken anlamlıdır, aksi halde null. */
   deltaPct: number | null;
+  /** Net değişimin tutarı (bu ay − geçen ay, aynı gün kesitinde); `deltaKind === 'amount'` iken gösterilir. */
+  deltaAmount: number | null;
+  /** 'pct': yüzde karşılaştırılabilir; 'amount': yüzde anlamsız (geçen ay gelir yok / işaret değişti) → tutar farkı; null: karşılaştırma yok. */
+  deltaKind: 'pct' | 'amount' | null;
 };
 
 /**
@@ -206,13 +223,20 @@ export function balanceFor(items: Expense[], incomes: Income[], ym: string): Bal
   const prevIncomes = incomes.filter((x) => inMonth(x.date, prevYm, a.cutoff));
   const curNetSame = sum(incomes.filter((x) => inMonth(x.date, ym, a.cutoff))) - sum(items.filter((x) => inMonth(x.date, ym, a.cutoff)));
   const prevNet = sum(prevIncomes) - sum(prevItems);
-  const comparable = prevItems.length + prevIncomes.length > 0 && prevNet !== 0 && incomes.some((x) => x.date.slice(0, 7) === ym);
+  const hasPrev = prevItems.length + prevIncomes.length > 0;
+  const hasIncome = incomes.some((x) => x.date.slice(0, 7) === ym);
+  const comparable = hasPrev && prevNet !== 0 && hasIncome;
+  // Yüzde yalnızca geçen ay gelir varsa ve iki net aynı işaretteyse anlamlıdır (aksi halde "+%999" gibi saçma oranlar çıkar): o zaman tutar farkı gösterilir
+  const pctOk = comparable && prevIncomes.length > 0 && Math.sign(prevNet) === Math.sign(curNetSame);
+  const diff = curNetSame - prevNet;
   return {
     spent,
     income,
-    hasIncome: incomes.some((x) => x.date.slice(0, 7) === ym),
+    hasIncome,
     net: income - spent,
-    deltaPct: comparable ? Math.round(((curNetSame - prevNet) / Math.abs(prevNet)) * 100) : null,
+    deltaPct: pctOk ? Math.round((diff / Math.abs(prevNet)) * 100) : null,
+    deltaAmount: comparable && !pctOk ? diff : null,
+    deltaKind: pctOk ? 'pct' : comparable ? 'amount' : null,
   };
 }
 

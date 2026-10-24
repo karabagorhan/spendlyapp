@@ -150,33 +150,45 @@ export function toMain(amount: number, from: Cur, to: Cur, r: Rates | null) {
   return r ? round2(convert(amount, from, to, r)) : null;
 }
 
+/** Kur yokken ana birime çevrilemeyen kayıtlar (özgün tutar/birimle, `unconv: true`) ve kaç kayıt/limit olduğu. */
+export type Unconverted = { items: Expense[]; subs: Sub[]; incomes: Income[]; limits: number; count: number };
+export type ViewData = DataLike & { unconverted: Unconverted };
+
 /**
  * Ekranlarda kullanılacak veri: bütün tutarlar ana para biriminde. Çevrilen kayıtlarda `orig` özgün tutarı taşır.
  * Saklanan veriye dokunmaz (yeni nesneler döndürür).
+ *
+ * Kur yokken (hiç çekilmediyse) çevrilemeyen kayıtlar items/subs/incomes içinde DEĞİL, `unconverted` altında döner:
+ * böylece toplam, grafik, bütçe ve yorumlar farklı para birimlerini karıştırmaz (35 € harcama "₺35" olarak toplanmaz).
+ * Listeler bunları özgün tutar ve birimle gösterebilir. Çevrilemeyen bütçe/limitler görünümde yoktur (0 / eksik = "yok");
+ * `fromViewSettings` bunları saklanan ayarlarda korur.
  */
-export function viewData(d: DataLike, mainCur: Cur, r: Rates | null): DataLike {
-  // Kur yokken çevrilemeyen kayıtlar özgün tutar ve para birimiyle kalır (cur ≠ ana birim); arayüz bunu uyarıyla belirtir.
-  const conv = <T extends { amount: number; cur?: Cur }>(x: T): T & { cur: Cur; orig?: { amount: number; cur: Cur } } => {
+export function viewData(d: DataLike, mainCur: Cur, r: Rates | null): ViewData {
+  const un: Unconverted = { items: [], subs: [], incomes: [], limits: 0, count: 0 };
+  const conv = <T extends { amount: number; cur?: Cur }>(x: T, out: T[]): (T & { cur: Cur; orig?: { amount: number; cur: Cur } }) | null => {
     const c = x.cur ?? 'TRY';
     const v = toMain(x.amount, c, mainCur, r);
-    if (v === null) return { ...x, cur: c };
+    if (v === null) { out.push({ ...x, cur: c, unconv: true } as T); un.count++; return null; }
     return c === mainCur ? { ...x, cur: mainCur } : { ...x, amount: v, cur: mainCur, orig: { amount: x.amount, cur: c } };
   };
+  const list = <T extends { amount: number; cur?: Cur }>(xs: T[], out: T[]) => xs.map((x) => conv(x, out)).filter((x): x is NonNullable<typeof x> => x !== null);
   const s = d.settings;
   const catBudgets: Record<string, number> = {};
   const catBudgetCur: Record<string, Cur> = {};
   for (const k of Object.keys(s.catBudgets)) {
-    const c = s.catBudgetCur[k] ?? 'TRY';
-    const v = toMain(s.catBudgets[k], c, mainCur, r);
-    catBudgets[k] = v ?? s.catBudgets[k];
-    catBudgetCur[k] = v === null ? c : mainCur;
+    const v = toMain(s.catBudgets[k], s.catBudgetCur[k] ?? 'TRY', mainCur, r);
+    if (v === null) { un.limits++; continue; }
+    catBudgets[k] = v;
+    catBudgetCur[k] = mainCur;
   }
-  const b = toMain(s.budget, s.budgetCur, mainCur, r);
+  const b = s.budget > 0 ? toMain(s.budget, s.budgetCur, mainCur, r) : 0;
+  if (b === null) un.limits++;
   return {
-    items: d.items.map(conv),
-    subs: d.subs.map(conv),
-    ...(d.incomes ? { incomes: d.incomes.map(conv) } : {}),
-    settings: { ...s, currency: mainCur, budget: b ?? s.budget, budgetCur: b === null ? s.budgetCur : mainCur, catBudgets, catBudgetCur },
+    items: list(d.items, un.items),
+    subs: list(d.subs, un.subs),
+    ...(d.incomes ? { incomes: list(d.incomes, un.incomes) } : {}),
+    settings: { ...s, currency: mainCur, budget: b ?? 0, budgetCur: mainCur, catBudgets, catBudgetCur },
+    unconverted: un,
   };
 }
 
@@ -192,6 +204,13 @@ export function fromViewSettings(next: Settings, stored: Settings, view: Setting
     const same = next.catBudgets[k] === view.catBudgets[k] && stored.catBudgets[k] !== undefined;
     catBudgets[k] = same ? stored.catBudgets[k] : next.catBudgets[k];
     catBudgetCur[k] = same ? stored.catBudgetCur[k] ?? 'TRY' : view.currency;
+  }
+  // Görünümde çevrilemediği için bulunmayan (kur yok) saklı limitler, kullanıcı o kategoriye yeni limit girmedikçe korunur
+  for (const k of Object.keys(stored.catBudgets)) {
+    if (!(k in view.catBudgets) && !(k in next.catBudgets)) {
+      catBudgets[k] = stored.catBudgets[k];
+      catBudgetCur[k] = stored.catBudgetCur[k] ?? 'TRY';
+    }
   }
   return {
     ...next,

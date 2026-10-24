@@ -314,7 +314,7 @@ const tr: Catalog = {
   'rates.refreshed': 'Kurlar güncellendi.',
   'rates.refreshFailed': 'Kurlar güncellenemedi.',
   'rates.note': 'Kur güncelleme: {time}',
-  'rates.noteNone': 'Kur yok: farklı para birimindeki tutarlar çevrilemedi',
+  'rates.noteNone': 'Kur yok: farklı para birimindeki kayıtlar toplamlara dahil edilmedi',
   'fmt.dateTime': '{day} {month} {year} {time}',
   'fmt.dateFull': '{day} {month} {year}',
   'xl.ratesNote': 'Tutarlar {cur} cinsindendir; kurlar {time} tarihinde güncellendi.',
@@ -547,8 +547,15 @@ const tr: Catalog = {
   'state.saveFailed': 'Kaydedilemedi. Cihazda yer kalmamış olabilir.',
   'xl.sheet.income': 'Gelirler',
   'bal.addShort': 'Ekle',
-  'dash.ratesNone': 'Kurlar alınamadı: farklı para birimindeki tutarlar çevrilmeden gösteriliyor. Bağlantını kontrol edip tekrar dene.',
+  'dash.ratesNone': 'Kurlar alınamadı: farklı para birimindeki tutarlar çevrilemiyor ve toplamlara dahil edilmiyor. Bağlantını kontrol edip tekrar dene.',
   'state.dismiss': 'Tamam',
+  'settings.notifOff': 'Bildirim izni kapalı; hatırlatmalar gelmeyecek.',
+  'settings.notifOffSystem': 'Bildirim izni kapalı; hatırlatmalar gelmeyecek. Telefonun Ayarlar bölümünden bu uygulamanın bildirimlerini aç.',
+  'settings.notifAllow': 'Bildirimlere izin ver',
+  'settings.notifOpenSettings': 'Sistem ayarlarını aç',
+  'amount.tooLarge': 'Tutar çok büyük (en fazla {max}).',
+  'dash.unconverted': { other: 'Kur olmadığı için {n} kayıt toplamlara dahil edilmedi; listelerde özgün tutarıyla görünür. Bağlantını kontrol edip tekrar dene.' },
+  'dash.limitsUnavailable': { other: 'Başka para birimindeki {n} bütçe/limit kur gelene kadar kullanılamıyor.' },
 };
 
 export default tr;

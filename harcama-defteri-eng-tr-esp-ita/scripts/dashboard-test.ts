@@ -80,7 +80,8 @@ eq('görünüm: özgün tutar saklanır', view.incomes![0].orig, { amount: 400, 
 eq('görünüm: aynı birimdeki gelir değişmez', [view.incomes![1].amount, view.incomes![1].orig], [10, undefined]);
 eq('görünüm: para birimi yok = TRY sayılır', view.incomes![2].amount, 0.13);
 const noRates = viewData({ items: [], subs: [], incomes: [inc('a', '2026-10-01', 400, 'salary', { cur: 'TRY' })], settings: { ...defaultSettings, currency: 'USD', budgetCur: 'USD' } }, 'USD', null);
-eq('kur yokken gelir çevrilmez, özgün para birimiyle kalır', [noRates.incomes![0].amount, noRates.incomes![0].cur], [400, 'TRY']);
+// F-06: kur yokken çevrilemeyen gelir toplamlara girmez; özgün tutar/birimle `unconverted` altında kalır
+eq('kur yokken çevrilemeyen gelir incomes listesinde yok, unconverted altında özgün tutar/birimle', [noRates.incomes!.length, noRates.unconverted.incomes.map((x) => [x.amount, x.cur, x.unconv]), noRates.unconverted.count], [0, [[400, 'TRY', true]], 1]);
 eq('gelirsiz görünüm verisi gelir alanı üretmez', 'incomes' in viewData({ items: [], subs: [], settings: defaultSettings }, 'TRY', null), false);
 eq('needsRates: yabancı para birimli gelir kur ister', needsRates({ items: [], subs: [], incomes: [inc('a', '2026-10-01', 1, 'salary', { cur: 'EUR' })], settings: defaultSettings }, 'TRY'), true);
 eq('needsRates: aynı birimde gelir kur istemez', needsRates({ items: [], subs: [], incomes: [inc('a', '2026-10-01', 1, 'salary', { cur: 'TRY' })], settings: defaultSettings }, 'TRY'), false);
@@ -106,16 +107,28 @@ eq('bakiye: bu ay gelir var', b1.hasIncome, true);
 eq('bakiye: değişim geçen ayın aynı gün kesitine göre (+%100, 30 Mart harcaması kesite girmez)', b1.deltaPct, 100);
 const b2 = balanceFor([exp('e', '2026-03-05', 300)], [], '2026-03');
 eq('gelir yoksa: hasIncome false, net = −gider, değişim yok (uydurma net gösterilmez)', [b2.hasIncome, b2.net, b2.deltaPct], [false, -300, null]);
-eq('boş veri: hepsi sıfır, değişim yok', balanceFor([], [], '2026-03'), { spent: 0, income: 0, hasIncome: false, net: 0, deltaPct: null });
+eq('boş veri: hepsi sıfır, değişim yok', balanceFor([], [], '2026-03'), { spent: 0, income: 0, hasIncome: false, net: 0, deltaPct: null, deltaAmount: null, deltaKind: null });
 eq('geçen ay kayıt yoksa değişim yok', balanceFor([], [inc('i', '2026-03-01', 100)], '2026-03').deltaPct, null);
 eq('geçen ayın neti sıfırsa değişim yok (sıfıra bölme yok)', balanceFor([exp('e', '2026-02-10', 100)], [inc('i', '2026-02-02', 100), inc('j', '2026-03-02', 50)], '2026-03').deltaPct, null);
-eq('geçen ay gelir yok bu ay var: karşılaştırma net üzerinden', balanceFor([exp('e', '2026-02-10', 100)], [inc('j', '2026-03-02', 50)], '2026-03').deltaPct, 150);
+// F-08: geçen ay gelir yoksa yüzde anlamsız (+%999 gibi) → tutar farkı
+const noPrevInc = balanceFor([exp('e', '2026-02-10', 100)], [inc('j', '2026-03-02', 50)], '2026-03');
+eq('geçen ay gelir yok bu ay var: yüzde değil tutar farkı (−100 → +50 = +150)', [noPrevInc.deltaKind, noPrevInc.deltaPct, noPrevInc.deltaAmount], ['amount', null, 150]);
 eq('bu ay gelir yok ama geçen ayın verisi var: net değişim gösterilmez (uydurma karşılaştırma yok)', balanceFor([exp('e', '2026-02-10', 100), exp('f', '2026-03-05', 40)], [inc('i', '2026-02-02', 200)], '2026-03').deltaPct, null);
 const negPrev = balanceFor([exp('e', '2026-02-10', 100)], [inc('j', '2026-03-02', 50)], '2026-03');
-eq('negatif önceki net: iyileşme pozitif yüzde', negPrev.deltaPct! > 0, true);
+eq('negatif önceki net (geçen ay gelir yok): iyileşme pozitif tutar farkı', [negPrev.deltaKind, negPrev.deltaAmount! > 0], ['amount', true]);
 const b3 = balanceFor([exp('e', '2026-03-05', 100)], [inc('j', '2026-03-02', 50)], '2026-03');
 eq('negatif net desteklenir', b3.net, -50);
-truthy('değişim her zaman sonlu', [b1, b2, b3, negPrev].every((b) => b.deltaPct === null || Number.isFinite(b.deltaPct)));
+truthy('değişim her zaman sonlu', [b1, b2, b3, negPrev, noPrevInc].every((b) => (b.deltaPct === null || Number.isFinite(b.deltaPct)) && (b.deltaAmount === null || Number.isFinite(b.deltaAmount))));
+eq('normal karşılaştırılabilir durum yüzde kalır', [b1.deltaKind, b1.deltaAmount], ['pct', null]);
+// Geçen ay gelir var ama net negatif ve bu ay net pozitif (işaret değişti): yüzde değil tutar
+const flip = balanceFor([exp('e', '2026-02-10', 300)], [inc('i', '2026-02-02', 100), inc('j', '2026-03-02', 500)], '2026-03');
+eq('işaret değişimi: tutar farkı (−200 → +500 = +700)', [flip.deltaKind, flip.deltaPct, flip.deltaAmount], ['amount', null, 700]);
+// Kullanıcının bildirdiği durum: geçen ay gelirsiz büyük gider, bu ay gelir var → "+%999+" yerine tutar
+const big = balanceFor([exp('e', '2026-02-10', 44629)], [inc('j', '2026-03-02', 50)], '2026-03');
+eq('+%999+ yerine tutar farkı', [big.deltaKind, big.deltaAmount], ['amount', 44679]);
+// İkisi de negatif ve gelir var: yüzde sürer
+const bothNeg = balanceFor([exp('e', '2026-02-10', 400), exp('f', '2026-03-10', 100)], [inc('i', '2026-02-02', 100), inc('j', '2026-03-02', 50)], '2026-03');
+eq('iki net de negatif ve geçen ay gelir var: yüzde (−300 → −50 = +%83)', [bothNeg.deltaKind, bothNeg.deltaPct], ['pct', 83]);
 
 /* ---------- Kategori dilimleri ---------- */
 const sl = categorySlices([exp('1', '2026-10-01', 50, 'Market'), exp('2', '2026-10-02', 30, 'Fatura'), exp('3', '2026-10-03', 20, 'Ulaşım')], 4);

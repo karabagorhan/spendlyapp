@@ -326,7 +326,7 @@ const en: Catalog = {
   'rates.refreshed': 'Rates updated.',
   'rates.refreshFailed': 'Could not update rates.',
   'rates.note': 'Rates updated: {time}',
-  'rates.noteNone': 'No rates: amounts in other currencies could not be converted',
+  'rates.noteNone': 'No rates: records in other currencies are left out of the totals',
   'fmt.dateTime': '{month} {day}, {year}, {time}',
   'fmt.dateFull': '{month} {day}, {year}',
   'xl.ratesNote': 'Amounts are in {cur}; rates updated {time}.',
@@ -559,8 +559,15 @@ const en: Catalog = {
   'state.saveFailed': 'Could not save. The device may be out of space.',
   'xl.sheet.income': 'Income',
   'bal.addShort': 'Add',
-  'dash.ratesNone': 'Rates unavailable: amounts in other currencies are shown unconverted. Check your connection and try again.',
+  'dash.ratesNone': 'Rates unavailable: amounts in other currencies can\'t be converted and are left out of the totals. Check your connection and try again.',
   'state.dismiss': 'Got it',
+  'settings.notifOff': 'Notification permission is off, so reminders won\'t arrive.',
+  'settings.notifOffSystem': 'Notification permission is off, so reminders won\'t arrive. Turn on notifications for this app in your phone\'s Settings.',
+  'settings.notifAllow': 'Allow notifications',
+  'settings.notifOpenSettings': 'Open system settings',
+  'amount.tooLarge': 'Amount is too large (max {max}).',
+  'dash.unconverted': { one: '{n} record is left out of the totals because there are no exchange rates; it still appears in lists with its original amount. Check your connection and try again.', other: '{n} records are left out of the totals because there are no exchange rates; they still appear in lists with their original amounts. Check your connection and try again.' },
+  'dash.limitsUnavailable': { one: '{n} budget/limit in another currency is unavailable until rates load.', other: '{n} budgets/limits in another currency are unavailable until rates load.' },
 };
 
 export default en;

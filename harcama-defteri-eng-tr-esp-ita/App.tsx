@@ -6,16 +6,16 @@ import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, AppState, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
+import { Cur, fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
 import { LanguageProvider, deviceLanguage, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
 import {
   Analysis, Expense, Income, SUB_TYPES, Settings, Sub, addMonths, analyse, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
-  balanceFor, incomeCatName, insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, recentTransactions, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
+  MAX_AMOUNT, balanceFor, incomeCatName, insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, recentTransactions, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
 } from './src/lib';
-import { ensurePermission, reschedule } from './src/notify';
+import { PermInfo, ensurePermission, permissionInfo, reschedule } from './src/notify';
 import { BudgetPanel, ExpenseSheet, IncomeSheet, SettingsPanel, SubSheet } from './src/sheets';
 import { merge, useAppData } from './src/store';
 import { FONTS, Theme, useTheme } from './src/theme';
@@ -134,6 +134,9 @@ function Main() {
   const [toastMsg, setToastMsg] = useState('');
   const [toastAction, setToastAction] = useState<{ label: string; run: () => void } | null>(null);
   const [query, setQuery] = useState('');
+  // Bildirim izninin gerçek durumu (web'de yerel bildirim yok: null). İzin değişince `permTick` bildirimleri yeniden kurdurur.
+  const [perm, setPerm] = useState<PermInfo | null>(null);
+  const [permTick, setPermTick] = useState(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -211,7 +214,7 @@ function Main() {
           const q = Linking.parse(u!).queryParams ?? {};
           // Kestirme bağlantılarının biçimi (tutar=125,50) uygulama dilinden bağımsızdır: her zaman Türkçe kurallarla okunur
           const amount = parseAmount(String(q.tutar ?? ''), 'tr');
-          prefill = { amount: amount || undefined, cat: SLUG[String(q.kategori ?? '').toLowerCase()] };
+          prefill = { amount: amount && amount <= MAX_AMOUNT ? amount : undefined, cat: SLUG[String(q.kategori ?? '').toLowerCase()] };
         } catch {}
         setMenuOpen(false);
         setExpSheet({ key: Date.now(), initial: null, prefill });
@@ -237,12 +240,32 @@ function Main() {
     return () => sub.remove();
   }, []);
 
-  // Bildirimleri veri değiştikçe yeniden kur (art arda değişikliklerde bir kez)
+  // Bildirimleri veri ya da izin değiştikçe yeniden kur (art arda değişikliklerde bir kez)
   useEffect(() => {
     if (!data) return;
     const h = setTimeout(() => reschedule(data.settings, data.subs, data.items), 1200);
     return () => clearTimeout(h);
-  }, [data]);
+  }, [data, permTick]);
+
+  const refreshPerm = async () => {
+    if (Platform.OS === 'web') return;
+    setPerm(await permissionInfo());
+    setPermTick((n) => n + 1);
+  };
+  // İzin durumunu aç; sistem ayarlarından dönüldüğünde de güncelle
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    permissionInfo().then(setPerm);
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') refreshPerm(); });
+    return () => sub.remove();
+  }, []);
+  // Daha önce abonelik eklenmiş ama izin hiç sorulmamışsa (varsayılan açık uyarı) açılışta bir kez sor; aboneliği olmayana sorulmaz
+  const askedOnStart = useRef(false);
+  useEffect(() => {
+    if (!data || !perm || askedOnStart.current) return;
+    askedOnStart.current = true;
+    if (perm.state === 'undetermined' && data.settings.subRemind && data.subs.length) ensurePermission().then(refreshPerm);
+  }, [data, perm]);
 
   // Hesap akışından gelen başarı durumları (e-posta doğrulandı, parola güncellendi) uygulamaya geçince bildirilir
   useEffect(() => {
@@ -258,6 +281,12 @@ function Main() {
 
   const { items, subs, settings } = view;
   const incomes = view.incomes ?? [];
+  // Kur yokken çevrilemeyen kayıtlar toplamlara girmez (items/subs/incomes yalnızca çevrilenleri içerir); yalnızca listelerde özgün tutar/birimle gösterilir.
+  // Abonelik "ödendi" denetimi ise çevrilemeyen ödemeleri de görmelidir (yoksa aynı dönem yeniden ödenebilir görünür).
+  const un = view.unconverted;
+  const payItems = items.concat(un.items);
+  const amountOf = (x: { amount: number; cur?: Cur; unconv?: true }) => (x.unconv ? fmtMoney(x.amount, x.cur ?? 'TRY') : money(x.amount));
+  const convSum = (xs: { amount: number; unconv?: true }[]) => sum(xs.filter((x) => !x.unconv));
   const stored = {
     item: (id: string) => data.items.find((x) => x.id === id),
     sub: (id: string) => data.subs.find((x) => x.id === id),
@@ -324,13 +353,20 @@ function Main() {
     update((d) => ({ ...d, subs: d.subs.filter((x) => x.id !== s.id).concat([s]) }));
     setSubSheet(null);
     buzz('success');
+    // Ödeme günü uyarısı varsayılan açıktır ama izin yoktur: ilk abonelik kaydında (tam gerektiği anda) izin istenir. Kalıcı reddedildiyse sorulmaz; Ayarlar'da uyarı görünür.
+    if (settings.subRemind && Platform.OS !== 'web') {
+      permissionInfo().then(async (p) => {
+        if (p.state === 'undetermined' || (p.state === 'denied' && p.canAskAgain)) await ensurePermission();
+        await refreshPerm();
+      });
+    }
   };
   const deleteSub = (id: string) => {
     update((d) => ({ ...d, subs: d.subs.filter((x) => x.id !== id) }));
     setSubSheet(null);
   };
   const paySub = (s: Sub) => {
-    const sst = subStatus(s, items);
+    const sst = subStatus(s, payItems);
     // Ödeme, aboneliğin kendi para biriminde ve tutarıyla yazılır (çevrilmiş değerle değil)
     const own = stored.sub(s.id) ?? s;
     const e: Expense = { id: uid(), amount: own.amount, cat: s.cat, note: s.name, date: iso(sst.due), ts: Date.now(), sub: s.id, period: sst.period, cur: own.cur ?? 'TRY' };
@@ -339,16 +375,28 @@ function Main() {
     toast(tr('toast.subAdded', { name: s.name }));
   };
   const skipSub = (s: Sub) => {
-    const period = subStatus(s, items).period;
+    const period = subStatus(s, payItems).period;
     update((d) => ({ ...d, subs: d.subs.map((x) => (x.id === s.id ? { ...x, skip: period } : x)) }));
   };
   const changeSettings = async (next: Settings) => {
     const turnedOn = (next.remind && !settings.remind) || (next.subRemind && !settings.subRemind);
     update((d) => ({ ...d, settings: fromViewSettings(next, d.settings, settings) }));
     if (next.budget !== settings.budget) toast(next.budget ? tr('toast.budgetSaved') : tr('toast.budgetRemoved'));
-    if (turnedOn && !(await ensurePermission())) {
-      toast(tr('toast.noNotifPermission'));
+    if (turnedOn) {
+      const granted = await ensurePermission();
+      await refreshPerm();
+      if (!granted) toast(tr('toast.noNotifPermission'));
     }
+  };
+  // Ayarlar'daki izin uyarısı: sorulabiliyorsa izin iste, kalıcı reddedilmişse sistem ayarlarını aç
+  const fixNotifPermission = async () => {
+    if (perm && !perm.canAskAgain) {
+      Linking.openSettings().catch(() => toast(tr('toast.noNotifPermission')));
+      return;
+    }
+    const granted = await ensurePermission();
+    await refreshPerm();
+    if (!granted) toast(tr('toast.noNotifPermission'));
   };
   const doExport = async (which: string | null) => {
     try {
@@ -410,14 +458,14 @@ function Main() {
       key={x.id}
       onPress={() => setExpSheet({ key: Date.now(), initial: stored.item(x.id) ?? x })}
       style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: money(x.amount) })}
+      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountOf(x) })}
     >
       <CatIcon cat={x.cat} t={t} />
       <View style={{ flex: 1 }}>
         <Text style={st.itemCat} numberOfLines={1}>{x.note || catName(x.cat)}</Text>
         <Text style={st.meta} numberOfLines={1}>{[x.note ? catName(x.cat) : '', showDate ? dayLabel(x.date) : '', x.sub ? tr('expense.subscriptionTag') : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || catName(x.cat)}</Text>
       </View>
-      <Text style={st.itemAmt}>{money(x.amount)}</Text>
+      <Text style={st.itemAmt}>{amountOf(x)}</Text>
       <Ionicons name="chevron-forward" size={16} color={t.muted} />
     </Pressable>
   );
@@ -427,7 +475,7 @@ function Main() {
   const curTotal = sum(curItems);
   const byCat: Record<string, number> = {};
   curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
-  const pendingSubs = subs.filter((x) => subStatus(x, items).state === 'pending').length;
+  const pendingSubs = subs.filter((x) => subStatus(x, payItems).state === 'pending').length;
   const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
 
   const txnToggle = (
@@ -446,24 +494,24 @@ function Main() {
       testID={`income-row-${i}`}
       onPress={() => setIncSheet({ key: Date.now(), initial: stored.income(x.id) ?? x })}
       style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: money(x.amount) })}
+      accessibilityLabel={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: amountOf(x) })}
     >
       <IncomeIcon cat={x.cat} t={t} />
       <View style={{ flex: 1 }}>
         <Text style={st.itemCat} numberOfLines={1}>{x.note || incomeCatName(x.cat)}</Text>
         <Text style={st.meta} numberOfLines={1}>{[x.note ? incomeCatName(x.cat) : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || incomeCatName(x.cat)}</Text>
       </View>
-      <Amount text={`+${money(x.amount)}`} style={[st.itemAmt, { color: t.good }]} />
+      <Amount text={`+${amountOf(x)}`} style={[st.itemAmt, { color: t.good }]} />
       <Ionicons name="chevron-forward" size={16} color={t.muted} />
     </Pressable>
   );
 
-  const ctx: Ctx = { t, st, a, ym, items, subs, monthItems, budget, settings };
+  const ctx: Ctx = { t, st, a, ym, items, payItems, subs, monthItems, budget, settings };
   const notes = insights(items, ym, settings);
 
   let body: ReactNode = null;
   if (screen === 'ozet') {
-    const pending = subs.map((s) => ({ s, x: subStatus(s, items) })).filter((r) => r.x.state === 'pending');
+    const pending = subs.map((s) => ({ s, x: subStatus(s, payItems) })).filter((r) => r.x.state === 'pending');
     const bal = balanceFor(items, incomes, ym);
     const todayAmount = a.isCur ? sum(items.filter((x) => x.date === todayIso())) : null;
     const slices = recentTransactions(items, incomes, 4);
@@ -474,9 +522,9 @@ function Main() {
         <BalanceCard t={t} bal={bal} hidden={settings.hideBalance} vsLabel={tr('bal.vsLast')} onAddIncome={openAddIncome}
           onToggle={() => changeSettings({ ...settings, hideBalance: !settings.hideBalance })} />
         <QuickActions t={t} onExpense={openAdd} onIncome={openAddIncome} onReports={() => go('raporlar')} onBudgets={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
-        {converting && rs.failed ? (
+        {converting && (rs.failed || (!rs.rates && (un.count > 0 || un.limits > 0))) ? (
           <>
-            <InlineNotice t={t} kind="warn" text={tr(rs.rates ? 'dash.ratesFailed' : 'dash.ratesNone')} action={rs.refreshing ? undefined : tr('state.retry')}
+            <InlineNotice t={t} kind="warn" text={rs.rates ? tr('dash.ratesFailed') : un.count > 0 ? tr('dash.unconverted', { n: un.count }) + (un.limits > 0 ? ' ' + tr('dash.limitsUnavailable', { n: un.limits }) : '') : un.limits > 0 ? tr('dash.limitsUnavailable', { n: un.limits }) : tr('dash.ratesNone')} action={rs.refreshing ? undefined : tr('state.retry')}
               onAction={async () => { const ok = await rs.refresh(); toast(ok ? tr('rates.refreshed') : tr('rates.refreshFailed')); }} />
             {rs.rates ? rateNote : null}
           </>
@@ -487,7 +535,7 @@ function Main() {
         </Pair>
         <Pair>
           <BudgetCard t={t} spent={a.total} budget={budget} periodLabel={monthLabel(ym)} onBudget={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
-          <SubsCard t={t} subs={subs} items={items} onAll={() => go('abonelikler')} onAdd={() => setSubSheet({ key: Date.now(), initial: null })} onOpen={(x) => setSubSheet({ key: Date.now(), initial: stored.sub(x.id) ?? x })} />
+          <SubsCard t={t} subs={subs} items={payItems} onAll={() => go('abonelikler')} onAdd={() => setSubSheet({ key: Date.now(), initial: null })} onOpen={(x) => setSubSheet({ key: Date.now(), initial: stored.sub(x.id) ?? x })} />
         </Pair>
         {pending.length ? (
           <View style={st.card}>
@@ -515,7 +563,7 @@ function Main() {
       </View>
     );
   } else if (screen === 'harcamalar' && txnTab === 'income') {
-    const monthIncomes = incomes.filter((x) => x.date.slice(0, 7) === ym);
+    const monthIncomes = incomes.concat(un.incomes).filter((x) => x.date.slice(0, 7) === ym);
     const groups: Record<string, Income[]> = {};
     monthIncomes.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
     const days = Object.keys(groups).sort().reverse();
@@ -526,7 +574,7 @@ function Main() {
         {rateNote}
         <View style={st.summaryRow}>
           <Text style={st.meta}>{tr('list.count', { n: monthIncomes.length })}</Text>
-          <Amount text={money(sum(monthIncomes))} style={st.summaryVal} symbolColor={t.gold} />
+          <Amount text={money(convSum(monthIncomes))} style={st.summaryVal} symbolColor={t.gold} />
         </View>
         {days.length ? (
           <>
@@ -537,7 +585,7 @@ function Main() {
                 <View key={d} style={{ gap: 6 }}>
                   <View style={st.dayHead}>
                     <Label t={t}>{dayLabel(d)}</Label>
-                    <Label t={t}>{money(sum(its))}</Label>
+                    {its.some((x) => !x.unconv) ? <Label t={t}>{money(convSum(its))}</Label> : null}
                   </View>
                   <View style={st.items}>{its.map((x, i) => incomeRow(x, i))}</View>
                 </View>
@@ -557,13 +605,14 @@ function Main() {
   } else if (screen === 'harcamalar') {
     const q = lower(query.trim());
     // Arama tüm aylarda yapılır; arama yokken seçili ay listelenir
-    const pool = q ? items : monthItems;
+    const listMonth = monthItems.concat(un.items.filter((x) => x.date.slice(0, 7) === ym));
+    const pool = q ? payItems : listMonth;
     const shown = pool.filter((x) => (!filterCat || x.cat === filterCat) && (!filterDay || x.date === filterDay) &&
-      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || money(x.amount).includes(q)));
+      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || amountOf(x).includes(q)));
     const groups: Record<string, Expense[]> = {};
     shown.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
     const days = Object.keys(groups).sort().reverse();
-    const cats = Array.from(new Set(monthItems.map((x) => x.cat)));
+    const cats = Array.from(new Set(listMonth.map((x) => x.cat)));
     body = (
       <>
         {txnToggle}
@@ -576,7 +625,7 @@ function Main() {
         {rateNote}
         <View style={st.summaryRow}>
           <Text style={st.meta}>{q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length })}</Text>
-          <Amount text={money(sum(shown))} style={st.summaryVal} symbolColor={t.gold} />
+          <Amount text={money(convSum(shown))} style={st.summaryVal} symbolColor={t.gold} />
         </View>
         {cats.length > 1 ? (
           <View onStartShouldSetResponderCapture={() => { touchX.current.start = 99999; return false; }}>
@@ -606,7 +655,7 @@ function Main() {
                 <View key={d} style={{ gap: 6 }}>
                   <View style={st.dayHead}>
                     <Label t={t}>{dayLabel(d)}</Label>
-                    <Label t={t}>{money(sum(its))}</Label>
+                    {its.some((x) => !x.unconv) ? <Label t={t}>{money(convSum(its))}</Label> : null}
                   </View>
                   <View style={st.items}>{its.map((x, i) => expenseRow(x, i))}</View>
                 </View>
@@ -616,9 +665,9 @@ function Main() {
         ) : (
           <View style={st.empty}>
             <Ionicons name={q ? 'search' : 'wallet-outline'} size={40} color={t.muted} />
-            <Text style={st.emptyTitle}>{q ? tr('empty.noResults') : monthItems.length ? tr('empty.noMatch') : tr('empty.noMonth')}</Text>
+            <Text style={st.emptyTitle}>{q ? tr('empty.noResults') : listMonth.length ? tr('empty.noMatch') : tr('empty.noMonth')}</Text>
             <Text style={[st.meta, { textAlign: 'center' }]}>
-              {q ? tr('empty.tryOther') : monthItems.length ? tr('empty.removeFilter') : tr('empty.useButton')}
+              {q ? tr('empty.tryOther') : listMonth.length ? tr('empty.removeFilter') : tr('empty.useButton')}
             </Text>
           </View>
         )}
@@ -642,14 +691,14 @@ function Main() {
   } else if (screen === 'abonelikler') {
     const rank = { pending: 0, upcoming: 1, paid: 2, skipped: 2 };
     const when = (x: ReturnType<typeof subStatus>) => ('next' in x ? x.next : x.due).getTime();
-    const rows = subs
-      .map((s) => ({ s, x: subStatus(s, items) }))
+    const rows = subs.concat(un.subs)
+      .map((s) => ({ s, x: subStatus(s, payItems) }))
       .sort((p, q) => rank[p.x.state] - rank[q.x.state] || when(p.x) - when(q.x));
-    const monthly = subs.reduce((s, x) => s + monthlyCost(x), 0);
+    const monthly = subs.reduce((s, x) => s + monthlyCost(x), 0); // yalnızca çevrilebilenler
     // Türlere göre grupla; en pahalı tür üstte
     const groups = SUB_TYPES.map((tp) => {
       const list = rows.filter((r) => r.s.type === tp.key);
-      return { tp, list, total: list.reduce((m, r) => m + monthlyCost(r.s), 0) };
+      return { tp, list, total: list.reduce((m, r) => m + (r.s.unconv ? 0 : monthlyCost(r.s)), 0) };
     }).filter((g) => g.list.length).sort((p, q) => q.total - p.total);
     const pendingCount = rows.filter((r) => r.x.state === 'pending').length;
     body = (
@@ -662,7 +711,7 @@ function Main() {
             {budget ? <View><Text style={st.subSumVal}>{fmtPercent(Math.round((monthly / budget) * 100))}</Text><Text style={st.tileSub}>{tr('subs.ofBudget')}</Text></View> : null}
           </View>
         ) : null}
-        {groups.length > 1 ? (
+        {groups.length > 1 && monthly > 0 ? (
           <View style={st.card}>
             <View style={st.cardHead}>
               <Label t={t}>{tr('subs.byType')}</Label>
@@ -688,7 +737,7 @@ function Main() {
             <View key={g.tp.key} style={{ gap: 6 }}>
               <View style={st.dayHead}>
                 <Label t={t}>{subLabel(g.tp.key)}</Label>
-                <Label t={t}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Label>
+                {g.list.some((r) => !r.s.unconv) ? <Label t={t}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Label> : null}
               </View>
               <View style={[st.card, { paddingVertical: 6 }]}>
                 {g.list.map(({ s }, i) => (
@@ -723,6 +772,7 @@ function Main() {
           onExport={doExport}
           onBackup={doBackup}
           onRestore={doRestore}
+          notifWarn={perm && perm.state !== 'granted' && (settings.remind || settings.subRemind) ? { canAskAgain: perm.canAskAgain, onFix: fixNotifPermission } : null}
           account={<AccountSection t={t} />}
           ym={ym}
           monthLabel={monthOnly(ym)}
@@ -851,7 +901,7 @@ function Main() {
 
 /* ---------- Ekran parçaları ---------- */
 type Styles = ReturnType<typeof makeStyles>;
-type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
+type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; payItems: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
 
 function Tiles({ ctx }: { ctx: Ctx }) {
   const { t, st, a, monthItems, budget } = ctx;
@@ -895,8 +945,8 @@ function Tiles({ ctx }: { ctx: Ctx }) {
 }
 
 function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; first: boolean; onEdit: () => void; onPay: () => void; onSkip: () => void }) {
-  const { t, st, items } = ctx;
-  const x = subStatus(s, items);
+  const { t, st, payItems } = ctx;
+  const x = subStatus(s, payItems);
   return (
     <View style={[st.subWrap, !first && st.topLine]}>
       <Pressable onPress={onEdit} style={st.subRow} accessibilityLabel={tr('sub.rowA11y', { name: s.name })}>
@@ -913,7 +963,7 @@ function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; fi
           </View>
         </View>
         <Text style={st.itemAmt}>
-          {money(s.amount)}
+          {s.unconv ? fmtMoney(s.amount, s.cur ?? 'TRY') : money(s.amount)}
           <Text style={st.meta}>/{tr(s.freq === 'yearly' ? 'sub.perYear' : 'sub.perMonth')}</Text>
           {s.orig ? <Text style={st.meta}>{'\n'}{fmtMoney(s.orig.amount, s.orig.cur)}</Text> : null}
         </Text>

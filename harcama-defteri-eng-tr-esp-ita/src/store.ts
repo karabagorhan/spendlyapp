@@ -4,7 +4,7 @@ import { Cur, isCur } from './currency';
 import { deviceLanguage, isLang } from './i18n';
 import { loadLangPref } from './auth/prefs';
 import { isAccent, isTint } from './palette';
-import { CATS, Expense, INCOME_CATS, Income, SUB_TYPES, Settings, Sub, guessSubType } from './lib';
+import { CATS, Expense, INCOME_CATS, Income, SUB_TYPES, Settings, Sub, guessSubType, isRealDate, validAmount } from './lib';
 
 // Tüm veriler telefonda tek bir kayıt olarak tutulur (internet gerekmez).
 export const KEY = 'harcama-defteri:v1';
@@ -24,7 +24,7 @@ function str(v: unknown, d = '') {
 /** Dışarıdan gelen (yedek dosyası, eski kayıt) veriyi güvenli biçime getirir. */
 export function normalize(raw: any): Data {
   const items: Expense[] = (Array.isArray(raw?.items) ? raw.items : [])
-    .filter((x: any) => x && typeof x.amount === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(str(x.date)))
+    .filter((x: any) => x && validAmount(x.amount) && isRealDate(x.date))
     .map((x: any) => ({
       id: str(x.id) || Math.random().toString(36).slice(2),
       amount: x.amount,
@@ -36,7 +36,7 @@ export function normalize(raw: any): Data {
       ...(x.sub ? { sub: str(x.sub), period: str(x.period) } : {}),
     }));
   const subs: Sub[] = (Array.isArray(raw?.subs) ? raw.subs : [])
-    .filter((s: any) => s && typeof s.amount === 'number' && str(s.name))
+    .filter((s: any) => s && validAmount(s.amount) && str(s.name))
     .map((s: any) => ({
       id: str(s.id) || 'sub_' + Math.random().toString(36).slice(2),
       name: s.name,
@@ -50,7 +50,7 @@ export function normalize(raw: any): Data {
       ...(isCur(s.cur) ? { cur: s.cur as Cur } : {}),
     }));
   const incomes: Income[] = (Array.isArray(raw?.incomes) ? raw.incomes : [])
-    .filter((x: any) => x && typeof x.amount === 'number' && x.amount > 0 && isFinite(x.amount) && /^\d{4}-\d{2}-\d{2}$/.test(str(x.date)))
+    .filter((x: any) => x && validAmount(x.amount) && isRealDate(x.date))
     .map((x: any) => ({
       id: str(x.id) || 'inc_' + Math.random().toString(36).slice(2),
       amount: x.amount,
@@ -62,7 +62,7 @@ export function normalize(raw: any): Data {
     }));
   const st = raw?.settings ?? {};
   const settings: Settings = {
-    budget: num(st.budget ?? raw?.budget),
+    budget: validAmount(st.budget ?? raw?.budget) ? (st.budget ?? raw?.budget) : 0,
     remind: st.remind === true,
     remindHour: Math.min(23, Math.max(0, num(st.remindHour, 21))),
     subRemind: st.subRemind !== false,
@@ -75,10 +75,10 @@ export function normalize(raw: any): Data {
     currency: isCur(st.currency) ? st.currency : 'TRY',
     budgetCur: isCur(st.budgetCur) ? st.budgetCur : 'TRY',
     catBudgets: Object.fromEntries(
-      CATS.filter((c) => typeof st.catBudgets?.[c] === 'number' && st.catBudgets[c] > 0).map((c) => [c, st.catBudgets[c] as number]),
+      CATS.filter((c) => validAmount(st.catBudgets?.[c])).map((c) => [c, st.catBudgets[c] as number]),
     ),
     catBudgetCur: Object.fromEntries(
-      CATS.filter((c) => typeof st.catBudgets?.[c] === 'number' && st.catBudgets[c] > 0 && isCur(st.catBudgetCur?.[c])).map((c) => [c, st.catBudgetCur[c] as Cur]),
+      CATS.filter((c) => validAmount(st.catBudgets?.[c]) && isCur(st.catBudgetCur?.[c])).map((c) => [c, st.catBudgetCur[c] as Cur]),
     ),
   };
   return { items, subs, incomes, settings };

@@ -5,7 +5,8 @@
 import * as XLSX from 'xlsx';
 import { CATALOGS, LANGS, Lang, fmtPercent, parseAmount, setLanguage, t } from '../src/i18n';
 import { setMainCurrency } from '../src/currency';
-import { money as fmtTL, guessSubType, dayLabel, monthLabel, shortDay, todayIso, subLabel, catName, CATS, SUB_TYPES, compact, amountText } from '../src/lib';
+import { normalize } from '../src/store';
+import { MAX_AMOUNT, isRealDate, validAmount, money as fmtTL, guessSubType, dayLabel, monthLabel, shortDay, todayIso, subLabel, catName, CATS, SUB_TYPES, compact, amountText } from '../src/lib';
 
 setMainCurrency('TRY');
 let fail = 0, pass = 0;
@@ -148,6 +149,35 @@ eq('tr Susam kursu', guessSubType('Susam kursu'), 'egitim');
 eq('tr Su faturası', guessSubType('Su faturası'), 'ev');
 eq('tr Site aidatı', guessSubType('Site aidatı'), 'kira');
 eq('tr Turkcell faturası', guessSubType('Turkcell faturası'), 'iletisim');
+
+// F-05/F-07: yedek/içe aktarma tutar ve tarih doğrulaması, tek MAX_AMOUNT sınırı
+eq('MAX_AMOUNT 1e10', MAX_AMOUNT, 1e10);
+eq('validAmount sınırlar', [0, -1, NaN, Infinity, 1e10 + 1, '5', null, 0.01, 1e10].map(validAmount), [false, false, false, false, false, false, false, true, true]);
+eq('isRealDate', ['2026-02-28', '2026-02-31', '2024-02-29', '2025-02-29', '2026-13-01', '2026-00-10', '2026-1-1', 'abc', 5].map(isRealDate), [true, false, true, false, false, false, false, false, false]);
+const badAmounts = [-5, 0, NaN, Infinity, -Infinity, 1e10 + 1, 999999999999999, '12', null];
+const rawItems = badAmounts.map((amount, i) => ({ id: 'i' + i, amount, cat: 'Market', note: '', date: '2026-10-01', ts: 1 }));
+const rawSubs = badAmounts.map((amount, i) => ({ id: 's' + i, name: 'Abo' + i, amount, day: 1, freq: 'monthly', month: 1, cat: 'Eğlence' }));
+const rawIncs = badAmounts.map((amount, i) => ({ id: 'n' + i, amount, cat: 'salary', note: '', date: '2026-10-01', ts: 1 }));
+const good = normalize({
+  items: [...rawItems, { id: 'ok', amount: 1e10, cat: 'Market', date: '2026-10-01' }, { id: 'ok2', amount: 0.5, cat: 'Market', date: '2024-02-29' }],
+  subs: [...rawSubs, { id: 'oks', name: 'Netflix', amount: 99.9, day: 1 }],
+  incomes: [...rawIncs, { id: 'oki', amount: 5, cat: 'salary', date: '2026-10-01' }],
+});
+eq('normalize: geçersiz harcama tutarları atılır', good.items.map((x) => x.id), ['ok', 'ok2']);
+eq('normalize: geçersiz abonelik tutarları atılır', good.subs.map((x) => x.id), ['oks']);
+eq('normalize: geçersiz gelir tutarları atılır', good.incomes.map((x) => x.id), ['oki']);
+const badDates = ['2026-02-31', '2026-04-31', '2026-13-01', '2025-02-29', '2026-00-01', '2026-10-32'];
+const dn = normalize({
+  items: [...badDates.map((date, i) => ({ id: 'd' + i, amount: 5, cat: 'Market', date })), { id: 'okd', amount: 5, cat: 'Market', date: '2026-02-28' }],
+  incomes: [...badDates.map((date, i) => ({ id: 'e' + i, amount: 5, cat: 'salary', date })), { id: 'oke', amount: 5, cat: 'salary', date: '2024-02-29' }],
+});
+eq('normalize: takvimde olmayan tarihli harcamalar atılır', dn.items.map((x) => x.id), ['okd']);
+eq('normalize: takvimde olmayan tarihli gelirler atılır', dn.incomes.map((x) => x.id), ['oke']);
+const bn = normalize({ settings: { budget: 1e12, catBudgets: { Market: 1e12, Fatura: 500, Sağlık: -3 } } }).settings;
+eq('normalize: aşırı/negatif bütçe ve limitler elenir', [bn.budget, bn.catBudgets], [0, { Fatura: 500 }]);
+eq('normalize: sınırdaki bütçe kabul', normalize({ settings: { budget: 1e10 } }).settings.budget, 1e10);
+setLanguage('tr');
+eq('parseAmount üst sınırı kendisi uygulamaz (arayüz MAX_AMOUNT ile satır içi hata verir)', parseAmount('999.999.999.999.999') > MAX_AMOUNT, true);
 
 console.log(`${pass} geçti, ${fail} başarısız`);
 process.exit(fail ? 1 : 0);
