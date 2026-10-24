@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions, type ScrollViewInstance, type TextInputInstance } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LANGS, Lang, t as tr } from '../i18n';
@@ -27,7 +27,7 @@ const SLIDES = [
 export function Onboarding({ t, lang, onLang, onDone, accountsEnabled }: { t: Theme; lang: Lang; onLang?: (l: Lang) => void; onDone: () => void; accountsEnabled: boolean }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const ref = useRef<ScrollView>(null);
+  const ref = useRef<ScrollViewInstance>(null);
   const [i, setI] = useState(0);
   const last = i === SLIDES.length - 1;
   const go = (n: number) => { setI(n); ref.current?.scrollTo({ x: n * width, animated: true }); };
@@ -140,7 +140,7 @@ export function SignUp({ t }: { t: Theme }) {
   const [pw2, setPw2] = useState('');
   const [consent, setConsent] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const refs = { email: useRef<TextInput>(null), pw: useRef<TextInput>(null), pw2: useRef<TextInput>(null) };
+  const refs = { email: useRef<TextInputInstance>(null), pw: useRef<TextInputInstance>(null), pw2: useRef<TextInputInstance>(null) };
   const touch = (k: string) => setTouched((p) => ({ ...p, [k]: true }));
   const suggestion = useMemo(() => (touched.email ? suggestEmail(email) : null), [touched.email, email]);
 
@@ -202,7 +202,7 @@ export function SignIn({ t }: { t: Theme }) {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [touched, setTouched] = useState(false);
-  const pwRef = useRef<TextInput>(null);
+  const pwRef = useRef<TextInputInstance>(null);
   const errors = { email: emailMsg(validateEmail(email)), pw: pw ? null : tr('auth.val.pwEmpty') };
 
   const submit = async () => {
@@ -312,7 +312,7 @@ export function Recovery({ t }: { t: Theme }) {
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [touched, setTouched] = useState(false);
-  const pw2Ref = useRef<TextInput>(null);
+  const pw2Ref = useRef<TextInputInstance>(null);
   const e1 = pw ? pwMsg(validatePassword(pw)) : tr('auth.val.pwEmpty');
   const e2 = pw2 !== pw ? tr('auth.val.pwMismatch') : null;
   const submit = async () => {

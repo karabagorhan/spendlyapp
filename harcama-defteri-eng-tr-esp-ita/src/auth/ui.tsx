@@ -1,6 +1,6 @@
 import * as Network from 'expo-network';
 import { ReactNode, RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t as tr } from '../i18n';
 import { FONTS, Theme } from '../theme';
@@ -74,7 +74,7 @@ export function LegalText({ text, onOpen, t, size = 13, center }: { text: string
 
 export function TextField({ label, value, onChangeText, t, error, hint, secure, inputRef, onBlur, onSubmitEditing, returnKeyType, kind = 'text', testID, maxLength, autoFocus }: {
   label: string; value: string; onChangeText: (s: string) => void; t: Theme; error?: string | null; hint?: ReactNode; secure?: boolean;
-  inputRef?: RefObject<TextInput | null>; onBlur?: () => void; onSubmitEditing?: () => void; returnKeyType?: 'next' | 'done' | 'go';
+  inputRef?: RefObject<TextInputInstance | null>; onBlur?: () => void; onSubmitEditing?: () => void; returnKeyType?: 'next' | 'done' | 'go';
   kind?: 'text' | 'email' | 'newPassword' | 'password' | 'name'; testID?: string; maxLength?: number; autoFocus?: boolean;
 }) {
   const [shown, setShown] = useState(false);
