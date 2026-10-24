@@ -23,7 +23,7 @@ const tr: Catalog = {
 
   // Ekran başlıkları
   'title.ozet': 'Özet',
-  'title.harcamalar': 'Harcamalar',
+  'title.harcamalar': 'İşlemler',
   'title.raporlar': 'Raporlar',
   'title.abonelikler': 'Abonelikler',
   'title.butce': 'Bütçe ve limitler',
@@ -39,6 +39,7 @@ const tr: Catalog = {
   'date.twoDaysAgo': '2 gün önce',
   'date.prevDay': 'Önceki gün',
   'date.nextDay': 'Sonraki gün',
+  'date.pick': 'Tarih seç',
   'month.prev': 'Önceki ay',
   'month.next': 'Sonraki ay',
   'month.0': 'Ocak', 'month.1': 'Şubat', 'month.2': 'Mart', 'month.3': 'Nisan', 'month.4': 'Mayıs', 'month.5': 'Haziran',

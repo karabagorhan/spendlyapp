@@ -23,7 +23,7 @@ const en: Catalog = {
 
   // Screen titles
   'title.ozet': 'Overview',
-  'title.harcamalar': 'Expenses',
+  'title.harcamalar': 'Transactions',
   'title.raporlar': 'Reports',
   'title.abonelikler': 'Subscriptions',
   'title.butce': 'Budget & limits',
@@ -39,6 +39,7 @@ const en: Catalog = {
   'date.twoDaysAgo': '2 days ago',
   'date.prevDay': 'Previous day',
   'date.nextDay': 'Next day',
+  'date.pick': 'Pick a date',
   'month.prev': 'Previous month',
   'month.next': 'Next month',
   'month.0': 'January', 'month.1': 'February', 'month.2': 'March', 'month.3': 'April', 'month.4': 'May', 'month.5': 'June',

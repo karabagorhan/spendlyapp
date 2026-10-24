@@ -345,7 +345,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await id(p, 'txn-tab-income').click(); await p.waitForTimeout(400);
     ok('Gelirler sekmesi: bu ayın geliri listelenir', await has(p, 'Pay') && await has(p, '+' + mny(1000)) && !(await has(p, 'OldPay')));
     ok('Gelirler: ay toplamı', (await text(p)).includes(mny(1000)));
-    ok('Gelirler sekmesinde ekran başlığı "Gelirler"', (await title()) === T('txn.income'), String(await title()));
+    ok('Gelirler sekmesinde ekran başlığı sekme adıyla (İşlemler) aynı kalır', (await title()) === T('tab.transactions'), String(await title()));
     ok('Gelirler sekmesinde hızlı düğme gelir ekler', await has(p, '+  ' + T('qa.income')));
     await audit(p, 'işlemler-gelir');
     await p.getByText('+  ' + T('qa.income'), { exact: true }).first().click();

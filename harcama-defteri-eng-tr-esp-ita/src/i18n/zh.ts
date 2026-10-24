@@ -24,7 +24,7 @@ const zh: Catalog = {
 
   // 页面标题
   'title.ozet': '概览',
-  'title.harcamalar': '支出',
+  'title.harcamalar': '交易',
   'title.raporlar': '报表',
   'title.abonelikler': '订阅',
   'title.butce': '预算与限额',
@@ -40,6 +40,7 @@ const zh: Catalog = {
   'date.twoDaysAgo': '前天',
   'date.prevDay': '前一天',
   'date.nextDay': '后一天',
+  'date.pick': '选择日期',
   'month.prev': '上个月',
   'month.next': '下个月',
   'month.0': '1月', 'month.1': '2月', 'month.2': '3月', 'month.3': '4月', 'month.4': '5月', 'month.5': '6月',

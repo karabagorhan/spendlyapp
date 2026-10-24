@@ -175,30 +175,37 @@ function Main() {
   };
   const swipeBackRef = useRef(swipeBack);
   swipeBackRef.current = swipeBack;
-  // PanResponder'ın x0/dx değerleri hareket yakalanınca sıfırlanır; bu yüzden dokunuşun başladığı yeri kendimiz tutarız
-  const touchX = useRef({ start: 0, last: 0 });
-  const shouldSwipe = (pageX: number, dy: number, capture: boolean) => {
-    const dx = pageX - touchX.current.start;
+  // PanResponder'ın x0/dx/dy/vx değerleri hareket yakalanınca sıfırlanır ya da önceki hareketlerden kalıntı taşıyabilir; bu yüzden dokunuşu kendimiz izleriz
+  const touchX = useRef({ start: 0, startY: 0, last: 0, lastY: 0, prev: 0, prevT: 0, lastT: 0 });
+  const shouldSwipe = (pageX: number, pageY: number, capture: boolean) => {
+    const dx = pageX - touchX.current.start, dy = pageY - touchX.current.startY;
     if (nav.current.blocked || dx < 14 || dx < Math.abs(dy) * 2.2) return false;
     return capture ? touchX.current.start <= EDGE : nav.current.canBack;
   };
   const edgePan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponderCapture: (e) => {
-        touchX.current = { start: e.nativeEvent.pageX, last: e.nativeEvent.pageX };
+        const { pageX, pageY } = e.nativeEvent, now = Date.now();
+        touchX.current = { start: pageX, startY: pageY, last: pageX, lastY: pageY, prev: pageX, prevT: now, lastT: now };
         return false;
       },
       // Kenardan başlayan hareket iç içe kaydırıcılardan önce yakalanır; ekranın başka yerinde yalnızca gidecek bir ekran varsa ve iç öğe (ör. yatay çipler) almadıysa
-      onMoveShouldSetPanResponderCapture: (e, g) => shouldSwipe(e.nativeEvent.pageX, g.dy, true),
-      onMoveShouldSetPanResponder: (e, g) => shouldSwipe(e.nativeEvent.pageX, g.dy, false),
+      onMoveShouldSetPanResponderCapture: (e) => shouldSwipe(e.nativeEvent.pageX, e.nativeEvent.pageY, true),
+      onMoveShouldSetPanResponder: (e) => shouldSwipe(e.nativeEvent.pageX, e.nativeEvent.pageY, false),
       onPanResponderGrant: () => setSwiping(true),
       onPanResponderMove: (e) => {
-        touchX.current.last = e.nativeEvent.pageX;
-        slide.setValue(Math.max(0, Math.min(touchX.current.last - touchX.current.start, 140)) * 0.5);
+        const c = touchX.current, now = Date.now();
+        if (now - c.lastT > 0) { c.prev = c.last; c.prevT = c.lastT; }
+        c.last = e.nativeEvent.pageX; c.lastY = e.nativeEvent.pageY; c.lastT = now;
+        slide.setValue(Math.max(0, Math.min(c.last - c.start, 140)) * 0.5);
       },
-      onPanResponderRelease: (_e, g) => {
+      onPanResponderRelease: () => {
         Animated.spring(slide, { toValue: 0, bounciness: 0, useNativeDriver: true }).start(() => setSwiping(false));
-        if (touchX.current.last - touchX.current.start > SWIPE_DIST || g.vx > 0.6) swipeBackRef.current();
+        const c = touchX.current, dx = c.last - c.start, dy = c.lastY - c.startY;
+        const vx = (c.last - c.prev) / Math.max(1, c.lastT - c.prevT);
+        // Tüm hareket boyunca yatay baskın olmalı; hız kestirmesi de yalnızca sağa doğru ve yeterince yatay harekette geçerli
+        const horizontal = dx > Math.abs(dy) * 1.5;
+        if (horizontal && (dx > SWIPE_DIST || (dx > 24 && vx > 0.6))) swipeBackRef.current();
       },
       onPanResponderTerminate: () => Animated.spring(slide, { toValue: 0, bounciness: 0, useNativeDriver: true }).start(() => setSwiping(false)),
     }),
@@ -819,7 +826,7 @@ function Main() {
             <Ionicons name="menu" size={24} color={t.fg} />
             {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
           </Pressable>
-          <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screen === 'harcamalar' && txnTab === 'income' ? tr('txn.income') : screenTitle(screen)}</Text>
+          <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screenTitle(screen)}</Text>
         </View>
       ) : null}
       <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, screen === 'ozet' && { paddingTop: insets.top + 8 }, { paddingBottom: barH + (showFab ? 96 : 28) }]} keyboardShouldPersistTaps="handled">
@@ -889,7 +896,7 @@ function Main() {
         <IncomeSheet key={incSheet.key} visible initial={incSheet.initial} main={main} rates={rs.rates} onSave={saveIncome} onDelete={deleteIncome} onClose={() => setIncSheet(null)} t={t} />
       ) : null}
       {expSheet ? (
-        <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
+        <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} lastCat={items.reduce<Expense | null>((a, e) => (!a || e.ts > a.ts ? e : a), null)?.cat} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
       ) : null}
       {subSheet ? (
         <SubSheet key={subSheet.key} visible initial={subSheet.initial} main={main} rates={rs.rates} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubSheet(null)} t={t} />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LANGS, Lang, t as tr } from '../i18n';
 import { FONTS, Theme } from '../theme';
@@ -95,7 +96,20 @@ export function Welcome({ t, closable }: { t: Theme; closable: boolean }) {
       footer={<LegalText text={tr('auth.legalNotice')} onOpen={openLegal} t={t} center />}
     >
       {apple ? (
-        <BusyButton testID="btn-apple" kind="dark" busy={a.busy} label={tr('auth.apple')} t={t} onPress={social(() => service.signInWithApple(meta()))} icon={<Ionicons name="logo-apple" size={22} color={t.bg} />} />
+        Platform.OS === 'ios' ? (
+          // iOS'ta Apple'ın resmi düğmesi (HIG gereği); testID resmi düğmede olmadığından sarmalayıcıda durur
+          <View testID="btn-apple" style={{ opacity: a.busy ? 0.5 : 1 }} pointerEvents={a.busy ? 'none' : 'auto'} aria-busy={a.busy}>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={t.name === 'noir' ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={26}
+              onPress={() => { if (!a.busy) social(() => service.signInWithApple(meta()))(); }}
+              style={{ height: 52, width: '100%' }}
+            />
+          </View>
+        ) : (
+          <BusyButton testID="btn-apple" kind="dark" busy={a.busy} label={tr('auth.apple')} t={t} onPress={social(() => service.signInWithApple(meta()))} icon={<Ionicons name="logo-apple" size={22} color={t.bg} />} />
+        )
       ) : null}
       {google ? (
         <BusyButton testID="btn-google" kind="ghost" busy={a.busy} label={tr('auth.google')} t={t} onPress={social(() => service.signInWithGoogle(meta()))} icon={<Ionicons name="logo-google" size={20} color={t.fg} />} />

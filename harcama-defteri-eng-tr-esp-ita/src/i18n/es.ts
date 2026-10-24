@@ -24,10 +24,10 @@ const es: Catalog = {
 
   // Títulos de pantalla
   'title.ozet': 'Resumen',
-  'title.harcamalar': 'Gastos',
+  'title.harcamalar': 'Movimientos',
   'title.raporlar': 'Informes',
   'title.abonelikler': 'Suscripciones',
-  'title.butce': 'Presupuesto y límites',
+  'title.butce': 'Presupuesto',
   'title.ayarlar': 'Ajustes',
 
   // Formatos de fecha y nombres
@@ -40,6 +40,7 @@ const es: Catalog = {
   'date.twoDaysAgo': 'Hace 2 días',
   'date.prevDay': 'Día anterior',
   'date.nextDay': 'Día siguiente',
+  'date.pick': 'Elegir fecha',
   'month.prev': 'Mes anterior',
   'month.next': 'Mes siguiente',
   'month.0': 'Enero', 'month.1': 'Febrero', 'month.2': 'Marzo', 'month.3': 'Abril', 'month.4': 'Mayo', 'month.5': 'Junio',
@@ -92,7 +93,7 @@ const es: Catalog = {
   // Menú lateral
   'menu.open': 'Abrir menú',
   'menu.close': 'Cerrar menú',
-  'menu.headerSub': 'Finanzas personales · {month}',
+  'menu.headerSub': 'Mis finanzas · {month}',
   'menu.general': 'General',
   'menu.management': 'Gestión',
   'menu.home': 'Resumen',

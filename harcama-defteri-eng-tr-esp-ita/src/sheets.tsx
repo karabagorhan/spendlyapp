@@ -6,6 +6,7 @@ import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Su
 import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
 import { FONTS, Theme } from './theme';
 import { incomeIcon } from './dashboard';
+import { DatePicker } from './calendar';
 import { Button, CatIcon, Chip, IconName, Label, Swatch, catIconName, subTypeColor } from './ui';
 
 type SheetAction = { label: string; onPress: () => void; disabled?: boolean };
@@ -140,11 +141,12 @@ function DeleteButton({ onDelete, t }: { onDelete: () => void; t: Theme }) {
 }
 
 /* ---------- Harcama ekle / düzenle ---------- */
-export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, rates, onSave, onDelete, onClose, t }: {
+export function ExpenseSheet({ visible, initial, prefill, frequent = [], lastCat, main, rates, onSave, onDelete, onClose, t }: {
   visible: boolean;
   initial: Expense | null;
   prefill?: { amount?: number; cat?: string };
   frequent?: { cat: string; note: string; amount: number }[];
+  lastCat?: string; // en son eklenen harcamanın kategorisi: yeni kayıtta varsayılan
   main: Cur;
   rates: Rates | null;
   onSave: (e: Expense) => void;
@@ -153,9 +155,10 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
   t: Theme;
 }) {
   const [amount, setAmount] = useState(initial ? amountText(initial.amount) : prefill?.amount ? amountText(prefill.amount) : '');
-  const [cat, setCat] = useState(initial?.cat ?? prefill?.cat ?? CATS[0]);
+  const [cat, setCat] = useState(initial?.cat ?? prefill?.cat ?? (lastCat && CATS.includes(lastCat) ? lastCat : CATS[0]));
   const [note, setNote] = useState(initial?.note ?? '');
   const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [cal, setCal] = useState(false); // takvim açık mı
   // Kayıt girildiği para biriminde gösterilir ve saklanır; yeni kayıt ana para biriminde başlar
   const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
   const raw = parseAmount(amount);
@@ -228,11 +231,15 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
           <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={8} style={st.stepBtn} accessibilityLabel={tr('date.prevDay')}>
             <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
           </Pressable>
-          <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+          <Pressable onPress={() => setCal(!cal)} style={st.dateBtn} accessibilityRole="button" accessibilityLabel={`${tr('date.pick')}: ${dayLabel(date)}`} accessibilityState={{ expanded: cal }}>
+            <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+            <Text style={{ color: t.muted, fontSize: 12 }}>{cal ? '▲' : '▼'}</Text>
+          </Pressable>
           <Pressable onPress={() => !isToday && setDate(addDays(date, 1))} hitSlop={8} style={[st.stepBtn, { opacity: isToday ? 0.3 : 1 }]} accessibilityLabel={tr('date.nextDay')}>
             <Text style={[st.stepTxt, { color: t.fg }]}>›</Text>
           </Pressable>
         </View>
+        {cal ? <DatePicker value={date} onChange={(d) => { setDate(d); setCal(false); }} t={t} /> : null}
       </Field>
       <View style={st.actions}>
         {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
@@ -250,6 +257,7 @@ export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, o
   const [cat, setCat] = useState(initial?.cat ?? INCOME_CATS[0]);
   const [note, setNote] = useState(initial?.note ?? '');
   const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [cal, setCal] = useState(false); // takvim açık mı
   const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
   const raw = parseAmount(amount);
   const value = raw > MAX_AMOUNT ? 0 : raw;
@@ -291,11 +299,15 @@ export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, o
           <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={8} style={st.stepBtn} accessibilityLabel={tr('date.prevDay')}>
             <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
           </Pressable>
-          <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+          <Pressable onPress={() => setCal(!cal)} style={st.dateBtn} accessibilityRole="button" accessibilityLabel={`${tr('date.pick')}: ${dayLabel(date)}`} accessibilityState={{ expanded: cal }}>
+            <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+            <Text style={{ color: t.muted, fontSize: 12 }}>{cal ? '▲' : '▼'}</Text>
+          </Pressable>
           <Pressable onPress={() => !isToday && setDate(addDays(date, 1))} hitSlop={8} style={[st.stepBtn, { opacity: isToday ? 0.3 : 1 }]} accessibilityLabel={tr('date.nextDay')}>
             <Text style={[st.stepTxt, { color: t.fg }]}>›</Text>
           </Pressable>
         </View>
+        {cal ? <DatePicker value={date} onChange={(d) => { setDate(d); setCal(false); }} t={t} /> : null}
       </Field>
       <View style={st.actions}>
         {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
@@ -644,6 +656,7 @@ const st = StyleSheet.create({
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   stepper: { height: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
+  dateBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   stepBtn: { width: 40, alignItems: 'center' },
   stepTxt: { fontSize: 24, lineHeight: 28 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth },

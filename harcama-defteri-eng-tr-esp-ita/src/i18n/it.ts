@@ -24,7 +24,7 @@ const it: Catalog = {
 
   // Titoli delle schermate
   'title.ozet': 'Riepilogo',
-  'title.harcamalar': 'Spese',
+  'title.harcamalar': 'Movimenti',
   'title.raporlar': 'Report',
   'title.abonelikler': 'Abbonamenti',
   'title.butce': 'Budget e limiti',
@@ -40,6 +40,7 @@ const it: Catalog = {
   'date.twoDaysAgo': '2 giorni fa',
   'date.prevDay': 'Giorno precedente',
   'date.nextDay': 'Giorno successivo',
+  'date.pick': 'Scegli data',
   'month.prev': 'Mese precedente',
   'month.next': 'Mese successivo',
   'month.0': 'Gennaio', 'month.1': 'Febbraio', 'month.2': 'Marzo', 'month.3': 'Aprile', 'month.4': 'Maggio', 'month.5': 'Giugno',
@@ -92,7 +93,7 @@ const it: Catalog = {
   // Menu laterale
   'menu.open': 'Apri il menu',
   'menu.close': 'Chiudi il menu',
-  'menu.headerSub': 'Budget personale · {month}',
+  'menu.headerSub': 'Il mio budget · {month}',
   'menu.general': 'Generale',
   'menu.management': 'Gestione',
   'menu.home': 'Riepilogo',
@@ -230,7 +231,7 @@ const it: Catalog = {
   'budget.limitsTitle': 'Limiti per categoria (mensili)',
   'budget.limitsHint': 'Quando una categoria raggiunge l’80% del limite vedrai un avviso in Riepilogo e Report. Le categorie lasciate vuote non hanno limite.',
   'budget.limitsTotal': 'Totale dei limiti: {amount}.',
-  'budget.limitNone': 'Nessun limite',
+  'budget.limitNone': 'Nessuno',
   'budget.limitA11y': 'Limite mensile di {cat}',
 
   // Impostazioni
