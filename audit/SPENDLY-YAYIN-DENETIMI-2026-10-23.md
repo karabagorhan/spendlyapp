@@ -337,3 +337,22 @@ PATH=/usr/lib/postgresql/16/bin:$PATH npm run test:sql
 npx expo export --platform web --output-dir /tmp/web-out
 PW_CHROMIUM=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome WEB_DIR=/tmp/web-out node scripts/gesture-ui-test.js tr   # F-11
 ```
+
+---
+
+## Ek C: Düzeltme turu (24 Ekim 2026), dal `orhan/awesome-clarke-nbqv4i`
+
+Yedek: GitHub dalları `yedek/2026-10-24-main`, `-spendly-dashboard`, `-eloquent-clarke`, `-awesome-clarke-denetim`.
+
+| Parça | Model | Commit | Kapatılan bulgular |
+|---|---|---|---|
+| 1 Veri doğruluğu | Sonnet | `663df40` | F-04, F-05, F-06, F-07, F-08 |
+| 2 Yayın yapılandırması, CI | Haiku | `73f1a39` | F-02, F-28; F-01 **geçici** ikonla (nihai tasarım bekleniyor); eas.json, şifreleme beyanı, Expo yamaları, check:release genişletmesi, GitHub Actions |
+| 3 Form ve gezinme | Sonnet | `c5642a6` | F-10, F-11, F-12, F-13, F-26 (+ son kategori hatırlanıyor) |
+| 4 Bütçe ekranı | Haiku | `82c8d8c` | F-14 |
+| 5 Güvenlik ve bağımlılık | Sonnet | `a472c0b` | F-18, F-22, F-29 |
+| Son kontrol | Opus | `2dd2d22` | Kilit atlatma (derin bağlantıyla form açılması) düzeltildi, erişilebilirlik ve küçük düzeltmeler |
+
+**Son test turu:** `npm test` 0 hata (core 705, currency 821, theme 1032, dashboard 134, auth 101, functions 42) · `test:sql` 34/34 · tarayıcı testleri tr/en/es/it'de ui, currency, gesture (33/33), theme, dashboard: 0 hata, 0 uyarı · auth-ui tr/en 103/103 · `check:release`: yalnızca 7 yasal `REPLACE_ME` engeli.
+
+**Açık kalanlar:** F-03 yasal bilgiler (sizden), nihai marka görselleri, F-09 işlem anı kuru, F-15/F-16/F-17/F-19/F-20/F-21/F-23/F-24/F-25/F-27/F-30; son kontrolün karara bıraktıkları: kur yokken Excel'in çevrilemeyen kayıtları sessizce dışarıda bırakması, panelde kur dışı aboneliklerin görünmemesi, başka para birimindeki bütçenin kur yokken "bütçe yok" görünmesi, Face ID izin metninin yalnız İngilizce olması. Kilit, bildirim izni, Apple düğmesi ve hareketler **gerçek cihazda** doğrulanmalı.
