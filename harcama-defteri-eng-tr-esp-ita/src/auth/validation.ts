@@ -62,9 +62,9 @@ const COMMON = new Set([
   '12345678', '123456789', '1234567890', '11111111', '00000000', '87654321', '12341234', '123123123', 'abcd1234', 'abc12345', 'iloveyou', 'letmein1',
   'welcome1', 'welcome123', 'admin123', 'administrator', 'monkey123', 'dragon123', 'football', 'baseball', 'sunshine', 'princess', 'superman', 'master123',
   'sifre123', 'sifre1234', 'parola123', 'merhaba123', 'istanbul', 'istanbul34', 'ankara06', 'izmir3535', 'galatasaray', 'fenerbahce', 'besiktas', 'trabzonspor',
-  'galatasaray1', 'fenerbahce1', 'besiktas1', 'trabzon61', 'turkiye123', 'sevgilim', 'canimanne', 'harcama123', 'spendly123',
+  'galatasaray1', 'fenerbahce1', 'besiktas1', 'trabzon61', 'turkiye123', 'sevgilim', 'canimanne', 'harcama123', 'spendly123', 'monibo123',
 ]);
-const COMMON_ROOTS = ['password', 'qwerty', 'asdfg', 'iloveyou', 'letmein', 'welcome', 'admin', 'sifre', 'parola', 'harcama', 'spendly'];
+const COMMON_ROOTS = ['password', 'qwerty', 'asdfg', 'iloveyou', 'letmein', 'welcome', 'admin', 'sifre', 'parola', 'harcama', 'spendly', 'monibo'];
 
 export const byteLength = (s: string) => new TextEncoder().encode(s).length;
 

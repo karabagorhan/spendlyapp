@@ -8,7 +8,7 @@ import { Expense, Income, Sub, iso } from './lib';
 import { Data, normalize } from './store';
 import { writeXlsx } from './xlsxWriter';
 
-/** Seçilen dosya bir Spendly yedeği değilse. */
+/** Seçilen dosya bir Monibo yedeği değilse. */
 export class BackupFormatError extends Error {}
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';

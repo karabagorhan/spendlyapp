@@ -7,8 +7,8 @@ import type { Catalog } from './index';
  */
 const it: Catalog = {
   // App
-  'app.name': 'Spendly',
-  'app.monogram': 'S',
+  'app.name': 'Monibo',
+  'app.monogram': 'M',
 
   // Comuni
   'common.all': 'Tutto',
@@ -278,8 +278,8 @@ const it: Catalog = {
   'toast.backupFail': 'Impossibile creare il file di backup.',
   'toast.restored': { one: '{n} record aggiunto.', other: '{n} record aggiunti.' },
   'toast.restoreNone': 'I record del backup sono già presenti.',
-  'toast.restoreBadFile': 'Questo file non è un backup di Spendly.',
-  'toast.restoreReadFail': 'Impossibile leggere il file. Assicurati di scegliere un backup di Spendly.',
+  'toast.restoreBadFile': 'Questo file non è un backup di Monibo.',
+  'toast.restoreReadFail': 'Impossibile leggere il file. Assicurati di scegliere un backup di Monibo.',
   'notif.daily': 'Hai già inserito le spese di oggi?',
   'notif.subTitle': 'Oggi si paga {name}',
   'notif.subBody': 'Oggi scade il pagamento di {amount}. Non dimenticare di confermarlo nell’app.',
@@ -309,9 +309,9 @@ const it: Catalog = {
   'xl.yearly': 'Annuale',
   'xl.payMonthly': 'Ogni mese, il {day}',
   'xl.payYearly': '{day} {month}',
-  'file.excelMonth': 'spendly-spese-{ym}.xlsx',
-  'file.excelAll': 'spendly-spese-tutte-{date}.xlsx',
-  'file.backup': 'spendly-backup-{date}.json',
+  'file.excelMonth': 'monibo-spese-{ym}.xlsx',
+  'file.excelAll': 'monibo-spese-tutte-{date}.xlsx',
+  'file.backup': 'monibo-backup-{date}.json',
 
   // Valute e tassi di cambio
   'currency.TRY': 'Lira turca',
@@ -490,7 +490,7 @@ const it: Catalog = {
   'del.confirm': 'Elimina definitivamente il mio account',
   'del.cancel': 'Annulla',
 
-  // Spendly paneli: gelir, net durum, kartlar, sekmeler, durumlar
+  // Monibo paneli: gelir, net durum, kartlar, sekmeler, durumlar
   'dash.greeting.morning': 'Buongiorno',
   'dash.greeting.afternoon': 'Buon pomeriggio',
   'dash.greeting.evening': 'Buonasera',
@@ -580,7 +580,7 @@ const it: Catalog = {
   'settings.notifAmounts': 'Importi nelle notifiche',
   'notif.subBodyPrivate': 'Oggi scade un abbonamento. Confermalo nell’app.',
   'lock.unlock': 'Sblocca',
-  'lock.reason': 'Sblocca Spendly',
+  'lock.reason': 'Sblocca Monibo',
   'toast.lockFailed': 'Verifica non riuscita. Blocco non attivato.',
   'lock.hint': 'Bloccata per proteggere i tuoi dati.',
 };

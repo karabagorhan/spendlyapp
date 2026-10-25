@@ -7,8 +7,8 @@ import type { Catalog } from './index';
  */
 const es: Catalog = {
   // Aplicación
-  'app.name': 'Spendly',
-  'app.monogram': 'S',
+  'app.name': 'Monibo',
+  'app.monogram': 'M',
 
   // Comunes
   'common.all': 'Todo',
@@ -278,8 +278,8 @@ const es: Catalog = {
   'toast.backupFail': 'No se pudo crear la copia de seguridad.',
   'toast.restored': { one: '{n} registro añadido.', other: '{n} registros añadidos.' },
   'toast.restoreNone': 'Los registros de la copia ya existen.',
-  'toast.restoreBadFile': 'Este archivo no es una copia de Spendly.',
-  'toast.restoreReadFail': 'No se pudo leer el archivo. Asegúrate de elegir una copia de Spendly.',
+  'toast.restoreBadFile': 'Este archivo no es una copia de Monibo.',
+  'toast.restoreReadFail': 'No se pudo leer el archivo. Asegúrate de elegir una copia de Monibo.',
   'notif.daily': '¿Has anotado ya tus gastos de hoy?',
   'notif.subTitle': 'Hoy se paga {name}',
   'notif.subBody': 'Hoy vence el pago de {amount}. No olvides confirmarlo en la aplicación.',
@@ -309,9 +309,9 @@ const es: Catalog = {
   'xl.yearly': 'Anual',
   'xl.payMonthly': 'Cada mes, día {day}',
   'xl.payYearly': '{day} de {month}',
-  'file.excelMonth': 'spendly-gastos-{ym}.xlsx',
-  'file.excelAll': 'spendly-gastos-todos-{date}.xlsx',
-  'file.backup': 'spendly-copia-{date}.json',
+  'file.excelMonth': 'monibo-gastos-{ym}.xlsx',
+  'file.excelAll': 'monibo-gastos-todos-{date}.xlsx',
+  'file.backup': 'monibo-copia-{date}.json',
 
   // Monedas y tipos de cambio
   'currency.TRY': 'Lira turca',
@@ -490,7 +490,7 @@ const es: Catalog = {
   'del.confirm': 'Eliminar mi cuenta para siempre',
   'del.cancel': 'Cancelar',
 
-  // Spendly paneli: gelir, net durum, kartlar, sekmeler, durumlar
+  // Monibo paneli: gelir, net durum, kartlar, sekmeler, durumlar
   'dash.greeting.morning': 'Buenos días',
   'dash.greeting.afternoon': 'Buenas tardes',
   'dash.greeting.evening': 'Buenas noches',
@@ -580,7 +580,7 @@ const es: Catalog = {
   'settings.notifAmounts': 'Importes en notificaciones',
   'notif.subBodyPrivate': 'Hoy vence una suscripción. Confírmala en la app.',
   'lock.unlock': 'Desbloquear',
-  'lock.reason': 'Desbloquear Spendly',
+  'lock.reason': 'Desbloquear Monibo',
   'toast.lockFailed': 'No se verificó. Bloqueo sin activar.',
   'lock.hint': 'Bloqueada para proteger tus datos.',
 };

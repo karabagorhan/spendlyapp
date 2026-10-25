@@ -237,9 +237,9 @@ const dyn = [
 for (const l of LANGS.map((x) => x.code) as Lang[]) {
   const missing = dyn.filter((k) => CATALOGS[l][k] === undefined);
   eq(`dinamik anahtarlar ${l}`, missing, []);
-  eq(`marka adı ${l}`, CATALOGS[l]['app.name'], 'Spendly');
-  truthy(`dosya adları markalı ${l}`, ['file.backup', 'file.excelMonth', 'file.excelAll'].every((k) => String(CATALOGS[l][k]).startsWith('spendly-')));
-  truthy(`yedek hata iletileri markalı ${l}`, ['toast.restoreBadFile', 'toast.restoreReadFail'].every((k) => String(CATALOGS[l][k]).includes('Spendly')));
+  eq(`marka adı ${l}`, CATALOGS[l]['app.name'], 'Monibo');
+  truthy(`dosya adları markalı ${l}`, ['file.backup', 'file.excelMonth', 'file.excelAll'].every((k) => String(CATALOGS[l][k]).startsWith('monibo-')));
+  truthy(`yedek hata iletileri markalı ${l}`, ['toast.restoreBadFile', 'toast.restoreReadFail'].every((k) => String(CATALOGS[l][k]).includes('Monibo')));
 }
 truthy('hiçbir dilde eski ürün adı kalmadı', LANGS.every((l) => !Object.values(CATALOGS[l.code]).some((v) => typeof v === 'string' && /Harcama Defteri|Expense Ledger|Libro de Gastos|Registro Spese|支出账本/.test(v))));
 

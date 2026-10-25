@@ -6,8 +6,8 @@ import type { Catalog } from './index';
  */
 const en: Catalog = {
   // App
-  'app.name': 'Spendly',
-  'app.monogram': 'S',
+  'app.name': 'Monibo',
+  'app.monogram': 'M',
 
   // Common
   'common.all': 'All',
@@ -277,8 +277,8 @@ const en: Catalog = {
   'toast.backupFail': 'Could not create the backup file.',
   'toast.restored': { one: '{n} record added.', other: '{n} records added.' },
   'toast.restoreNone': 'The records in this backup already exist.',
-  'toast.restoreBadFile': 'This file is not a Spendly backup.',
-  'toast.restoreReadFail': 'Could not read the file. Make sure you chose a Spendly backup.',
+  'toast.restoreBadFile': 'This file is not a Monibo backup.',
+  'toast.restoreReadFail': 'Could not read the file. Make sure you chose a Monibo backup.',
   'notif.daily': 'Have you logged today\'s expenses?',
   'notif.subTitle': '{name} payment due',
   'notif.subBody': '{amount} to pay today. Remember to confirm it in the app.',
@@ -308,9 +308,9 @@ const en: Catalog = {
   'xl.yearly': 'Yearly',
   'xl.payMonthly': 'Monthly, day {day}',
   'xl.payYearly': '{month} {day}',
-  'file.excelMonth': 'spendly-expenses-{ym}.xlsx',
-  'file.excelAll': 'spendly-expenses-all-{date}.xlsx',
-  'file.backup': 'spendly-backup-{date}.json',
+  'file.excelMonth': 'monibo-expenses-{ym}.xlsx',
+  'file.excelAll': 'monibo-expenses-all-{date}.xlsx',
+  'file.backup': 'monibo-backup-{date}.json',
 
   // Currencies and exchange rates
   'currency.TRY': 'Turkish Lira',
@@ -489,7 +489,7 @@ const en: Catalog = {
   'del.confirm': 'Permanently delete my account',
   'del.cancel': 'Cancel',
 
-  // Spendly paneli: gelir, net durum, kartlar, sekmeler, durumlar
+  // Monibo paneli: gelir, net durum, kartlar, sekmeler, durumlar
   'dash.greeting.morning': 'Good morning',
   'dash.greeting.afternoon': 'Good afternoon',
   'dash.greeting.evening': 'Good evening',
@@ -579,7 +579,7 @@ const en: Catalog = {
   'settings.notifAmounts': 'Show amounts in notifications',
   'notif.subBodyPrivate': 'You have a subscription payment today. Remember to confirm it in the app.',
   'lock.unlock': 'Unlock',
-  'lock.reason': 'Unlock Spendly',
+  'lock.reason': 'Unlock Monibo',
   'toast.lockFailed': 'Couldn\'t verify. App lock stays off.',
   'lock.hint': 'Locked to protect your data.',
 };

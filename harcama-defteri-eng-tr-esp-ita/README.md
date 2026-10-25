@@ -1,10 +1,10 @@
-# Spendly · TR / EN / ES / IT / 中文
+# Monibo · TR / EN / ES / IT / 中文
 
 `harcama-app` klasöründeki uygulamanın **bağımsız** çok dilli, çok para birimli sürümü. Kaynak proje değiştirilmedi;
 tüm geliştirmeler yalnızca bu klasörde yapıldı. Önceki uygulamanın bütün işlevleri (harcama, bütçe ve kategori limitleri,
 raporlar, abonelikler, Excel/yedek, bildirimler, Noir ve Fildişi temalar) ve tasarımı korunmuştur.
 
-## Spendly paneli
+## Monibo paneli
 
 Ana ekran referans tasarıma göre yenilendi (koyu/açık tema, tüm vurgu renkleri ve zemin tonlarıyla çalışır):
 
@@ -17,7 +17,7 @@ Ana ekran referans tasarıma göre yenilendi (koyu/açık tema, tüm vurgu renkl
 - **Alt sekme çubuğu:** Ana sayfa · İşlemler · Bütçe · Raporlar · Ayarlar. Yan menü, kaydırma hareketleri ve tüm eski ekranlar yerinde.
 - **Durumlar:** yüklenme iskeleti; veri açılamazsa hata ekranı (**gerçek veriye yazılmaz**, "Tekrar dene"); bozuk kayıt özgün kopyası saklanarak kurtarılır ve kalıcı uyarıyla bildirilir; kayıt yazılamazsa uyarı; kur alınamazsa doğru metinli uyarı; her kartın boş durumu; başarı bildirimleri (geri alma dahil).
 - **Duyarlı:** 320 px telefondan 1280 px web'e; geniş ekranda içerik ≤ 920 px ortalı. Çok dar ekranda ikili kartlar alt alta dizilir. Uzun tutarlar küçülerek tek satırda kalır.
-- **Görünen ad her yerde Spendly:** uygulama adı, bildirimler, dosya adları (`spendly-…`), yedek iletileri. Paket/EAS kimlikleri (slug, bundle id, `harcama://` şeması) **değişmedi**, mevcut kurulumlar ve kestirme bağlantılar çalışmaya devam eder.
+- **Görünen ad her yerde Monibo:** uygulama adı, bildirimler, dosya adları (`monibo-…`), yedek iletileri. Paket/EAS kimlikleri (slug, bundle id, `harcama://` şeması) **değişmedi**, mevcut kurulumlar ve kestirme bağlantılar çalışmaya devam eder.
 - Yeni kurulumların varsayılan görünümü referansa yakındır (telefona göre açık/koyu, safir vurgu, mavi ton); **mevcut kullanıcıların ayarlarına dokunulmaz**.
 
 Ayrıntı ve test sonuçları: [`docs/DASHBOARD.md`](docs/DASHBOARD.md).
@@ -95,11 +95,15 @@ npm run test:sql         # gerçek PostgreSQL'de migration ve RLS testleri (init
 npm run check:release    # yayın engelleri (yasal bilgiler, sahte servis, anahtar sızıntısı)
 ```
 
-## Marka görselleri (geçici)
+## Marka: Monibo
 
-`assets/` klasöründeki simge, Android uyarlanabilir simge, açılış ekranı ve favicon görselleri **geçici olarak üretilmiş** ara görsellerdir
-(beyaz "S" harfi, mavi gradyan). Mağaza gönderiminden önce tasarımcının son görselleriyle **mutlaka değiştirilmelidir**;
-`npm run check:release` bu görsellerin varsayılan Expo şablonu olmadığını denetler ama tasarım onayının yerini tutmaz.
+Görünen ad **Monibo** (önceki adı Spendly; App Store'da benzer adlı uygulamalar nedeniyle değiştirildi). Paket/EAS kimlikleri
+(slug, bundle id, `harcama://` şeması) değişmedi; mevcut kurulumlar, kestirmeler ve eski yedekler çalışmaya devam eder.
+
+`assets/` simgeleri konsept C'dir (safir-mor gradyan, beyaz kese, yükselen çubuklar; kaynak: `../audit/marka/`):
+`icon.png` 1024 saydamsız, Android ön/arka/tek renk katmanları, açılış ekranı ve favicon.
+**Yayından önce:** "Monibo" adı için TÜRKPATENT, EUIPO (TMview), USPTO ve WIPO'da 9, 36 ve 42. sınıflarda resmi marka
+araştırması yapılmalı; ön taramada benzer adlı "MonBo" (finans) ve "Moniboi" (oyun) uygulamaları görüldü.
 
 ## Testler
 

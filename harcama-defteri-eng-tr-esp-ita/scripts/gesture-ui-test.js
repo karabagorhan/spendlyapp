@@ -83,7 +83,7 @@ const data = {
     return el ? el.textContent : '';
   });
   const goto = async (n) => { await openMenu(); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(600); };
-  // Panelde (Özet) üst başlık markadır (Spendly); diğer ekranlarda ekran adı
+  // Panelde (Özet) üst başlık markadır (Monibo); diğer ekranlarda ekran adı
   const T = (k) => (k === 'ozet' ? cat('app.name') : cat('title.' + k));
 
   /* ---- Yan menü ---- */

@@ -6,8 +6,8 @@ import type { Catalog } from './index';
  */
 const tr: Catalog = {
   // Uygulama
-  'app.name': 'Spendly',
-  'app.monogram': 'S',
+  'app.name': 'Monibo',
+  'app.monogram': 'M',
 
   // Ortak
   'common.all': 'Tümü',
@@ -265,8 +265,8 @@ const tr: Catalog = {
   'toast.backupFail': 'Yedek dosyası oluşturulamadı.',
   'toast.restored': '{n} kayıt eklendi.',
   'toast.restoreNone': 'Yedekteki kayıtlar zaten var.',
-  'toast.restoreBadFile': 'Bu dosya bir Spendly yedeği değil.',
-  'toast.restoreReadFail': 'Dosya okunamadı. Spendly yedeği seçtiğinden emin ol.',
+  'toast.restoreBadFile': 'Bu dosya bir Monibo yedeği değil.',
+  'toast.restoreReadFail': 'Dosya okunamadı. Monibo yedeği seçtiğinden emin ol.',
   'notif.daily': 'Bugünkü harcamalarını girdin mi?',
   'notif.subTitle': '{name} ödeme günü',
   'notif.subBody': '{amount} bugün ödenecek. Uygulamada onaylamayı unutma.',
@@ -296,9 +296,9 @@ const tr: Catalog = {
   'xl.yearly': 'Yıllık',
   'xl.payMonthly': 'Her ay {day}',
   'xl.payYearly': '{day} {month}',
-  'file.excelMonth': 'spendly-harcamalar-{ym}.xlsx',
-  'file.excelAll': 'spendly-harcamalar-tumu-{date}.xlsx',
-  'file.backup': 'spendly-yedek-{date}.json',
+  'file.excelMonth': 'monibo-harcamalar-{ym}.xlsx',
+  'file.excelAll': 'monibo-harcamalar-tumu-{date}.xlsx',
+  'file.backup': 'monibo-yedek-{date}.json',
 
   // Para birimleri ve döviz kurları
   'currency.TRY': 'Türk Lirası',
@@ -477,7 +477,7 @@ const tr: Catalog = {
   'del.confirm': 'Hesabımı kalıcı olarak sil',
   'del.cancel': 'Vazgeç',
 
-  // Spendly paneli: gelir, net durum, kartlar, sekmeler, durumlar
+  // Monibo paneli: gelir, net durum, kartlar, sekmeler, durumlar
   'dash.greeting.morning': 'Günaydın',
   'dash.greeting.afternoon': 'İyi günler',
   'dash.greeting.evening': 'İyi akşamlar',
@@ -567,7 +567,7 @@ const tr: Catalog = {
   'settings.notifAmounts': 'Bildirimlerde tutarı göster',
   'notif.subBodyPrivate': 'Bugün bir abonelik ödemen var. Uygulamada onaylamayı unutma.',
   'lock.unlock': 'Kilidi aç',
-  'lock.reason': 'Spendly kilidini aç',
+  'lock.reason': 'Monibo kilidini aç',
   'toast.lockFailed': 'Doğrulanamadı. Uygulama kilidi açılmadı.',
   'lock.hint': 'Verilerini korumak için kilitli.',
 };

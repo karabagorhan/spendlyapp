@@ -1,5 +1,5 @@
 /**
- * Spendly paneli arayüz testi (tarayıcıda, gerçek veriyle): `npx tsx scripts/dashboard-ui-test.ts <tr|en|es|it|zh>`
+ * Monibo paneli arayüz testi (tarayıcıda, gerçek veriyle): `npx tsx scripts/dashboard-ui-test.ts <tr|en|es|it|zh>`
  *   Önce web paketi: npx expo export --platform web --output-dir /tmp/web-dash   (dizin: WEB_DIR)
  * Kapsam: hesapların doğruluğu, gelir ekleme/düzenleme/silme (geri al), gizleme, para birimi geçişi ve veri bütünlüğü,
  * sekmeler ve gezinme, boş/yalnız-gider durumları, bozuk veri kurtarma, okuma/yazma hatası, yüklenme durumu, temalar ve
@@ -182,7 +182,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
   {
     const p = await open({ data: full() });
     const t0 = await text(p);
-    ok('marka adı Spendly', t0.includes('Spendly'));
+    ok('marka adı Monibo', t0.includes('Monibo'));
     ok('selamlama saate uygun ve adı içerir', (await tid(p, 'dash-greeting')) === T('dash.greetName', { greeting: T('dash.greeting.' + greetingKey(new Date().getHours())), name: 'Orhan' }), await tid(p, 'dash-greeting'));
     const card = await tid(p, 'balance-card');
     ok('net durum = gelir − gider', card.includes(mny(NET)), card);
@@ -363,7 +363,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     ok('Ayarlar: yasal bağlantılar korunmuş', (await id(p, 'legal-privacy').count()) === 1);
     await audit(p, 'ayarlar');
     await id(p, 'tab-ozet').click(); await p.waitForTimeout(500);
-    ok('sekme: Ana sayfa', (await title()) === 'Spendly', String(await title()));
+    ok('sekme: Ana sayfa', (await title()) === 'Monibo', String(await title()));
     await id(p, 'qa-reports').click(); await p.waitForTimeout(500);
     ok('hızlı eylem: Raporlar', (await title()) === T('title.raporlar'));
     await id(p, 'tab-ozet').click(); await id(p, 'qa-budgets').click(); await p.waitForTimeout(500);

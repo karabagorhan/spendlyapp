@@ -1,3 +1,14 @@
+# Marka: Monibo + ikon konsepti C (seçildi, 25 Ekim 2026)
+
+**Seçilen ad: Monibo** (kullanıcı seçimi). Ön tarama (web araması): birebir aynı adlı uygulama, şirket ya da marka bulunamadı.
+Benzer adlar: **MonBo** (App Store'da kişisel finans uygulaması, aynı kategori) ve **Moniboi** (para temalı oyun) — karıştırılma
+riski düşük-orta. Yayından önce TÜRKPATENT, EUIPO (TMview), USPTO ve WIPO'da 9, 36 ve 42. sınıflarda resmi araştırma ve
+App Store Connect'te ad ayırma yapılmalıdır. Bu ön tarama hukuki görüş değildir.
+
+**Seçilen ikon: C** (safir-mor gradyan, beyaz kese, yükselen çubuklar) — uygulamanın `assets/` klasörüne tüm boyutlarda uygulandı.
+
+---
+
 # Marka önerisi: isim ve ikon (taslak, 25 Ekim 2026)
 
 **Önerilen isim: Kesena** — Türkçe "kese" (para kesesi) kökünden türetilmiş özgün bir ad. Tr/En/Es/It'de kolay okunur, kısa ve hatırlanır.

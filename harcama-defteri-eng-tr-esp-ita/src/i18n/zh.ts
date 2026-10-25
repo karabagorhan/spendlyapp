@@ -7,8 +7,8 @@ import type { Catalog } from './index';
  */
 const zh: Catalog = {
   // 应用
-  'app.name': 'Spendly',
-  'app.monogram': 'S',
+  'app.name': 'Monibo',
+  'app.monogram': 'M',
 
   // 通用
   'common.all': '全部',
@@ -278,8 +278,8 @@ const zh: Catalog = {
   'toast.backupFail': '无法生成备份文件。',
   'toast.restored': '已添加 {n} 条记录。',
   'toast.restoreNone': '备份中的记录已经存在。',
-  'toast.restoreBadFile': '这个文件不是 Spendly 的备份。',
-  'toast.restoreReadFail': '无法读取文件。请确认选择的是 Spendly 的备份。',
+  'toast.restoreBadFile': '这个文件不是 Monibo 的备份。',
+  'toast.restoreReadFail': '无法读取文件。请确认选择的是 Monibo 的备份。',
   'notif.daily': '今天的支出记了吗？',
   'notif.subTitle': '今天扣款：{name}',
   'notif.subBody': '今天要支付 {amount}。别忘了在应用里确认。',
@@ -309,9 +309,9 @@ const zh: Catalog = {
   'xl.yearly': '每年',
   'xl.payMonthly': '每月 {day} 日',
   'xl.payYearly': '{month}{day}日',
-  'file.excelMonth': 'spendly-支出-{ym}.xlsx',
-  'file.excelAll': 'spendly-支出-全部-{date}.xlsx',
-  'file.backup': 'spendly-备份-{date}.json',
+  'file.excelMonth': 'monibo-支出-{ym}.xlsx',
+  'file.excelAll': 'monibo-支出-全部-{date}.xlsx',
+  'file.backup': 'monibo-备份-{date}.json',
 
   // 货币与汇率
   'currency.TRY': '土耳其里拉',
@@ -490,7 +490,7 @@ const zh: Catalog = {
   'del.confirm': '永久删除我的账户',
   'del.cancel': '取消',
 
-  // Spendly paneli: gelir, net durum, kartlar, sekmeler, durumlar
+  // Monibo paneli: gelir, net durum, kartlar, sekmeler, durumlar
   'dash.greeting.morning': '早上好',
   'dash.greeting.afternoon': '下午好',
   'dash.greeting.evening': '晚上好',
@@ -580,7 +580,7 @@ const zh: Catalog = {
   'settings.notifAmounts': '通知中显示金额',
   'notif.subBodyPrivate': '今天有一笔订阅要扣款。别忘了在应用里确认。',
   'lock.unlock': '解锁',
-  'lock.reason': '解锁 Spendly',
+  'lock.reason': '解锁 Monibo',
   'toast.lockFailed': '验证失败，应用锁未开启。',
   'lock.hint': '已锁定以保护你的数据。',
 };
