@@ -15,6 +15,20 @@ export type Expense = {
   period?: string; // abonelik dönemi: "2026-10" (aylık) ya da "2026" (yıllık)
   cur?: Cur; // girildiği para birimi (yoksa TRY: eski kayıtlar)
   orig?: { amount: number; cur: Cur }; // yalnızca ekran verisinde: çevrilmeden önceki özgün tutar
+  unconv?: true; // yalnızca ekran verisinde: kur yok, çevrilemedi (toplamlara girmez; özgün tutar/birimle listelenir)
+};
+
+/** Gelir kaydı. Harcamalardan ayrı tutulur: eski veri ve yedekler etkilenmez (yoksa boş liste). */
+export type Income = {
+  id: string;
+  amount: number;
+  cat: string; // INCOME_CATS anahtarı
+  note: string;
+  date: string; // YYYY-MM-DD
+  ts: number;
+  cur?: Cur; // girildiği para birimi (yoksa TRY)
+  orig?: { amount: number; cur: Cur }; // yalnızca ekran verisinde
+  unconv?: true; // yalnızca ekran verisinde: kur yok, çevrilemedi
 };
 
 export type Sub = {
@@ -29,6 +43,7 @@ export type Sub = {
   type: string; // abonelik türü (SUB_TYPES anahtarı)
   cur?: Cur; // girildiği para birimi (yoksa TRY)
   orig?: { amount: number; cur: Cur }; // yalnızca ekran verisinde
+  unconv?: true; // yalnızca ekran verisinde: kur yok, çevrilemedi
 };
 
 export type Settings = {
@@ -41,10 +56,13 @@ export type Settings = {
   accent: Accent; // vurgu rengi (renk kartelası)
   tint: Tint; // zemin tonu
   name: string; // menüdeki profil satırında görünen ad
+  hideBalance: boolean; // özet kartındaki tutarları gizle (göz simgesi)
   language: Lang; // arayüz dili
   currency: Cur; // ana para birimi: tüm ekranlar bu birimde gösterir (dilden bağımsız)
   budgetCur: Cur; // `budget` tutarının para birimi
   catBudgetCur: Record<string, Cur>; // kategori limitlerinin para birimleri (yoksa TRY)
+  lock: boolean; // uygulama kilidi (Face ID / parmak izi / cihaz parolası)
+  notifAmounts: boolean; // abonelik bildirimlerinde tutar görünsün (kapalıysa genel metin)
 };
 
 /** Kategori kimlikleri veride bu sabit adlarla saklanır (yedekler uyumlu kalsın); ekranda `catName` ile çevrilir. */
@@ -55,6 +73,14 @@ export const monthName = (i: number) => t('month.' + i); // i: 0-11
 export const monthShortName = (i: number) => t('monthShort.' + i);
 export const weekdayName = (i: number) => t('weekday.' + i); // i: 0 = Pazar (Date.getDay)
 export const weekdayShortName = (i: number) => t('weekdayShort.' + i);
+
+/** Gelir kategorileri: veride bu sabit anahtarlarla saklanır, ekranda `incat.<anahtar>` ile çevrilir. */
+export const INCOME_CATS = ['salary', 'freelance', 'investment', 'gift', 'other'] as const;
+export const incomeCatName = (c: string) => (has('incat.' + c) ? t('incat.' + c) : c);
+export const incomeCatIndex = (c: string) => {
+  const i = (INCOME_CATS as readonly string[]).indexOf(c);
+  return i < 0 ? INCOME_CATS.length - 1 : i;
+};
 
 export function catIndex(c: string) {
   const i = CATS.indexOf(c);
@@ -69,6 +95,11 @@ export function parseIso(s: string) {
   return new Date(y, m - 1, d);
 }
 export const todayIso = () => iso(new Date());
+/** YYYY-MM-DD biçiminde ve takvimde gerçekten var olan bir gün mü? (2026-02-31 geçersiz.) */
+export function isRealDate(s: unknown): s is string {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  return iso(parseIso(s)) === s;
+}
 export const today0 = () => parseIso(todayIso());
 export function daysIn(ym: string) {
   const d = parseIso(ym + '-01');
@@ -96,6 +127,10 @@ export function shortDay(s: string) {
   const d = parseIso(s);
   return t('fmt.dayShort', { day: d.getDate(), month: monthShortName(d.getMonth()) });
 }
+/** Kompakt satırlar için: bugün/dün adıyla, daha eski tarihler kısa biçimde ("18 Eki"). */
+export function dayLabelShort(s: string) {
+  return s === todayIso() || s === addDays(todayIso(), -1) ? dayLabel(s) : shortDay(s);
+}
 export function dayLabel(s: string) {
   if (s === todayIso()) return t('date.today');
   if (s === addDays(todayIso(), -1)) return t('date.yesterday');
@@ -110,6 +145,11 @@ export const compact = fmtCompact;
 export const parseAmount = parseAmountI18n;
 /** Giriş alanına yazılacak tutar metni (seçili dilin ondalık ayracıyla). */
 export const amountText = decimalText;
+
+/** Tek bir kaydın/limitin kabul edilen en büyük tutarı (kendi para biriminde); girişte ve yedek içe aktarmada geçerlidir. */
+export const MAX_AMOUNT = 1e10;
+/** Geçerli bir kayıt tutarı: sonlu, 0'dan büyük ve en çok MAX_AMOUNT. */
+export const validAmount = (v: unknown): v is number => typeof v === 'number' && isFinite(v) && v > 0 && v <= MAX_AMOUNT;
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 export const sum = (arr: { amount: number }[]) => arr.reduce((s, x) => s + x.amount, 0);
@@ -154,6 +194,115 @@ export function analyse(items: Expense[], ym: string): Analysis {
     projection: isCur && elapsed ? (total / elapsed) * dim : total,
   };
 }
+
+/* ---------- Bütçe ilerlemesi (Bütçe ekranı) ---------- */
+export type LimitRow = { cat: string; spent: number; limit: number; ratio: number };
+export type BudgetProgress = {
+  budget: number; // 0: bütçe yok
+  spent: number;
+  remaining: number; // bütçe − harcama; negatifse aşım (bütçe yoksa 0)
+  ratio: number; // harcama / bütçe (bütçe yoksa 0)
+  daysLeft: number; // bugün dahil ay sonuna kalan gün (geçmiş ay 0, gelecek ay tüm ay)
+  perDay: number | null; // kalan / gün; yalnızca kalan > 0 ve gün > 0 iken
+  limits: LimitRow[]; // limiti olan kategoriler, kullanım oranına göre büyükten küçüğe
+};
+
+/**
+ * Seçili ayın bütçe ilerlemesi. `items` ve `settings` ana para biriminde görünüm verisinden gelmelidir
+ * (çevrilemeyen kayıtlar zaten `items` içinde yoktur, toplamlara girmez).
+ */
+export function budgetProgress(items: Expense[], settings: Settings, ym: string, today = todayIso()): BudgetProgress {
+  const monthItems = items.filter((x) => x.date.slice(0, 7) === ym);
+  const spent = sum(monthItems);
+  const budget = settings.budget > 0 ? settings.budget : 0;
+  const remaining = budget ? budget - spent : 0;
+  const curYm = today.slice(0, 7);
+  const daysLeft = ym < curYm ? 0 : ym > curYm ? daysIn(ym) : daysIn(ym) - +today.slice(8) + 1;
+  const by: Record<string, number> = {};
+  monthItems.forEach((x) => (by[x.cat] = (by[x.cat] || 0) + x.amount));
+  const limits = Object.keys(settings.catBudgets)
+    .filter((c) => settings.catBudgets[c] > 0)
+    .map((c) => ({ cat: c, spent: by[c] || 0, limit: settings.catBudgets[c], ratio: (by[c] || 0) / settings.catBudgets[c] }))
+    .sort((p, q) => q.ratio - p.ratio);
+  return {
+    budget,
+    spent,
+    remaining,
+    ratio: budget ? spent / budget : 0,
+    daysLeft,
+    perDay: budget && remaining > 0 && daysLeft > 0 ? remaining / daysLeft : null,
+    limits,
+  };
+}
+
+/* ---------- Panel: gelir, gider ve net durum ---------- */
+export type Balance = {
+  spent: number;
+  income: number;
+  /** Bu ay hiç gelir kaydı var mı (yoksa kartta tutar yerine "gelir ekle" gösterilir; uydurma tutar yok). */
+  hasIncome: boolean;
+  /** Bu ayki net durum: gelir − gider. */
+  net: number;
+  /** Geçen ayın aynı dönemine göre net değişim (%); yalnızca `deltaKind === 'pct'` iken anlamlıdır, aksi halde null. */
+  deltaPct: number | null;
+  /** Net değişimin tutarı (bu ay − geçen ay, aynı gün kesitinde); `deltaKind === 'amount'` iken gösterilir. */
+  deltaAmount: number | null;
+  /** 'pct': yüzde karşılaştırılabilir; 'amount': yüzde anlamsız (geçen ay gelir yok / işaret değişti) → tutar farkı; null: karşılaştırma yok. */
+  deltaKind: 'pct' | 'amount' | null;
+};
+
+/**
+ * Seçili ayın gelir/gider/net özeti. Değişim yüzdesi, geçen ayın aynı günlerine kadarki net durumla kıyaslanır
+ * (ay henüz bitmediyse adil karşılaştırma); geçen ay hiç kayıt yoksa ya da net sıfırsa değişim gösterilmez.
+ */
+export function balanceFor(items: Expense[], incomes: Income[], ym: string): Balance {
+  const a = analyse(items, ym);
+  const prevYm = addMonths(ym, -1);
+  const inMonth = (d: string, m: string, cutoff = 99) => d.slice(0, 7) === m && +d.slice(8) <= cutoff;
+  const spent = sum(items.filter((x) => inMonth(x.date, ym)));
+  const income = sum(incomes.filter((x) => inMonth(x.date, ym)));
+  const prevItems = items.filter((x) => inMonth(x.date, prevYm, a.cutoff));
+  const prevIncomes = incomes.filter((x) => inMonth(x.date, prevYm, a.cutoff));
+  const curNetSame = sum(incomes.filter((x) => inMonth(x.date, ym, a.cutoff))) - sum(items.filter((x) => inMonth(x.date, ym, a.cutoff)));
+  const prevNet = sum(prevIncomes) - sum(prevItems);
+  const hasPrev = prevItems.length + prevIncomes.length > 0;
+  const hasIncome = incomes.some((x) => x.date.slice(0, 7) === ym);
+  const comparable = hasPrev && prevNet !== 0 && hasIncome;
+  // Yüzde yalnızca geçen ay gelir varsa ve iki net aynı işaretteyse anlamlıdır (aksi halde "+%999" gibi saçma oranlar çıkar): o zaman tutar farkı gösterilir
+  const pctOk = comparable && prevIncomes.length > 0 && Math.sign(prevNet) === Math.sign(curNetSame);
+  const diff = curNetSame - prevNet;
+  return {
+    spent,
+    income,
+    hasIncome,
+    net: income - spent,
+    deltaPct: pctOk ? Math.round((diff / Math.abs(prevNet)) * 100) : null,
+    deltaAmount: comparable && !pctOk ? diff : null,
+    deltaKind: pctOk ? 'pct' : comparable ? 'amount' : null,
+  };
+}
+
+/** Kategori dağılımı: en büyük `top` kategori + kalanı "diğer" olarak birleştirilmiş (halka grafik için). */
+export function categorySlices(monthItems: Expense[], top = 5) {
+  const by: Record<string, number> = {};
+  monthItems.forEach((x) => (by[x.cat] = (by[x.cat] || 0) + x.amount));
+  const total = Object.values(by).reduce((p, q) => p + q, 0);
+  const rows = Object.keys(by).sort((p, q) => by[q] - by[p]).map((cat) => ({ cat, value: by[cat], pct: total ? by[cat] / total : 0 }));
+  if (rows.length <= top + 1) return { total, rows, other: null as null | { value: number; pct: number } };
+  const rest = rows.slice(top);
+  const value = rest.reduce((p, r) => p + r.value, 0);
+  return { total, rows: rows.slice(0, top), other: { value, pct: total ? value / total : 0 } };
+}
+
+/** Harcama ve gelirleri tek listede, en yeni üstte (son işlemler). */
+export type Txn = { kind: 'expense'; x: Expense } | { kind: 'income'; x: Income };
+export function recentTransactions(items: Expense[], incomes: Income[], limit = 4): Txn[] {
+  const all: Txn[] = [...items.map((x) => ({ kind: 'expense' as const, x })), ...incomes.map((x) => ({ kind: 'income' as const, x }))];
+  return all.sort((p, q) => (p.x.date < q.x.date ? 1 : p.x.date > q.x.date ? -1 : q.x.ts - p.x.ts)).slice(0, limit);
+}
+
+/** Saate göre selamlama anahtarı: "morning" 05–11, "afternoon" 12–17, "evening" 18–21, "night" diğer. */
+export const greetingKey = (hour: number) => (hour >= 5 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : hour >= 18 && hour < 22 ? 'evening' : 'night');
 
 /* ---------- Abonelikler ---------- */
 export type SubState =

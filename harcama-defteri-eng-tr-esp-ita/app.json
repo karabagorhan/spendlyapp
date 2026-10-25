@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Harcama Defteri",
+    "name": "Monibo",
     "slug": "harcama-defteri-eng-tr-esp-ita",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,11 +11,15 @@
       "bundleIdentifier": "com.karabag.harcamadefteri.global",
       "runtimeVersion": {
         "policy": "appVersion"
+      },
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#3B4FEA",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -29,7 +33,24 @@
     "plugins": [
       "expo-sharing",
       "expo-status-bar",
-      "expo-font"
+      "expo-font",
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      ["expo-local-authentication", { "faceIDPermission": "Allow Monibo to use Face ID to unlock your data." }],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#F4F6FB",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0B1220"
+          }
+        }
+      ]
     ],
     "scheme": "harcama",
     "owner": "karabagorhans-team",

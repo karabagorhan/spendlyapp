@@ -6,9 +6,23 @@
  */
 import { chromium } from 'playwright-core';
 import { createServer } from 'http';
-import { existsSync, mkdirSync, readFileSync, createReadStream, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, createReadStream, statSync } from 'fs';
 import { extname, join } from 'path';
 import { ACCENTS, ACCENT_COLORS, Mode, TINTS, TINT_COLORS, makeTheme } from '../src/palette';
+
+// Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
+function findChromium(): string | undefined {
+  if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
+  try {
+    const hits: string[] = [];
+    for (const d of readdirSync('/opt/pw-browsers').filter((n) => n.startsWith('chromium-')).sort())
+      for (const s of readdirSync(`/opt/pw-browsers/${d}`).filter((n) => n.startsWith('chrome-linux')).sort())
+        if (existsSync(`/opt/pw-browsers/${d}/${s}/chrome`)) hits.push(`/opt/pw-browsers/${d}/${s}/chrome`);
+    return hits.pop();
+  } catch {
+    return undefined;
+  }
+}
 
 const lang = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'tr';
 const shotsIdx = process.argv.indexOf('--shots');
@@ -44,7 +58,7 @@ const data = (extra: Record<string, unknown> = {}) => ({
 (async () => {
   await new Promise<void>((r) => server.listen(PORT, r));
   const base = `http://127.0.0.1:${PORT}/`;
-  const exe = process.env.PW_CHROMIUM || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => existsSync(p));
+  const exe = findChromium();
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   let pass = 0; const errors: string[] = [];
   const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; if (process.argv.includes('-v')) console.log('OK    ' + name); } else { errors.push(name); console.log('HATA  ' + name + (detail ? ' — ' + detail : '')); } };
@@ -64,7 +78,7 @@ const data = (extra: Record<string, unknown> = {}) => ({
     await page.waitForTimeout(1200);
   };
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('harcama-defteri:v1') as string));
-  const menuBtn = () => page.locator('[role="button"][aria-label]').first();
+  const menuBtn = () => page.getByTestId('menu-open');
   const goSettings = async () => { await menuBtn().click(); await page.waitForTimeout(450); await page.locator('[role="menuitem"]').nth(6).click(); await page.waitForTimeout(600); };
   // Ekranın arka plan rengi: en büyük (ekranı kaplayan) arka planlı öğe
   const pageBg = () => page.evaluate(() => {

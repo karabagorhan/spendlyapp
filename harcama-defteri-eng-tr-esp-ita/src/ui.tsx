@@ -5,7 +5,7 @@ import { Animated, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, T
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
 import { contrast } from './palette';
-import { Analysis, Insight, catIndex, catName, compact, pad, subLabel, subType, subTypeIndex } from './lib';
+import { Analysis, Insight, catIndex, catName, compact, pad, subType, subTypeIndex } from './lib';
 import { FONTS, Theme } from './theme';
 
 export function Chip({ label, active, color, icon, onPress, t, disabled }: { label: string; active: boolean; color?: string; icon?: IconName; onPress: () => void; t: Theme; disabled?: boolean }) {
@@ -152,12 +152,15 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
  * Tutar metni: rakamlar serif yazı tipinde, para simgesi (₺ $ € £ ¥; yazı tipinde ₺ bulunmadığı için) sistem yazı tipinde
  * ve daha küçük yazılır. Simge sayının önünde (₺1.250) ya da sonunda (1250 €) olabilir.
  */
-export function Amount({ text, style, symbolColor }: { text: string; style: StyleProp<TextStyle>; symbolColor?: string }) {
+/** Uzun tutar tek satırda kalsın diye yazı boyutunu metin uzunluğuna göre küçültür (web'de `adjustsFontSizeToFit` çalışmaz). `max`: bu uzunluğa kadar tam boyut. */
+export const fitFont = (text: string, base: number, max: number) => (text.length <= max ? base : Math.max(base * 0.55, (base * max) / text.length));
+
+export function Amount({ text, style, symbolColor, fit }: { text: string; style: StyleProp<TextStyle>; symbolColor?: string; fit?: boolean }) {
   const flat = StyleSheet.flatten(style) || {};
   const size = (flat.fontSize ?? 16) * 0.6;
   const parts = text.split(/([₺$€£¥])/);
   return (
-    <Text style={[style, { fontVariant: ['lining-nums'] }]}>
+    <Text style={[style, { fontVariant: ['lining-nums'] }]} {...(fit ? { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 } : {})}>
       {parts.map((p, i) =>
         SYMBOL_SET.includes(p) ? (
           <Text key={i} style={{ fontFamily: 'System', fontSize: size, fontWeight: '400', color: symbolColor ?? flat.color, letterSpacing: 0 }}>{p}</Text>
@@ -194,15 +197,33 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
 }) {
   const x = useRef(new Animated.Value(1)).current;
   const [mounted, setMounted] = useState(open);
-  // Sola kaydırarak kapatma: parmakla birlikte kayar; yeterince uzun ya da hızlıysa kapanır, değilse geri yaylanır
+  // Sola kaydırarak kapatma: parmakla birlikte kayar; yeterince uzun ya da yatay baskın ve hızlıysa kapanır, değilse geri yaylanır.
+  // PanResponder'ın dx/dy/vx değerleri (özellikle webde) önceki hareketlerden kalıntı taşıyabilir; bu yüzden dokunuş koordinatlarını kendimiz izleriz.
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const track = useRef({ x0: 0, y0: 0, x: 0, y: 0, px: 0, pt: 0, t: 0 });
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponderCapture: (_e, g) => g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-      onPanResponderMove: (_e, g) => x.setValue(Math.min(1, Math.max(0, -g.dx / (MENU_W + 24)))),
-      onPanResponderRelease: (_e, g) => {
-        if (g.dx < -70 || g.vx < -0.6) closeRef.current();
+      onStartShouldSetPanResponderCapture: (e) => {
+        const { pageX, pageY } = e.nativeEvent, now = Date.now();
+        track.current = { x0: pageX, y0: pageY, x: pageX, y: pageY, px: pageX, pt: now, t: now };
+        return false;
+      },
+      onMoveShouldSetPanResponderCapture: (e) => {
+        const dx = e.nativeEvent.pageX - track.current.x0, dy = e.nativeEvent.pageY - track.current.y0;
+        return dx < -10 && Math.abs(dx) > Math.abs(dy) * 1.5;
+      },
+      onPanResponderMove: (e) => {
+        const c = track.current, now = Date.now();
+        if (now - c.t > 0) { c.px = c.x; c.pt = c.t; }
+        c.x = e.nativeEvent.pageX; c.y = e.nativeEvent.pageY; c.t = now;
+        x.setValue(Math.min(1, Math.max(0, -(c.x - c.x0) / (MENU_W + 24))));
+      },
+      onPanResponderRelease: () => {
+        const c = track.current, dx = c.x - c.x0, dy = c.y - c.y0;
+        const vx = (c.x - c.px) / Math.max(1, c.t - c.pt);
+        const horizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
+        if (horizontal && (dx < -70 || (dx < -24 && vx < -0.6))) closeRef.current();
         else Animated.timing(x, { toValue: 0, duration: 160, useNativeDriver: true }).start();
       },
       onPanResponderTerminate: () => Animated.timing(x, { toValue: 0, duration: 160, useNativeDriver: true }).start(),
@@ -238,7 +259,7 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
           </LinearGradient>
           <View style={{ flex: 1 }}>
             <Text style={{ fontFamily: FONTS.display, fontSize: 18, color: t.fg }} numberOfLines={1}>{header.title}</Text>
-            <Text style={{ fontSize: 13, color: t.muted }} numberOfLines={1}>{header.sub}</Text>
+            <Text style={{ fontSize: 13, color: t.muted }} numberOfLines={2}>{header.sub}</Text>
           </View>
           <Ionicons name="chevron-down" size={18} color={t.muted} />
         </Pressable>
@@ -327,7 +348,7 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
             <Text style={{ fontSize: 15, fontWeight: '600', color: t.fg }} numberOfLines={1}>{profile.name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.good }} />
-              <Text style={{ fontSize: 12, color: t.muted, flexShrink: 1 }} numberOfLines={1}>{status}</Text>
+              <Text style={{ fontSize: 12, color: t.muted, flexShrink: 1 }} numberOfLines={2}>{status}</Text>
             </View>
           </View>
           <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel={tr('menu.close')} style={[s.close, { borderColor: t.line }]}>
@@ -408,12 +429,13 @@ export function InsightList({ list, t }: { list: Insight[]; t: Theme }) {
 }
 
 /** İnce ilerleme çubuğu (kategori limitleri). */
-export function Progress({ value, max, t }: { value: number; max: number; t: Theme }) {
+/** Çubuk: varsayılan renk %80'e kadar vurgu, sonrası uyarı rengi; `color` verilirse onu kullanır (ör. üç kademeli bütçe çubuğu). */
+export function Progress({ value, max, t, color }: { value: number; max: number; t: Theme; color?: string }) {
   const over = value > max;
   const near = !over && value >= max * 0.8;
   return (
     <View style={{ height: 6, borderRadius: 99, backgroundColor: t.bg, overflow: 'hidden' }}>
-      <View style={{ width: `${Math.min(100, (value / max) * 100)}%`, height: '100%', borderRadius: 99, backgroundColor: over || near ? t.warn : t.accent }} />
+      <View style={{ width: `${Math.min(100, (value / max) * 100)}%`, height: '100%', borderRadius: 99, backgroundColor: color ?? (over || near ? t.warn : t.accent) }} />
     </View>
   );
 }

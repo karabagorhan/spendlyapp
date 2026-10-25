@@ -1,10 +1,12 @@
 import { ReactNode, useRef, useState } from 'react';
 import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtStamp, money, symbolOf, toMain } from './currency';
-import { LANGS, Lang, fmtTime, t as tr } from './i18n';
-import { CATS, Expense, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, guessSubType, monthName, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
+import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
+import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
 import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
 import { FONTS, Theme } from './theme';
+import { incomeIcon } from './dashboard';
+import { DatePicker } from './calendar';
 import { Button, CatIcon, Chip, IconName, Label, Swatch, catIconName, subTypeColor } from './ui';
 
 type SheetAction = { label: string; onPress: () => void; disabled?: boolean };
@@ -38,13 +40,13 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.surface }} {...edge.panHandlers}>
         <View style={st.topRow}>
-          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" style={{ flexShrink: 0 }}>
             <Text style={{ color: t.muted, fontSize: 17 }}>{tr('common.cancel')}</Text>
           </Pressable>
           {action ? (
             <Pressable onPress={action.onPress} disabled={action.disabled} hitSlop={12} accessibilityRole="button"
               style={[st.topSave, { backgroundColor: action.disabled ? 'transparent' : t.accent, borderColor: action.disabled ? t.line : t.accent }]}>
-              <Text style={{ color: action.disabled ? t.muted : t.accentFg, fontSize: 16, fontWeight: '700' }}>{action.label}</Text>
+              <Text numberOfLines={1} style={{ color: action.disabled ? t.muted : t.accentFg, fontSize: 16, fontWeight: '700' }}>{action.label}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -102,6 +104,15 @@ function ConvertHint({ amount, cur, main, rates, t }: { amount: number; cur: Cur
   );
 }
 
+/** Tutar alanı en çok bu kadar karakter alır (MAX_AMOUNT, binlik ayraçları ve ondalıklarla birlikte sığar). */
+const AMOUNT_MAXLEN = 18;
+
+/** Tutar çok büyükse alanın altında görünen satır içi hata. */
+function AmountError({ value, t }: { value: number; t: Theme }) {
+  if (value <= MAX_AMOUNT) return null;
+  return <Text style={{ color: t.warn, fontSize: 13 }} testID="amount-too-large" accessibilityRole="alert">{tr('amount.tooLarge', { max: fmtNumber(MAX_AMOUNT, 0) })}</Text>;
+}
+
 function inputStyle(t: Theme, big = false) {
   return [st.input, big && st.big, { backgroundColor: t.bg, borderColor: t.line, color: t.fg }];
 }
@@ -130,11 +141,12 @@ function DeleteButton({ onDelete, t }: { onDelete: () => void; t: Theme }) {
 }
 
 /* ---------- Harcama ekle / düzenle ---------- */
-export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, rates, onSave, onDelete, onClose, t }: {
+export function ExpenseSheet({ visible, initial, prefill, frequent = [], lastCat, main, rates, onSave, onDelete, onClose, t }: {
   visible: boolean;
   initial: Expense | null;
   prefill?: { amount?: number; cat?: string };
   frequent?: { cat: string; note: string; amount: number }[];
+  lastCat?: string; // en son eklenen harcamanın kategorisi: yeni kayıtta varsayılan
   main: Cur;
   rates: Rates | null;
   onSave: (e: Expense) => void;
@@ -143,12 +155,14 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
   t: Theme;
 }) {
   const [amount, setAmount] = useState(initial ? amountText(initial.amount) : prefill?.amount ? amountText(prefill.amount) : '');
-  const [cat, setCat] = useState(initial?.cat ?? prefill?.cat ?? CATS[0]);
+  const [cat, setCat] = useState(initial?.cat ?? prefill?.cat ?? (lastCat && CATS.includes(lastCat) ? lastCat : CATS[0]));
   const [note, setNote] = useState(initial?.note ?? '');
   const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [cal, setCal] = useState(false); // takvim açık mı
   // Kayıt girildiği para biriminde gösterilir ve saklanır; yeni kayıt ana para biriminde başlar
   const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
-  const value = parseAmount(amount);
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw; // çok büyük tutar geçersiz sayılır; alanın altında satır içi hata gösterilir
   const isToday = date >= todayIso();
 
   const save = () => {
@@ -193,8 +207,10 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
           autoFocus={!initial}
           inputAccessoryViewID="expense-save"
           style={inputStyle(t, true)}
+          maxLength={AMOUNT_MAXLEN}
           accessibilityLabel={tr('expense.amountA11y')}
         />
+        <AmountError value={raw} t={t} />
         <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
         <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
       </Field>
@@ -202,7 +218,7 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
         <CatChips value={cat} onChange={setCat} t={t} />
       </Field>
       <Field label={tr('expense.note')} t={t}>
-        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t)}
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t)} maxLength={80}
           inputAccessoryViewID="expense-save" returnKeyType="done" onSubmitEditing={save} />
       </Field>
       <Field label={tr('expense.date')} t={t}>
@@ -215,11 +231,83 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
           <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={8} style={st.stepBtn} accessibilityLabel={tr('date.prevDay')}>
             <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
           </Pressable>
-          <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+          <Pressable onPress={() => setCal(!cal)} style={st.dateBtn} accessibilityRole="button" accessibilityLabel={`${tr('date.pick')}: ${dayLabel(date)}`} accessibilityState={{ expanded: cal }}>
+            <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+            <Text style={{ color: t.muted, fontSize: 12 }}>{cal ? '▲' : '▼'}</Text>
+          </Pressable>
           <Pressable onPress={() => !isToday && setDate(addDays(date, 1))} hitSlop={8} style={[st.stepBtn, { opacity: isToday ? 0.3 : 1 }]} accessibilityLabel={tr('date.nextDay')}>
             <Text style={[st.stepTxt, { color: t.fg }]}>›</Text>
           </Pressable>
         </View>
+        {cal ? <DatePicker value={date} onChange={(d) => { setDate(d); setCal(false); }} t={t} /> : null}
+      </Field>
+      <View style={st.actions}>
+        {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
+        <Button label={tr('common.save')} onPress={save} disabled={!value} t={t} style={{ flex: 1 }} />
+      </View>
+    </Sheet>
+  );
+}
+
+/* ---------- Gelir ekle / düzenle ---------- */
+export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, onClose, t }: {
+  visible: boolean; initial: Income | null; main: Cur; rates: Rates | null; onSave: (x: Income) => void; onDelete: (id: string) => void; onClose: () => void; t: Theme;
+}) {
+  const [amount, setAmount] = useState(initial ? amountText(initial.amount) : '');
+  const [cat, setCat] = useState(initial?.cat ?? INCOME_CATS[0]);
+  const [note, setNote] = useState(initial?.note ?? '');
+  const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [cal, setCal] = useState(false); // takvim açık mı
+  const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw;
+  const isToday = date >= todayIso();
+
+  const save = () => {
+    if (!value) return;
+    onSave({ id: initial?.id ?? uid(), amount: value, cat, note: note.trim().slice(0, 80), date, ts: initial?.ts ?? Date.now(), cur });
+  };
+
+  return (
+    <Sheet visible={visible} title={initial ? tr('income.editTitle') : tr('income.newTitle')} onClose={onClose} t={t}
+      accessoryId="income-save" action={{ label: value ? tr('income.saveAmount', { amount: fmtMoney(value, cur) }) : tr('common.save'), onPress: save, disabled: !value }}>
+      <Field label={tr('common.amountField', { sym: symbolOf(cur) })} t={t}>
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted}
+          autoFocus={!initial} inputAccessoryViewID="income-save" style={inputStyle(t, true)} maxLength={AMOUNT_MAXLEN} accessibilityLabel={tr('income.amountA11y')} testID="income-amount" />
+        <AmountError value={raw} t={t} />
+        <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
+        <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
+      </Field>
+      <Field label={tr('common.category')} t={t}>
+        <View style={st.chips}>
+          {INCOME_CATS.map((c) => (
+            <Chip key={c} label={incomeCatName(c)} active={cat === c} color={t.cats[incomeCatIndex(c)]} icon={incomeIcon(c)} onPress={() => setCat(c)} t={t} />
+          ))}
+        </View>
+      </Field>
+      <Field label={tr('expense.note')} t={t}>
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('income.notePlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t)} maxLength={80}
+          inputAccessoryViewID="income-save" returnKeyType="done" onSubmitEditing={save} />
+      </Field>
+      <Field label={tr('expense.date')} t={t}>
+        <View style={st.chips}>
+          <Chip label={tr('date.today')} active={date === todayIso()} onPress={() => setDate(todayIso())} t={t} />
+          <Chip label={tr('date.yesterday')} active={date === addDays(todayIso(), -1)} onPress={() => setDate(addDays(todayIso(), -1))} t={t} />
+          <Chip label={tr('date.twoDaysAgo')} active={date === addDays(todayIso(), -2)} onPress={() => setDate(addDays(todayIso(), -2))} t={t} />
+        </View>
+        <View style={[st.stepper, { backgroundColor: t.bg, borderColor: t.line }]}>
+          <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={8} style={st.stepBtn} accessibilityLabel={tr('date.prevDay')}>
+            <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
+          </Pressable>
+          <Pressable onPress={() => setCal(!cal)} style={st.dateBtn} accessibilityRole="button" accessibilityLabel={`${tr('date.pick')}: ${dayLabel(date)}`} accessibilityState={{ expanded: cal }}>
+            <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
+            <Text style={{ color: t.muted, fontSize: 12 }}>{cal ? '▲' : '▼'}</Text>
+          </Pressable>
+          <Pressable onPress={() => !isToday && setDate(addDays(date, 1))} hitSlop={8} style={[st.stepBtn, { opacity: isToday ? 0.3 : 1 }]} accessibilityLabel={tr('date.nextDay')}>
+            <Text style={[st.stepTxt, { color: t.fg }]}>›</Text>
+          </Pressable>
+        </View>
+        {cal ? <DatePicker value={date} onChange={(d) => { setDate(d); setCal(false); }} t={t} /> : null}
       </Field>
       <View style={st.actions}>
         {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
@@ -244,7 +332,8 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
   // Kullanıcı türü/kategoriyi kendisi seçtiyse addan tahmin edilen değer onun yerine geçmez
   const [typeTouched, setTypeTouched] = useState(!!initial);
   const [catTouched, setCatTouched] = useState(!!initial);
-  const value = parseAmount(amount);
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw;
   const d = parseInt(day, 10);
   const valid = !!name.trim() && !!value && d >= 1 && d <= 31;
 
@@ -279,7 +368,8 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
         </View>
       </Field>
       <Field label={tr('common.amountField', { sym: symbolOf(cur) })} t={t}>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t, true)} inputAccessoryViewID="sub-save" />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t, true)} maxLength={AMOUNT_MAXLEN} inputAccessoryViewID="sub-save" />
+        <AmountError value={raw} t={t} />
         <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
         <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
       </Field>
@@ -320,6 +410,8 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
   settings: Settings; focusBudget?: boolean; onChange: (s: Settings) => void; t: Theme;
 }) {
   const [budget, setBudget] = useState(settings.budget ? amountText(settings.budget) : '');
+  const budgetRaw = parseAmount(budget);
+  const saveBudget = () => { if (budgetRaw <= MAX_AMOUNT) onChange({ ...settings, budget: budgetRaw }); };
   const limitTotal = Object.values(settings.catBudgets).reduce((a, b) => a + b, 0);
   return (
     <View style={{ gap: 22 }}>
@@ -334,12 +426,14 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
             autoFocus={focusBudget}
             selectTextOnFocus
             returnKeyType="done"
-            onSubmitEditing={() => onChange({ ...settings, budget: parseAmount(budget) })}
+            onSubmitEditing={saveBudget}
+            maxLength={AMOUNT_MAXLEN}
             style={[...inputStyle(t), { flex: 1, minWidth: 0 }]}
             accessibilityLabel={tr('budget.a11y')}
           />
-          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); onChange({ ...settings, budget: parseAmount(budget) }); }} t={t} style={{ height: 48 }} />
+          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); saveBudget(); }} t={t} style={{ height: 48 }} />
         </View>
+        <AmountError value={budgetRaw} t={t} />
       </Field>
 
       <View style={{ gap: 0 }}>
@@ -362,7 +456,7 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
 }
 
 /* ---------- Ayarlar ekranı: ad, görünüm, bildirimler, dışa/içe aktarma ---------- */
-export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
+export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, lockAvailable, notifWarn, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
   settings: Settings;
   rates: Rates | null;
   refreshing: boolean;
@@ -372,6 +466,12 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
   onExport: (ym: string | null) => void;
   onBackup: () => void;
   onRestore: () => void;
+  /** Uygulama kilidi anahtarı görünsün mü (cihazda biyometri/parola varsa; web'de hayır). */
+  lockAvailable?: boolean;
+  /** Hatırlatma anahtarı açık ama bildirim izni yok: uyarı satırı ve düzeltme düğmesi (sorulamıyorsa sistem ayarlarını açar). */
+  notifWarn?: { canAskAgain: boolean; onFix: () => void } | null;
+  /** Hesap ve yasal bölümleri (giriş kapısı sağlar). */
+  account?: ReactNode;
   ym: string;
   monthLabel: string;
   t: Theme;
@@ -452,7 +552,26 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.subReminder')}</Text>
           <Switch value={settings.subRemind} onValueChange={(v) => onChange({ ...settings, subRemind: v })} trackColor={{ true: t.accent }} />
         </View>
+        <View style={row}>
+          <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.notifAmounts')}</Text>
+          <Switch value={settings.notifAmounts} onValueChange={(v) => onChange({ ...settings, notifAmounts: v })} trackColor={{ true: t.accent }} />
+        </View>
+        {notifWarn ? (
+          <View style={{ gap: 8, paddingTop: 10 }} testID="notif-warn">
+            <Text style={{ color: t.warn, fontSize: 13, lineHeight: 18 }}>{tr(notifWarn.canAskAgain ? 'settings.notifOff' : 'settings.notifOffSystem')}</Text>
+            <Button label={tr(notifWarn.canAskAgain ? 'settings.notifAllow' : 'settings.notifOpenSettings')} kind="ghost" onPress={notifWarn.onFix} t={t} />
+          </View>
+        ) : null}
       </View>
+
+      {lockAvailable ? (
+        <View style={{ gap: 0 }}>
+          <View style={row}>
+            <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.lock')}</Text>
+            <Switch value={settings.lock} onValueChange={(v) => onChange({ ...settings, lock: v })} trackColor={{ true: t.accent }} accessibilityLabel={tr('settings.lock')} />
+          </View>
+        </View>
+      ) : null}
 
       <View style={{ gap: 10 }}>
         <Label t={t}>{tr('settings.excel')}</Label>
@@ -468,6 +587,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         <Button label={tr('settings.backupMake')} kind="ghost" onPress={onBackup} t={t} />
         <Button label={tr('settings.backupRestore')} kind="ghost" onPress={onRestore} t={t} />
       </View>
+      {account}
     </View>
   );
 }
@@ -507,11 +627,13 @@ export function RatesBox({ main, rates, refreshing, failed, onRefresh, t }: {
 
 function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; onChange: (v: number) => void; t: Theme }) {
   const [text, setText] = useState(value ? amountText(value) : '');
+  const raw = parseAmount(text);
   const commit = () => {
-    const v = parseAmount(text);
-    if (v !== value) onChange(v);
+    if (raw > MAX_AMOUNT) return; // çok büyük limit kaydedilmez; satırın altında hata görünür
+    if (raw !== value) onChange(raw);
   };
   return (
+    <View>
     <View style={[st.row, { borderColor: t.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
         <CatIcon cat={cat} t={t} size={30} />
@@ -525,8 +647,11 @@ function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; 
         placeholder={tr('budget.limitNone')}
         placeholderTextColor={t.muted}
         style={[st.limitInput, { backgroundColor: t.bg, borderColor: t.line, color: t.fg }]}
+        maxLength={AMOUNT_MAXLEN}
         accessibilityLabel={tr('budget.limitA11y', { cat: catName(cat) })}
       />
+    </View>
+    <AmountError value={raw} t={t} />
     </View>
   );
 }
@@ -535,7 +660,7 @@ const st = StyleSheet.create({
   freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 10, maxWidth: 200 },
   limitInput: { width: 110, height: 40, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, fontSize: 16, textAlign: 'right' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, minHeight: 56 },
-  topSave: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 18 },
+  topSave: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 18, flexShrink: 1, marginLeft: 12 },
   accessory: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
   accessorySave: { flex: 1, maxWidth: 260, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 28, fontFamily: FONTS.display, paddingHorizontal: 20, paddingTop: 4 },
@@ -546,6 +671,7 @@ const st = StyleSheet.create({
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   stepper: { height: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
+  dateBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   stepBtn: { width: 40, alignItems: 'center' },
   stepTxt: { fontSize: 24, lineHeight: 28 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth },

@@ -10,6 +10,20 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
+function findChromium() {
+  if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
+  try {
+    const hits = [];
+    for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => n.startsWith('chromium-')).sort())
+      for (const s of fs.readdirSync(`/opt/pw-browsers/${d}`).filter((n) => n.startsWith('chrome-linux')).sort())
+        if (fs.existsSync(`/opt/pw-browsers/${d}/${s}/chrome`)) hits.push(`/opt/pw-browsers/${d}/${s}/chrome`);
+    return hits.pop();
+  } catch {
+    return undefined;
+  }
+}
+
 const lang = process.argv[2] || 'tr';
 const WEB_DIR = process.env.WEB_DIR || '/tmp/web-out';
 const PORT = 9200 + Math.floor(Math.random() * 100);
@@ -36,7 +50,7 @@ const data = {
 
 (async () => {
   await new Promise((r) => server.listen(PORT, r));
-  const exe = process.env.PW_CHROMIUM || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
+  const exe = findChromium();
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const pageErrors = [];
@@ -61,15 +75,16 @@ const data = {
     await touch('touchEnd', x1, y1); await page.waitForTimeout(650);
   };
   const menuOpen = async () => (await page.locator('[role="menuitem"]').count()) > 0;
-  const openMenu = async () => { if (!(await menuOpen())) { await page.locator('[role="button"][aria-label]').first().click(); await page.waitForTimeout(500); } };
+  const openMenu = async () => { if (!(await menuOpen())) { await page.getByTestId('menu-open').click(); await page.waitForTimeout(500); } };
   const closeMenuByTap = async () => { await page.mouse.click(370, 400); await page.waitForTimeout(500); };
   // Üst başlık (34 px yazı)
   const title = () => page.evaluate(() => {
-    const el = Array.from(document.querySelectorAll('div')).find((e) => getComputedStyle(e).fontSize === '34px' && e.childNodes.length === 1 && e.firstChild.nodeType === 3);
+    const el = Array.from(document.querySelectorAll('div,h1,h2')).find((e) => getComputedStyle(e).fontSize === '34px' && e.childNodes.length === 1 && e.firstChild.nodeType === 3);
     return el ? el.textContent : '';
   });
   const goto = async (n) => { await openMenu(); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(600); };
-  const T = (k) => cat('title.' + k);
+  // Panelde (Özet) üst başlık markadır (Monibo); diğer ekranlarda ekran adı
+  const T = (k) => (k === 'ozet' ? cat('app.name') : cat('title.' + k));
 
   /* ---- Yan menü ---- */
   await openMenu();
@@ -143,14 +158,14 @@ const data = {
   ok('hızlı kısa kaydırma (fling) geri döner', (await title()) === T('ozet'), await title());
 
   // Özet'ten Bütçe'ye doğrudan bağlantı: geri → Özet
-  await page.getByText(new RegExp(cat('hero.budget').split('{amount}')[0].trim())).first().click();
+  await page.getByTestId('qa-budgets').click();
   await page.waitForTimeout(700);
   ok('Özet kartından bütçeye gidildi', (await title()) === T('butce'), await title());
   await drag(4, 400, 200, 400);
   ok('geri: Bütçe → Özet', (await title()) === T('ozet'), await title());
 
   /* ---- Alt sayfa ---- */
-  await page.getByText(/^\+\s+/).first().click(); await page.waitForTimeout(800);
+  await page.getByTestId('qa-expense').click(); await page.waitForTimeout(800);
   ok('yeni harcama sayfası açıldı', (await page.evaluate(() => document.body.innerText)).includes(cat('expense.newTitle')));
   await drag(4, 400, 200, 400);
   ok('alt sayfa sol kenardan kaydırarak kapanıyor', !(await page.evaluate(() => document.body.innerText)).includes(cat('expense.newTitle')));

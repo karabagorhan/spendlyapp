@@ -1,27 +1,34 @@
 import { PlayfairDisplay_600SemiBold } from '@expo-google-fonts/playfair-display/600SemiBold';
 import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700Bold';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, AppState, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
+import { Cur, fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
-import { LanguageProvider, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
+import { LanguageProvider, deviceLanguage, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
 import {
-  Analysis, Expense, SUB_TYPES, Settings, Sub, addMonths, analyse, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
-  insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
+  Analysis, Expense, Income, SUB_TYPES, Settings, Sub, addMonths, analyse, budgetProgress, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
+  MAX_AMOUNT, balanceFor, incomeCatName, insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, recentTransactions, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
 } from './src/lib';
-import { ensurePermission, reschedule } from './src/notify';
-import { BudgetPanel, ExpenseSheet, SettingsPanel, SubSheet } from './src/sheets';
+import { LockLayer, authenticate, useAppLock, useLockSupported } from './src/lock';
+import { PermInfo, ensurePermission, permissionInfo, reschedule } from './src/notify';
+import { BudgetPanel, ExpenseSheet, IncomeSheet, SettingsPanel, SubSheet } from './src/sheets';
 import { merge, useAppData } from './src/store';
 import { FONTS, Theme, useTheme } from './src/theme';
 import { useRates } from './src/useRates';
+import { AccountSection } from './src/auth/AccountSection';
+import { useAccount } from './src/auth/AccountProvider';
+import { Gate } from './src/auth/Gate';
 import { Amount, Bars, Button, CatIcon, SubTypeIcon, subTypeColor, DailyChart, InsightList, Ionicons, Label, MenuSection, Pill, Progress, SideMenu } from './src/ui';
+import {
+  BalanceCard, BudgetCard, BudgetOverview, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, IncomeIcon, InlineNotice, Pair, QuickActions,
+  RecentCard, SpendingCard, SubsCard, TAB_BAR_H, TabBar,
+} from './src/dashboard';
 
 /** Web: tarayıcının kenardan "geri git" kaydırması uygulamanın kendi geri hareketiyle çakışmasın. */
 function useWebOverscroll() {
@@ -41,7 +48,9 @@ export default function App() {
   if (!fontsLoaded && !fontError) return null;
   return (
     <SafeAreaProvider>
-      <Main />
+      <Gate>
+        <Main />
+      </Gate>
     </SafeAreaProvider>
   );
 }
@@ -56,6 +65,7 @@ const SWIPE_DIST = 60;
 type Screen = 'ozet' | 'harcamalar' | 'raporlar' | 'abonelikler' | 'butce' | 'ayarlar';
 type ExpenseSheetState = { key: number; initial: Expense | null; prefill?: { amount?: number; cat?: string } } | null;
 type SubSheetState = { key: number; initial: Sub | null } | null;
+type IncomeSheetState = { key: number; initial: Income | null } | null;
 
 const screenTitle = (screen: Screen) => tr('title.' + screen);
 
@@ -96,10 +106,13 @@ const SLUG: Record<string, string> = {
 
 function Main() {
   const insets = useSafeAreaInsets();
-  const { data, update } = useAppData();
+  const { data, update, status, reload, recovered, saveFailed } = useAppData();
+  const { notice, setNotice } = useAccount();
   const rs = useRates();
+  const lock = useAppLock(!!data?.settings.lock);
+  const lockSupported = useLockSupported();
   // Dil çizim sırasında (alt bileşenlerden önce) ayarlanır; değişince <LanguageProvider> ağacı yeniden çizdirir.
-  const lang = data?.settings.language ?? 'tr';
+  const lang = data?.settings.language ?? deviceLanguage();
   setLanguage(lang);
   // Ana para birimi de aynı şekilde çizim sırasında ayarlanır; ekranlar `money()` ile bu birimde gösterir.
   const main = data?.settings.currency ?? 'TRY';
@@ -117,11 +130,18 @@ function Main() {
   const [filterDay, setFilterDay] = useState<string | null>(null);
   const [expSheet, setExpSheet] = useState<ExpenseSheetState>(null);
   const [subSheet, setSubSheet] = useState<SubSheetState>(null);
+  const [incSheet, setIncSheet] = useState<IncomeSheetState>(null);
+  const [curMenu, setCurMenu] = useState(false);
+  const [recoveredSeen, setRecoveredSeen] = useState(false);
+  const [txnTab, setTxnTab] = useState<'expenses' | 'income'>('expenses');
   const [toastMsg, setToastMsg] = useState('');
   const [toastAction, setToastAction] = useState<{ label: string; run: () => void } | null>(null);
   const [query, setQuery] = useState('');
+  // Bildirim izninin gerçek durumu (web'de yerel bildirim yok: null). İzin değişince `permTick` bildirimleri yeniden kurdurur.
+  const [perm, setPerm] = useState<PermInfo | null>(null);
+  const [permTick, setPermTick] = useState(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const toast = (m: string, action?: { label: string; run: () => void }) => {
     setToastMsg(m);
@@ -136,6 +156,7 @@ function Main() {
     p.catch(() => {});
   };
   const openAdd = () => setExpSheet({ key: Date.now(), initial: null });
+  const openAddIncome = () => setIncSheet({ key: Date.now(), initial: null });
 
   /* ---------- Kaydırma hareketleri ----------
    * Ekranın sol kenarından sağa kaydırma = geri (önceki ekran; ana ekranda yan menüyü açar).
@@ -143,7 +164,7 @@ function Main() {
   const slide = useRef(new Animated.Value(0)).current;
   const [swiping, setSwiping] = useState(false); // geri oku yalnızca kaydırma sırasında çizilir
   const nav = useRef({ screen, history, blocked: false, canBack: false });
-  nav.current = { screen, history, blocked: menuOpen || !!expSheet || !!subSheet, canBack: history.length > 0 || screen !== 'ozet' };
+  nav.current = { screen, history, blocked: menuOpen || curMenu || !!expSheet || !!subSheet || !!incSheet, canBack: history.length > 0 || screen !== 'ozet' };
   const swipeBack = () => {
     const { screen: cur, history: hist } = nav.current;
     if (hist.length) {
@@ -157,30 +178,37 @@ function Main() {
   };
   const swipeBackRef = useRef(swipeBack);
   swipeBackRef.current = swipeBack;
-  // PanResponder'ın x0/dx değerleri hareket yakalanınca sıfırlanır; bu yüzden dokunuşun başladığı yeri kendimiz tutarız
-  const touchX = useRef({ start: 0, last: 0 });
-  const shouldSwipe = (pageX: number, dy: number, capture: boolean) => {
-    const dx = pageX - touchX.current.start;
+  // PanResponder'ın x0/dx/dy/vx değerleri hareket yakalanınca sıfırlanır ya da önceki hareketlerden kalıntı taşıyabilir; bu yüzden dokunuşu kendimiz izleriz
+  const touchX = useRef({ start: 0, startY: 0, last: 0, lastY: 0, prev: 0, prevT: 0, lastT: 0 });
+  const shouldSwipe = (pageX: number, pageY: number, capture: boolean) => {
+    const dx = pageX - touchX.current.start, dy = pageY - touchX.current.startY;
     if (nav.current.blocked || dx < 14 || dx < Math.abs(dy) * 2.2) return false;
     return capture ? touchX.current.start <= EDGE : nav.current.canBack;
   };
   const edgePan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponderCapture: (e) => {
-        touchX.current = { start: e.nativeEvent.pageX, last: e.nativeEvent.pageX };
+        const { pageX, pageY } = e.nativeEvent, now = Date.now();
+        touchX.current = { start: pageX, startY: pageY, last: pageX, lastY: pageY, prev: pageX, prevT: now, lastT: now };
         return false;
       },
       // Kenardan başlayan hareket iç içe kaydırıcılardan önce yakalanır; ekranın başka yerinde yalnızca gidecek bir ekran varsa ve iç öğe (ör. yatay çipler) almadıysa
-      onMoveShouldSetPanResponderCapture: (e, g) => shouldSwipe(e.nativeEvent.pageX, g.dy, true),
-      onMoveShouldSetPanResponder: (e, g) => shouldSwipe(e.nativeEvent.pageX, g.dy, false),
+      onMoveShouldSetPanResponderCapture: (e) => shouldSwipe(e.nativeEvent.pageX, e.nativeEvent.pageY, true),
+      onMoveShouldSetPanResponder: (e) => shouldSwipe(e.nativeEvent.pageX, e.nativeEvent.pageY, false),
       onPanResponderGrant: () => setSwiping(true),
       onPanResponderMove: (e) => {
-        touchX.current.last = e.nativeEvent.pageX;
-        slide.setValue(Math.max(0, Math.min(touchX.current.last - touchX.current.start, 140)) * 0.5);
+        const c = touchX.current, now = Date.now();
+        if (now - c.lastT > 0) { c.prev = c.last; c.prevT = c.lastT; }
+        c.last = e.nativeEvent.pageX; c.lastY = e.nativeEvent.pageY; c.lastT = now;
+        slide.setValue(Math.max(0, Math.min(c.last - c.start, 140)) * 0.5);
       },
-      onPanResponderRelease: (_e, g) => {
+      onPanResponderRelease: () => {
         Animated.spring(slide, { toValue: 0, bounciness: 0, useNativeDriver: true }).start(() => setSwiping(false));
-        if (touchX.current.last - touchX.current.start > SWIPE_DIST || g.vx > 0.6) swipeBackRef.current();
+        const c = touchX.current, dx = c.last - c.start, dy = c.lastY - c.startY;
+        const vx = (c.last - c.prev) / Math.max(1, c.lastT - c.prevT);
+        // Tüm hareket boyunca yatay baskın olmalı; hız kestirmesi de yalnızca sağa doğru ve yeterince yatay harekette geçerli
+        const horizontal = dx > Math.abs(dy) * 1.5;
+        if (horizontal && (dx > SWIPE_DIST || (dx > 24 && vx > 0.6))) swipeBackRef.current();
       },
       onPanResponderTerminate: () => Animated.spring(slide, { toValue: 0, bounciness: 0, useNativeDriver: true }).start(() => setSwiping(false)),
     }),
@@ -196,7 +224,7 @@ function Main() {
           const q = Linking.parse(u!).queryParams ?? {};
           // Kestirme bağlantılarının biçimi (tutar=125,50) uygulama dilinden bağımsızdır: her zaman Türkçe kurallarla okunur
           const amount = parseAmount(String(q.tutar ?? ''), 'tr');
-          prefill = { amount: amount || undefined, cat: SLUG[String(q.kategori ?? '').toLowerCase()] };
+          prefill = { amount: amount && amount <= MAX_AMOUNT ? amount : undefined, cat: SLUG[String(q.kategori ?? '').toLowerCase()] };
         } catch {}
         setMenuOpen(false);
         setExpSheet({ key: Date.now(), initial: null, prefill });
@@ -222,25 +250,64 @@ function Main() {
     return () => sub.remove();
   }, []);
 
-  // Bildirimleri veri değiştikçe yeniden kur (art arda değişikliklerde bir kez)
+  // Bildirimleri veri ya da izin değiştikçe yeniden kur (art arda değişikliklerde bir kez)
   useEffect(() => {
     if (!data) return;
     const h = setTimeout(() => reschedule(data.settings, data.subs, data.items), 1200);
     return () => clearTimeout(h);
-  }, [data]);
+  }, [data, permTick]);
 
-  if (!data || !view) {
-    return (
-      <View style={[st.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </View>
-    );
-  }
+  const refreshPerm = async () => {
+    if (Platform.OS === 'web') return;
+    setPerm(await permissionInfo());
+    setPermTick((n) => n + 1);
+  };
+  // İzin durumunu aç; sistem ayarlarından dönüldüğünde de güncelle
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    permissionInfo().then(setPerm);
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') refreshPerm(); });
+    return () => sub.remove();
+  }, []);
+  // Daha önce abonelik eklenmiş ama izin hiç sorulmamışsa (varsayılan açık uyarı) açılışta bir kez sor; aboneliği olmayana sorulmaz
+  const askedOnStart = useRef(false);
+  useEffect(() => {
+    if (!data || !perm || askedOnStart.current) return;
+    askedOnStart.current = true;
+    if (perm.state === 'undetermined' && data.settings.subRemind && data.subs.length) ensurePermission().then(refreshPerm);
+  }, [data, perm]);
+
+  // Hesap akışından gelen başarı durumları (e-posta doğrulandı, parola güncellendi) uygulamaya geçince bildirilir
+  useEffect(() => {
+    if (!data || !notice) return;
+    if (notice.kind === 'verified') toast(tr('auth.notice.verified'));
+    else if (notice.kind === 'resetDone') toast(tr('auth.notice.resetDone'));
+    else return;
+    setNotice(null);
+  }, [data, notice]);
+
+  // Kilitlenince açık sayfa/menüler kapanır (yerel Modal'lar kilit katmanının üstünde kalmasın)
+  useEffect(() => {
+    if (!lock.locked) return;
+    setExpSheet(null); setSubSheet(null); setIncSheet(null); setCurMenu(false); setMenuOpen(false);
+  }, [lock.locked]);
+
+  const lockLayer = <LockLayer locked={lock.locked} covered={lock.covered} onUnlock={lock.unlock} t={t} />;
+  if (status === 'error') return <LanguageProvider value={lang}><ErrorState t={t} onRetry={reload} topInset={insets.top} /></LanguageProvider>;
+  if (!data || !view) return <LanguageProvider value={lang}><DashboardSkeleton t={t} topInset={insets.top} /></LanguageProvider>;
 
   const { items, subs, settings } = view;
+  const incomes = view.incomes ?? [];
+  // Kur yokken çevrilemeyen kayıtlar toplamlara girmez (items/subs/incomes yalnızca çevrilenleri içerir); yalnızca listelerde özgün tutar/birimle gösterilir.
+  // Abonelik "ödendi" denetimi ise çevrilemeyen ödemeleri de görmelidir (yoksa aynı dönem yeniden ödenebilir görünür).
+  const un = view.unconverted;
+  const payItems = items.concat(un.items);
+  const amountOf = (x: { amount: number; cur?: Cur; unconv?: true }) => (x.unconv ? fmtMoney(x.amount, x.cur ?? 'TRY') : money(x.amount));
+  const convSum = (xs: { amount: number; unconv?: true }[]) => sum(xs.filter((x) => !x.unconv));
   const stored = {
     item: (id: string) => data.items.find((x) => x.id === id),
     sub: (id: string) => data.subs.find((x) => x.id === id),
+    income: (id: string) => data.incomes.find((x) => x.id === id),
   };
   const converting = needsRates(data, main);
   const a = analyse(items, ym);
@@ -281,17 +348,42 @@ function Main() {
       run: () => update((d) => ({ ...d, items: d.items.filter((x) => x.id !== removed.id).concat([removed]) })),
     } : undefined);
   };
+  const saveIncome = (x: Income) => {
+    const isNew = !data.incomes.some((i) => i.id === x.id);
+    update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== x.id).concat([x]) }));
+    setIncSheet(null);
+    setYm(x.date.slice(0, 7));
+    buzz('success');
+    toast(isNew ? tr('toast.incomeAdded', { amount: fmtMoney(x.amount, x.cur ?? main) }) : tr('toast.incomeUpdated'));
+  };
+  const deleteIncome = (id: string) => {
+    const removed = stored.income(id);
+    update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== id) }));
+    setIncSheet(null);
+    buzz('warn');
+    toast(tr('toast.incomeDeleted'), removed ? {
+      label: tr('toast.undo'),
+      run: () => update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== removed.id).concat([removed]) })),
+    } : undefined);
+  };
   const saveSub = (s: Sub) => {
     update((d) => ({ ...d, subs: d.subs.filter((x) => x.id !== s.id).concat([s]) }));
     setSubSheet(null);
     buzz('success');
+    // Ödeme günü uyarısı varsayılan açıktır ama izin yoktur: ilk abonelik kaydında (tam gerektiği anda) izin istenir. Kalıcı reddedildiyse sorulmaz; Ayarlar'da uyarı görünür.
+    if (settings.subRemind && Platform.OS !== 'web') {
+      permissionInfo().then(async (p) => {
+        if (p.state === 'undetermined' || (p.state === 'denied' && p.canAskAgain)) await ensurePermission();
+        await refreshPerm();
+      });
+    }
   };
   const deleteSub = (id: string) => {
     update((d) => ({ ...d, subs: d.subs.filter((x) => x.id !== id) }));
     setSubSheet(null);
   };
   const paySub = (s: Sub) => {
-    const sst = subStatus(s, items);
+    const sst = subStatus(s, payItems);
     // Ödeme, aboneliğin kendi para biriminde ve tutarıyla yazılır (çevrilmiş değerle değil)
     const own = stored.sub(s.id) ?? s;
     const e: Expense = { id: uid(), amount: own.amount, cat: s.cat, note: s.name, date: iso(sst.due), ts: Date.now(), sub: s.id, period: sst.period, cur: own.cur ?? 'TRY' };
@@ -300,21 +392,38 @@ function Main() {
     toast(tr('toast.subAdded', { name: s.name }));
   };
   const skipSub = (s: Sub) => {
-    const period = subStatus(s, items).period;
+    const period = subStatus(s, payItems).period;
     update((d) => ({ ...d, subs: d.subs.map((x) => (x.id === s.id ? { ...x, skip: period } : x)) }));
   };
   const changeSettings = async (next: Settings) => {
+    // Uygulama kilidi açılmadan önce doğrulama başarılı olmalı (kilitli kalıp çıkamama riskine karşı)
+    if (next.lock && !settings.lock) {
+      if ((await authenticate()) !== 'ok') { toast(tr('toast.lockFailed')); return; }
+      lock.markUnlocked();
+    }
     const turnedOn = (next.remind && !settings.remind) || (next.subRemind && !settings.subRemind);
     update((d) => ({ ...d, settings: fromViewSettings(next, d.settings, settings) }));
     if (next.budget !== settings.budget) toast(next.budget ? tr('toast.budgetSaved') : tr('toast.budgetRemoved'));
-    if (turnedOn && !(await ensurePermission())) {
-      toast(tr('toast.noNotifPermission'));
+    if (turnedOn) {
+      const granted = await ensurePermission();
+      await refreshPerm();
+      if (!granted) toast(tr('toast.noNotifPermission'));
     }
+  };
+  // Ayarlar'daki izin uyarısı: sorulabiliyorsa izin iste, kalıcı reddedilmişse sistem ayarlarını aç
+  const fixNotifPermission = async () => {
+    if (perm && !perm.canAskAgain) {
+      Linking.openSettings().catch(() => toast(tr('toast.noNotifPermission')));
+      return;
+    }
+    const granted = await ensurePermission();
+    await refreshPerm();
+    if (!granted) toast(tr('toast.noNotifPermission'));
   };
   const doExport = async (which: string | null) => {
     try {
       const note = converting && rs.rates ? tr('xl.ratesNote', { cur: main, time: fmtStamp(rs.rates.fetchedAt, fmtTime, monthShortName) }) : null;
-      const ok = await exportExcel(items, subs, which, main, note);
+      const ok = await exportExcel(items, subs, which, main, note, incomes);
       if (!ok) toast(which ? tr('toast.exportNoMonth') : tr('toast.exportNoData'));
     } catch {
       toast(tr('toast.excelFail'));
@@ -371,40 +480,85 @@ function Main() {
       key={x.id}
       onPress={() => setExpSheet({ key: Date.now(), initial: stored.item(x.id) ?? x })}
       style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: money(x.amount) })}
+      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountOf(x) })}
     >
       <CatIcon cat={x.cat} t={t} />
       <View style={{ flex: 1 }}>
         <Text style={st.itemCat} numberOfLines={1}>{x.note || catName(x.cat)}</Text>
         <Text style={st.meta} numberOfLines={1}>{[x.note ? catName(x.cat) : '', showDate ? dayLabel(x.date) : '', x.sub ? tr('expense.subscriptionTag') : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || catName(x.cat)}</Text>
       </View>
-      <Text style={st.itemAmt}>{money(x.amount)}</Text>
+      <Text style={st.itemAmt}>{amountOf(x)}</Text>
       <Ionicons name="chevron-forward" size={16} color={t.muted} />
     </Pressable>
   );
 
-  const ctx: Ctx = { t, st, a, ym, items, subs, monthItems, budget, settings };
+  const curYm = todayIso().slice(0, 7);
+  const curItems = items.filter((x) => x.date.slice(0, 7) === curYm);
+  const curTotal = sum(curItems);
+  const byCat: Record<string, number> = {};
+  curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
+  const pendingSubs = subs.concat(un.subs).filter((x) => subStatus(x, payItems).state === 'pending').length; // rozet: çevrilemeyen abonelikler de ödeme bekler
+  const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
+
+  const txnToggle = (
+    <View style={[st.seg, { backgroundColor: t.surface, borderColor: t.line }]} accessibilityRole="tablist">
+      {(['expenses', 'income'] as const).map((k) => (
+        <Pressable key={k} testID={`txn-tab-${k}`} onPress={() => setTxnTab(k)} accessibilityRole="tab" aria-selected={txnTab === k}
+          style={[st.segBtn, txnTab === k && { backgroundColor: t.accent }]}>
+          <Text style={{ color: txnTab === k ? t.accentFg : t.muted, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{tr('txn.' + k)}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+  const incomeRow = (x: Income, i: number) => (
+    <Pressable
+      key={x.id}
+      testID={`income-row-${i}`}
+      onPress={() => setIncSheet({ key: Date.now(), initial: stored.income(x.id) ?? x })}
+      style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
+      accessibilityLabel={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: amountOf(x) })}
+    >
+      <IncomeIcon cat={x.cat} t={t} />
+      <View style={{ flex: 1 }}>
+        <Text style={st.itemCat} numberOfLines={1}>{x.note || incomeCatName(x.cat)}</Text>
+        <Text style={st.meta} numberOfLines={1}>{[x.note ? incomeCatName(x.cat) : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || incomeCatName(x.cat)}</Text>
+      </View>
+      <Amount text={`+${amountOf(x)}`} style={[st.itemAmt, { color: t.good }]} />
+      <Ionicons name="chevron-forward" size={16} color={t.muted} />
+    </Pressable>
+  );
+
+  const ctx: Ctx = { t, st, a, ym, items, payItems, subs, monthItems, budget, settings };
   const notes = insights(items, ym, settings);
 
   let body: ReactNode = null;
   if (screen === 'ozet') {
-    const pending = subs.map((s) => ({ s, x: subStatus(s, items) })).filter((r) => r.x.state === 'pending');
-    const recent = [...items].sort((p, q) => (p.date < q.date ? 1 : p.date > q.date ? -1 : q.ts - p.ts)).slice(0, 5);
+    const pending = subs.map((s) => ({ s, x: subStatus(s, payItems) })).filter((r) => r.x.state === 'pending');
+    const bal = balanceFor(items, incomes, ym);
+    const todayAmount = a.isCur ? sum(items.filter((x) => x.date === todayIso())) : null;
+    const slices = recentTransactions(items, incomes, 4);
     body = (
-      <>
+      <View style={st.dashBody}>
+        <DashHeader t={t} name={settings.name} initials={initials(settings.name)} currency={main} onCurrency={() => setCurMenu(true)} onMenu={() => setMenuOpen(true)} alertDot={!!(pendingSubs || limitAlerts)} />
         {monthSwitcher}
-        <Hero ctx={ctx} onBudget={() => { go('butce'); setBudgetFocusKey(Date.now()); }} />
-        <Tiles ctx={ctx} />
-        {rateNote}
-        {notes.length ? (
-          <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.highlights')}</Label>
-              {notes.length > 3 ? <Pressable onPress={() => go('raporlar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
-            </View>
-            <InsightList list={notes.slice(0, 3)} t={t} />
-          </View>
-        ) : null}
+        <BalanceCard t={t} bal={bal} hidden={settings.hideBalance} vsLabel={tr('bal.vsLast')} onAddIncome={openAddIncome}
+          onToggle={() => changeSettings({ ...settings, hideBalance: !settings.hideBalance })} />
+        <QuickActions t={t} onExpense={openAdd} onIncome={openAddIncome} onReports={() => go('raporlar')} onBudgets={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
+        {converting && (rs.failed || (!rs.rates && (un.count > 0 || un.limits > 0))) ? (
+          <>
+            <InlineNotice t={t} kind="warn" text={rs.rates ? tr('dash.ratesFailed') : un.count > 0 ? tr('dash.unconverted', { n: un.count }) + (un.limits > 0 ? ' ' + tr('dash.limitsUnavailable', { n: un.limits }) : '') : un.limits > 0 ? tr('dash.limitsUnavailable', { n: un.limits }) : tr('dash.ratesNone')} action={rs.refreshing ? undefined : tr('state.retry')}
+              onAction={async () => { const ok = await rs.refresh(); toast(ok ? tr('rates.refreshed') : tr('rates.refreshFailed')); }} />
+            {rs.rates ? rateNote : null}
+          </>
+        ) : rateNote}
+        <Pair>
+          <SpendingCard t={t} a={a} ym={ym} todayAmount={todayAmount} monthTitle={monthLabel(ym)} />
+          <CategoriesCard t={t} monthItems={monthItems} monthTitle={monthLabel(ym)} />
+        </Pair>
+        <Pair>
+          <BudgetCard t={t} spent={a.total} budget={budget} periodLabel={monthLabel(ym)} onBudget={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
+          <SubsCard t={t} subs={subs} items={payItems} onAll={() => go('abonelikler')} onAdd={() => setSubSheet({ key: Date.now(), initial: null })} onOpen={(x) => setSubSheet({ key: Date.now(), initial: stored.sub(x.id) ?? x })} />
+        </Pair>
         {pending.length ? (
           <View style={st.card}>
             <View style={st.cardHead}>
@@ -416,27 +570,74 @@ function Main() {
             ))}
           </View>
         ) : null}
-        <View style={st.card}>
-          <View style={st.cardHead}>
-            <Label t={t}>{tr('section.recent')}</Label>
-            {recent.length ? <Pressable onPress={() => go('harcamalar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
+        {notes.length ? (
+          <View style={st.card}>
+            <View style={st.cardHead}>
+              <Label t={t}>{tr('section.highlights')}</Label>
+              {notes.length > 3 ? <Pressable onPress={() => go('raporlar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
+            </View>
+            <InsightList list={notes.slice(0, 3)} t={t} />
           </View>
-          {recent.length ? <View style={st.items}>{recent.map((x, i) => expenseRow(x, i, true))}</View> : <Text style={st.meta}>{tr('recent.empty')}</Text>}
+        ) : null}
+        <Tiles ctx={ctx} />
+        <RecentCard t={t} list={slices} onAll={() => go('harcamalar')}
+          onOpen={(r) => (r.kind === 'income' ? setIncSheet({ key: Date.now(), initial: stored.income(r.x.id) ?? r.x }) : setExpSheet({ key: Date.now(), initial: stored.item(r.x.id) ?? r.x }))} />
+      </View>
+    );
+  } else if (screen === 'harcamalar' && txnTab === 'income') {
+    const monthIncomes = incomes.concat(un.incomes).filter((x) => x.date.slice(0, 7) === ym);
+    const groups: Record<string, Income[]> = {};
+    monthIncomes.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
+    const days = Object.keys(groups).sort().reverse();
+    body = (
+      <>
+        {txnToggle}
+        {monthSwitcher}
+        {rateNote}
+        <View style={st.summaryRow}>
+          <Text style={st.meta}>{tr('list.count', { n: monthIncomes.length })}</Text>
+          <Amount text={money(convSum(monthIncomes))} style={st.summaryVal} symbolColor={t.gold} />
         </View>
+        {days.length ? (
+          <>
+            <Text style={[st.meta, { paddingHorizontal: 4 }]}>{tr('txn.incomeHint')}</Text>
+            {days.map((d) => {
+              const its = groups[d].sort((p, q) => q.ts - p.ts);
+              return (
+                <View key={d} style={{ gap: 6 }}>
+                  <View style={st.dayHead}>
+                    <Label t={t}>{dayLabel(d)}</Label>
+                    {its.some((x) => !x.unconv) ? <Label t={t}>{money(convSum(its))}</Label> : null}
+                  </View>
+                  <View style={st.items}>{its.map((x, i) => incomeRow(x, i))}</View>
+                </View>
+              );
+            })}
+          </>
+        ) : (
+          <View style={st.empty} testID="income-empty">
+            <Ionicons name="cash-outline" size={40} color={t.muted} />
+            <Text style={st.emptyTitle}>{tr('txn.incomeEmpty')}</Text>
+            <Text style={[st.meta, { textAlign: 'center' }]}>{tr('txn.incomeEmptyHint')}</Text>
+            <Button label={tr('qa.income')} kind="ghost" onPress={openAddIncome} t={t} style={{ marginTop: 12, minWidth: 180 }} />
+          </View>
+        )}
       </>
     );
   } else if (screen === 'harcamalar') {
     const q = lower(query.trim());
     // Arama tüm aylarda yapılır; arama yokken seçili ay listelenir
-    const pool = q ? items : monthItems;
+    const listMonth = monthItems.concat(un.items.filter((x) => x.date.slice(0, 7) === ym));
+    const pool = q ? payItems : listMonth;
     const shown = pool.filter((x) => (!filterCat || x.cat === filterCat) && (!filterDay || x.date === filterDay) &&
-      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || money(x.amount).includes(q)));
+      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || amountOf(x).includes(q)));
     const groups: Record<string, Expense[]> = {};
     shown.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
     const days = Object.keys(groups).sort().reverse();
-    const cats = Array.from(new Set(monthItems.map((x) => x.cat)));
+    const cats = Array.from(new Set(listMonth.map((x) => x.cat)));
     body = (
       <>
+        {txnToggle}
         <View style={st.search}>
           <Ionicons name="search" size={18} color={t.muted} />
           <TextInput value={query} onChangeText={setQuery} placeholder={tr('search.placeholder')} placeholderTextColor={t.muted}
@@ -446,7 +647,7 @@ function Main() {
         {rateNote}
         <View style={st.summaryRow}>
           <Text style={st.meta}>{q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length })}</Text>
-          <Amount text={money(sum(shown))} style={st.summaryVal} symbolColor={t.gold} />
+          <Amount text={money(convSum(shown))} style={st.summaryVal} symbolColor={t.gold} />
         </View>
         {cats.length > 1 ? (
           <View onStartShouldSetResponderCapture={() => { touchX.current.start = 99999; return false; }}>
@@ -476,7 +677,7 @@ function Main() {
                 <View key={d} style={{ gap: 6 }}>
                   <View style={st.dayHead}>
                     <Label t={t}>{dayLabel(d)}</Label>
-                    <Label t={t}>{money(sum(its))}</Label>
+                    {its.some((x) => !x.unconv) ? <Label t={t}>{money(convSum(its))}</Label> : null}
                   </View>
                   <View style={st.items}>{its.map((x, i) => expenseRow(x, i))}</View>
                 </View>
@@ -486,9 +687,9 @@ function Main() {
         ) : (
           <View style={st.empty}>
             <Ionicons name={q ? 'search' : 'wallet-outline'} size={40} color={t.muted} />
-            <Text style={st.emptyTitle}>{q ? tr('empty.noResults') : monthItems.length ? tr('empty.noMatch') : tr('empty.noMonth')}</Text>
+            <Text style={st.emptyTitle}>{q ? tr('empty.noResults') : listMonth.length ? tr('empty.noMatch') : tr('empty.noMonth')}</Text>
             <Text style={[st.meta, { textAlign: 'center' }]}>
-              {q ? tr('empty.tryOther') : monthItems.length ? tr('empty.removeFilter') : tr('empty.useButton')}
+              {q ? tr('empty.tryOther') : listMonth.length ? tr('empty.removeFilter') : tr('empty.useButton')}
             </Text>
           </View>
         )}
@@ -512,14 +713,14 @@ function Main() {
   } else if (screen === 'abonelikler') {
     const rank = { pending: 0, upcoming: 1, paid: 2, skipped: 2 };
     const when = (x: ReturnType<typeof subStatus>) => ('next' in x ? x.next : x.due).getTime();
-    const rows = subs
-      .map((s) => ({ s, x: subStatus(s, items) }))
+    const rows = subs.concat(un.subs)
+      .map((s) => ({ s, x: subStatus(s, payItems) }))
       .sort((p, q) => rank[p.x.state] - rank[q.x.state] || when(p.x) - when(q.x));
-    const monthly = subs.reduce((s, x) => s + monthlyCost(x), 0);
+    const monthly = subs.reduce((s, x) => s + monthlyCost(x), 0); // yalnızca çevrilebilenler
     // Türlere göre grupla; en pahalı tür üstte
     const groups = SUB_TYPES.map((tp) => {
       const list = rows.filter((r) => r.s.type === tp.key);
-      return { tp, list, total: list.reduce((m, r) => m + monthlyCost(r.s), 0) };
+      return { tp, list, total: list.reduce((m, r) => m + (r.s.unconv ? 0 : monthlyCost(r.s)), 0) };
     }).filter((g) => g.list.length).sort((p, q) => q.total - p.total);
     const pendingCount = rows.filter((r) => r.x.state === 'pending').length;
     body = (
@@ -532,7 +733,7 @@ function Main() {
             {budget ? <View><Text style={st.subSumVal}>{fmtPercent(Math.round((monthly / budget) * 100))}</Text><Text style={st.tileSub}>{tr('subs.ofBudget')}</Text></View> : null}
           </View>
         ) : null}
-        {groups.length > 1 ? (
+        {groups.length > 1 && monthly > 0 ? (
           <View style={st.card}>
             <View style={st.cardHead}>
               <Label t={t}>{tr('subs.byType')}</Label>
@@ -558,7 +759,7 @@ function Main() {
             <View key={g.tp.key} style={{ gap: 6 }}>
               <View style={st.dayHead}>
                 <Label t={t}>{subLabel(g.tp.key)}</Label>
-                <Label t={t}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Label>
+                {g.list.some((r) => !r.s.unconv) ? <Label t={t}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Label> : null}
               </View>
               <View style={[st.card, { paddingVertical: 6 }]}>
                 {g.list.map(({ s }, i) => (
@@ -579,6 +780,9 @@ function Main() {
     body = (
       <View style={{ gap: 14 }}>
       {rateNote}
+      {/* Üstte bu ayın ilerlemesi (görünüm verisi: ana para biriminde, çevrilemeyenler yok); altta form */}
+      <BudgetOverview t={t} p={budgetProgress(items, settings, todayIso().slice(0, 7))} periodLabel={monthLabel(todayIso().slice(0, 7))} />
+      <Label t={t}>{tr('budget.editTitle')}</Label>
       <View style={st.card}>
         <BudgetPanel key={budgetFocusKey} focusBudget={budgetFocusKey > 0} settings={settings} onChange={changeSettings} t={t} />
       </View>
@@ -593,6 +797,9 @@ function Main() {
           onExport={doExport}
           onBackup={doBackup}
           onRestore={doRestore}
+          lockAvailable={lockSupported || settings.lock}
+          notifWarn={perm && perm.state !== 'granted' && (settings.remind || settings.subRemind) ? { canAskAgain: perm.canAskAgain, onFix: fixNotifPermission } : null}
+          account={<AccountSection t={t} />}
           ym={ym}
           monthLabel={monthOnly(ym)}
           rates={rs.rates}
@@ -605,16 +812,11 @@ function Main() {
     );
   }
 
-  const showFab = screen === 'ozet' || screen === 'harcamalar' || screen === 'raporlar';
+  // Hızlı "Ekle" düğmesi: panelde hızlı eylemler var; Harcamalar ekranının Gelirler sekmesinde gelir ekler
+  const showFab = screen === 'harcamalar' || screen === 'raporlar';
+  const barH = TAB_BAR_H + insets.bottom;
 
   /* ---------- Yan menü verisi (her zaman içinde bulunulan ay) ---------- */
-  const curYm = todayIso().slice(0, 7);
-  const curItems = items.filter((x) => x.date.slice(0, 7) === curYm);
-  const curTotal = sum(curItems);
-  const byCat: Record<string, number> = {};
-  curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
-  const pendingSubs = subs.filter((x) => subStatus(x, items).state === 'pending').length;
-  const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
   const menuSections: MenuSection[] = [
     { title: tr('menu.general'), items: [
       { key: 'ozet', label: tr('menu.home'), icon: 'grid-outline' },
@@ -629,7 +831,7 @@ function Main() {
     ] },
   ];
   const menuPins = Object.keys(byCat).sort((p, q) => byCat[q] - byCat[p]).slice(0, 3).map((c) => ({ cat: c, amount: money0(byCat[c]) }));
-  const lastTs = items.reduce((m, x) => Math.max(m, x.ts || 0), 0);
+  const lastTs = payItems.reduce((m, x) => Math.max(m, x.ts || 0), 0);
   const curMonthName = monthOnly(curYm);
 
   return (
@@ -637,23 +839,31 @@ function Main() {
     <View style={st.root}>
       <StatusBar style={t.statusBar} />
       <Animated.View style={{ flex: 1, transform: [{ translateX: slide }] }} {...edgePan.panHandlers}>
-      <View style={[st.topBar, { paddingTop: insets.top + 6 }]}>
-        <Pressable onPress={() => setMenuOpen(true)} style={st.menuBtn} hitSlop={8} accessibilityLabel={tr('menu.open')} accessibilityRole="button">
-          <Ionicons name="menu" size={24} color={t.fg} />
-          {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
-        </Pressable>
-        <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screenTitle(screen)}</Text>
-      </View>
-      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + (showFab ? 110 : 40) }]} keyboardShouldPersistTaps="handled">
-        {body}
+      {screen !== 'ozet' ? (
+        <View style={[st.topBar, { paddingTop: insets.top + 6 }]}>
+          <Pressable onPress={() => setMenuOpen(true)} style={st.menuBtn} hitSlop={8} accessibilityLabel={tr('menu.open')} accessibilityRole="button" testID="menu-open">
+            <Ionicons name="menu" size={24} color={t.fg} />
+            {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
+          </Pressable>
+          <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screenTitle(screen)}</Text>
+        </View>
+      ) : null}
+      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, screen === 'ozet' && { paddingTop: insets.top + 8 }, { paddingBottom: barH + (showFab ? 96 : 28) }]} keyboardShouldPersistTaps="handled">
+        <View style={st.wrap}>
+          {/* Veri sorunları kalıcı bandla bildirilir (kısa bir bildirim gözden kaçabilir): kurtarılan bozuk kayıt / yazılamayan değişiklik */}
+          {recovered && !recoveredSeen ? <InlineNotice t={t} kind="warn" text={tr('state.recovered')} action={tr('state.dismiss')} onAction={() => setRecoveredSeen(true)} /> : null}
+          {saveFailed ? <InlineNotice t={t} kind="warn" text={tr('state.saveFailed')} /> : null}
+          {body}
+        </View>
       </ScrollView>
 
       {showFab ? (
-        <View style={[st.fabBar, { paddingBottom: insets.bottom + 10 }]}>
-          <Button label={tr('fab.add')} kind="primary" onPress={openAdd} t={t} style={st.fab} />
+        <View style={[st.fabBar, { bottom: barH, paddingBottom: 10 }]} pointerEvents="box-none">
+          <Button label={screen === 'harcamalar' && txnTab === 'income' ? `+  ${tr('qa.income')}` : tr('fab.add')} kind="primary" onPress={screen === 'harcamalar' && txnTab === 'income' ? openAddIncome : openAdd} t={t} style={st.fab} />
         </View>
       ) : null}
       </Animated.View>
+      <TabBar t={t} current={screen} onSelect={(k) => go(k)} bottomInset={insets.bottom} />
       {/* Geri hareketi sırasında kenardan beliren ok: bırakınca ne olacağını gösterir (geri ya da ana ekranda menü) */}
       {swiping ? (
       <Animated.View pointerEvents="none" style={[st.backHint, {
@@ -665,7 +875,7 @@ function Main() {
       ) : null}
 
       {toastMsg ? (
-        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: insets.bottom + (showFab ? 82 : 24) }]}>
+        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: barH + (showFab ? 82 : 18) }]}>
           <Text style={{ color: t.fg, fontSize: 14, flexShrink: 1 }}>{toastMsg}</Text>
           {toastAction ? (
             <Pressable hitSlop={10} onPress={() => { toastAction.run(); setToastMsg(''); setToastAction(null); buzz(); }}>
@@ -699,12 +909,19 @@ function Main() {
         t={t}
       />
 
-      {expSheet ? (
-        <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
+      <CurrencyMenu visible={curMenu && !lock.locked} t={t} current={main} rates={rs.rates} onClose={() => setCurMenu(false)}
+        onPick={(c) => { setCurMenu(false); if (c !== main) changeSettings({ ...settings, currency: c }); }} />
+      {/* Kilitliyken yerel Modal sayfaları çizilmez (kilit katmanının üstünde açılıp veriyi göstermesinler; ör. kilitliyken gelen derin bağlantı) */}
+      {incSheet && !lock.locked ? (
+        <IncomeSheet key={incSheet.key} visible initial={incSheet.initial} main={main} rates={rs.rates} onSave={saveIncome} onDelete={deleteIncome} onClose={() => setIncSheet(null)} t={t} />
       ) : null}
-      {subSheet ? (
+      {expSheet && !lock.locked ? (
+        <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} lastCat={items.reduce<Expense | null>((a, e) => (!a || e.ts > a.ts ? e : a), null)?.cat} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
+      ) : null}
+      {subSheet && !lock.locked ? (
         <SubSheet key={subSheet.key} visible initial={subSheet.initial} main={main} rates={rs.rates} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubSheet(null)} t={t} />
       ) : null}
+      {lockLayer}
     </View>
     </LanguageProvider>
   );
@@ -712,48 +929,7 @@ function Main() {
 
 /* ---------- Ekran parçaları ---------- */
 type Styles = ReturnType<typeof makeStyles>;
-type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
-
-/** Özet kartı: koyu metal kart görünümü, şampanya altını ayrıntılar. */
-function Hero({ ctx, onBudget }: { ctx: Ctx; onBudget: () => void }) {
-  const { t, st, a, ym, items, budget } = ctx;
-  const left = budget - a.total;
-  return (
-    <LinearGradient colors={t.heroGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.hero}>
-      <View style={st.heroTop}>
-        <Text style={st.heroBrand}>{upper(tr('app.name'))}</Text>
-        <Text style={st.heroBrand}>{upper(monthLabel(ym))}</Text>
-      </View>
-      <View>
-        <Text style={st.heroLabel}>{a.isCur ? tr('hero.today') : tr('hero.avgDaily')}</Text>
-        <Amount text={a.isCur ? money(sum(items.filter((x) => x.date === todayIso()))) : money(a.avg)} style={st.heroBig} symbolColor={t.heroLabel} />
-      </View>
-      <View style={st.heroRule} />
-      <View style={st.heroRow}>
-        <View>
-          <Text style={st.heroLabel}>{a.isCur ? tr('hero.thisMonth') : tr('hero.monthTotal')}</Text>
-          <Amount text={money(a.total)} style={st.heroMid} symbolColor={t.heroLabel} />
-        </View>
-        <Pressable onPress={onBudget} hitSlop={8} style={st.heroBudget}>
-          <Text style={st.heroBudgetTxt}>{budget ? tr('hero.budget', { amount: money0(budget) }) : tr('hero.setBudget')}</Text>
-        </Pressable>
-      </View>
-      {budget ? (
-        <View style={{ gap: 8 }}>
-          <View style={st.track}>
-            <View style={[st.fill, { width: `${Math.min(100, (a.total / budget) * 100)}%`, backgroundColor: a.total > budget ? t.warn : t.heroFill }]} />
-          </View>
-          <View style={st.heroRow}>
-            <Text style={st.heroSmall}>{left >= 0 ? tr('hero.left', { amount: money0(left) }) : tr('hero.over', { amount: money0(-left) })}</Text>
-            <Text style={st.heroSmall}>
-              {a.isCur && left > 0 ? tr('hero.perDay', { amount: money0(left / (a.dim - a.elapsed + 1)) }) : tr('hero.used', { pct: Math.round((a.total / budget) * 100) })}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-    </LinearGradient>
-  );
-}
+type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; payItems: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
 
 function Tiles({ ctx }: { ctx: Ctx }) {
   const { t, st, a, monthItems, budget } = ctx;
@@ -797,8 +973,8 @@ function Tiles({ ctx }: { ctx: Ctx }) {
 }
 
 function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; first: boolean; onEdit: () => void; onPay: () => void; onSkip: () => void }) {
-  const { t, st, items } = ctx;
-  const x = subStatus(s, items);
+  const { t, st, payItems } = ctx;
+  const x = subStatus(s, payItems);
   return (
     <View style={[st.subWrap, !first && st.topLine]}>
       <Pressable onPress={onEdit} style={st.subRow} accessibilityLabel={tr('sub.rowA11y', { name: s.name })}>
@@ -815,7 +991,7 @@ function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; fi
           </View>
         </View>
         <Text style={st.itemAmt}>
-          {money(s.amount)}
+          {s.unconv ? fmtMoney(s.amount, s.cur ?? 'TRY') : money(s.amount)}
           <Text style={st.meta}>/{tr(s.freq === 'yearly' ? 'sub.perYear' : 'sub.perMonth')}</Text>
           {s.orig ? <Text style={st.meta}>{'\n'}{fmtMoney(s.orig.amount, s.orig.cur)}</Text> : null}
         </Text>
@@ -974,7 +1150,11 @@ function makeStyles(t: Theme) {
     topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 8, backgroundColor: t.bg },
     menuDot: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: t.gold, borderWidth: 2 },
     menuBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
-    scroll: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
+    scroll: { paddingHorizontal: 16, paddingTop: 8 },
+    wrap: { width: '100%', maxWidth: DASH_MAX, alignSelf: 'center', gap: 16 },
+    dashBody: { gap: 14 },
+    seg: { flexDirection: 'row', borderWidth: 1, borderRadius: 99, padding: 4, gap: 4 },
+    segBtn: { flex: 1, minHeight: 40, borderRadius: 99, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
     h1: { fontSize: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.3 },
     link: { color: t.gold, fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
     months: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

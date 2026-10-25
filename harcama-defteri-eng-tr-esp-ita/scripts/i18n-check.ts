@@ -54,7 +54,7 @@ for (const lang of langs) {
       if (!s.trim()) errors.push(`${lang}: ${key} boş`);
       if (placeholders(s) !== want) errors.push(`${lang}: ${key} yer tutucu uyuşmazlığı (beklenen {${want}}, bulunan {${placeholders(s)}}) → ${s}`);
     }
-    if (typeof e === 'string' && typeof tr[key] === 'string' && e === tr[key] && /[A-Za-zÇĞİÖŞÜçğıöşü]{3,}/.test(e) && !/^(xl\.dateFormat|settings\.excel|settings\.themeNoir)$/.test(key)) {
+    if (typeof e === 'string' && typeof tr[key] === 'string' && e === tr[key] && /[A-Za-zÇĞİÖŞÜçğıöşü]{3,}/.test(e) && !/^(xl\.dateFormat|settings\.excel|settings\.themeNoir|acct\.provider\.(apple|google)|dash\.greetName)$/.test(key)) {
       warnings.push(`${lang}: ${key} Türkçeyle aynı kalmış: ${e}`);
     }
     if (info.code !== 'tr' && typeof e === 'string' && /[ğĞıİşŞ]/.test(e) && !/^(menu\.defaultName)$/.test(key) && lang !== 'tr') {
