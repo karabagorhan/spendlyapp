@@ -205,8 +205,19 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
     heroFill: accent === 'gold' ? base.heroFill : heroA,
     heroTrack: accent === 'gold' ? base.heroTrack : rgba(heroA, 0.18),
     heroAlt: heroAltFor(accent, sec?.color),
+    // Kırmızı/turuncu vurgularda uyarı rengi vurguyla karışmasın (aşılan bütçe ile normal çubuk ayırt edilsin): kehribar kullanılır
+    ...(WARM_ACCENTS.includes(accent) ? warnFor(accent === 'copper' ? 'red' : 'amber', dark, surf.bg) : {}),
   };
 }
+
+/** Kehribar (kırmızı/pembe vurgular için) ya da kırmızı (bakır için) uyarı tonu. */
+function warnFor(kind: 'amber' | 'red', dark: boolean, bg: string) {
+  const c = kind === 'amber' ? (dark ? '#f2b84b' : '#8a5600') : (dark ? '#ff7a7a' : '#b3263a');
+  return { warn: c, warnSoft: dark ? mix(c, bg, 0.84) : mix(c, '#ffffff', 0.88) };
+}
+
+/** Uyarı rengiyle (turuncu-kırmızı) karışabilecek sıcak vurgular. */
+export const WARM_ACCENTS: Accent[] = ['copper', 'coral', 'ruby', 'rose', 'coralteal'];
 
 /** Motifin ikinci rengi: hazır temada çiftin öbür rengi, yoksa vurguyla uyumlu bir kategori tonu; koyu karta karşı seçilebilir olsun diye gerekirse açılır. */
 function heroAltFor(accent: Accent, secondary?: string): string {

@@ -3,7 +3,7 @@
  * 2 mod × 7 zemin tonu × 13 vurgu rengi (182 tema) için WCAG kontrast oranları ve tutarlılık.
  */
 import { normalize } from '../src/store';
-import { ACCENTS, PRESETS, presetOf, ACCENT_COLORS, BASE, Mode, TINTS, TINT_COLORS, contrast, isAccent, isTint, makeTheme, mix } from '../src/palette';
+import { ACCENTS, PRESETS, presetOf, ACCENT_COLORS, BASE, Mode, TINTS, TINT_COLORS, contrast, isAccent, isTint, makeTheme, mix, WARM_ACCENTS } from '../src/palette';
 
 let fail = 0, pass = 0;
 const check = (name: string, ok: boolean, detail = '') => { if (ok) pass++; else { fail++; console.log(`FAIL ${name} ${detail}`); } };
@@ -75,6 +75,18 @@ check('yeni değerler doğrulanır', ['coralteal', 'cobaltlime', 'plumpeach'].ev
 check('boş kayıt: varsayılanlar değişmedi', normalize({}).settings.accent === 'gold' && normalize({}).settings.tint === 'classic');
 // İkinci renk özet kartında: gradyan ikinci renkten türer, etiket vurguda kalır
 check('coralteal özet kartı turkuaz', makeTheme('noir', 'deepsea', 'coralteal').heroGrad[0] !== makeTheme('noir', 'deepsea', 'coral').heroGrad[0]);
+// Uyarı rengi (aşılan bütçe, hata) vurgudan ayırt edilmeli ve okunmalı: sıcak vurgularda kehribar/kırmızı uyarı
+const hue = (h: string) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return 0; const x = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return (x * 60 + 360) % 360; };
+const hueGap = (a: string, b: string) => { const d = Math.abs(hue(a) - hue(b)); return Math.min(d, 360 - d); };
+for (const mode of ['noir', 'ivory'] as Mode[]) for (const tint of TINTS) for (const accent of ACCENTS) {
+  const t = makeTheme(mode, tint, accent);
+  check(`uyarı okunur ${mode}/${tint}/${accent}`, contrast(t.warn, t.surface) >= 4.5 && contrast(t.warn, t.bg) >= 4.5, `${t.warn}`);
+}
+for (const accent of WARM_ACCENTS) for (const tint of TINTS) {
+  const t = makeTheme('noir', tint, accent);
+  check(`uyarı vurgudan ayrışır noir/${tint}/${accent}`, hueGap(t.warn, t.accent) >= 20, `${t.warn} ~ ${t.accent}`);
+}
 if (verbose) console.log(rows.join('\n'));
 console.log(`${pass} geçti, ${fail} başarısız`);
 process.exit(fail ? 1 : 0);
