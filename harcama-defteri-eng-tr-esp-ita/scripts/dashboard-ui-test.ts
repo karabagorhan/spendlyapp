@@ -11,7 +11,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CATALOGS, Lang, fmtPercent, setLanguage, t as tr } from '../src/i18n';
-import { fmtMoney, setMainCurrency } from '../src/currency';
+import { fmtMoney, maskedMoney, setMainCurrency } from '../src/currency';
 import { catName, greetingKey } from '../src/lib';
 
 // Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
@@ -40,6 +40,7 @@ const sp = (s: string) => s.replace(/[\u00a0\u202f]/g, ' ');
 const T = (k: string, p: Record<string, string | number> = {}) => sp(tr(k, p));
 const mny = (n: number, cur: 'TRY' | 'USD' = 'TRY', d = 2) => sp(fmtMoney(n, cur, d));
 const pc = (n: number | string) => sp(fmtPercent(n));
+const MASKED = () => sp(maskedMoney('TRY')); // gizlilik kipinde her tutarın görünümü ("₺••••")
 
 const mime: Record<string, string> = { '.html': 'text/html', '.js': 'application/javascript', '.json': 'application/json', '.css': 'text/css', '.ttf': 'font/ttf', '.png': 'image/png', '.ico': 'image/x-icon' };
 const server = http.createServer((req, res) => {
@@ -215,14 +216,74 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
   {
     const p = await open({ data: full() });
     await id(p, 'bal-eye').click();
-    ok('gizle: bakiye ••••••', (await tid(p, 'bal-amount')) === '••••••');
+    // Davranış değişikliği: gizleme artık yalnızca bakiye kartında değil her ekranda; kartta da "••••••" yerine "₺••••" (dile göre "•••• €") görünür
+    ok('gizle: bakiye ' + MASKED(), (await tid(p, 'bal-amount')) === MASKED(), await tid(p, 'bal-amount'));
     ok('gizle: gelir/gider kutuları gizli, gerçek tutar görünmez', !(await tid(p, 'balance-card')).includes(mny(NET)) && !(await tid(p, 'balance-card')).includes(mny(INCOME)));
     ok('gizle: kalıcı kaydedildi', (await stored(p)).settings.hideBalance === true);
     ok('gizle: veri değişmedi', JSON.stringify((await stored(p)).items) === JSON.stringify(items) && JSON.stringify((await stored(p)).incomes) === JSON.stringify(incomes));
     await p.reload(); await p.waitForTimeout(1200);
-    ok('gizle: yenilemeden sonra da gizli', (await tid(p, 'bal-amount')) === '••••••');
+    ok('gizle: yenilemeden sonra da gizli', (await tid(p, 'bal-amount')) === MASKED());
     await id(p, 'bal-eye').click();
     ok('göster: tutar geri gelir', (await tid(p, 'balance-card')).includes(mny(NET)));
+  }
+
+  /* 2b) Gizlilik kipi uygulama geneli: panel, işlem listesi, raporlar, bütçe, abonelikler, yan menü; Ayarlar anahtarı */
+  {
+    const p = await open({ data: full({ hideBalance: true }) });
+    const dash = await text(p);
+    ok('gizli (panel): gerçek tutarlar görünmez', ![mny(NET), mny(SPENT), mny(INCOME), money0(SPENT)].some((x) => dash.includes(x)));
+    ok('gizli (panel): maskeli tutarlar görünür', dash.includes(MASKED()), MASKED());
+    ok('gizli (panel): maskeli tutarın erişilebilirlik etiketi "' + T('amount.hidden') + '"', (await p.locator(`[aria-label="${T('amount.hidden')}"]`).count()) > 0);
+    await id(p, 'tab-harcamalar').click(); await p.waitForTimeout(500);
+    const list = await text(p);
+    ok('gizli (işlemler): liste tutarları maskeli', list.split(MASKED()).length - 1 >= 4, String(list.split(MASKED()).length - 1)); // 3 harcama + ay toplamı
+    ok('gizli (işlemler): gerçek tutar görünmez', !list.includes(mny(100)) && !list.includes(mny(50)) && !list.includes(mny(25)) && !list.includes(mny(SPENT)));
+    ok('gizli (işlemler): not/kategori yine görünür', list.includes('Alpha') && list.includes('Bravo'));
+    await id(p, 'txn-tab-income').click(); await p.waitForTimeout(400);
+    const incl = await text(p);
+    ok('gizli (gelirler): tutarlar maskeli', incl.includes(MASKED()) && !incl.includes(mny(INCOME)));
+    await id(p, 'txn-tab-expenses').click();
+    await id(p, 'tab-raporlar').click(); await p.waitForTimeout(600);
+    const rep = await text(p);
+    ok('gizli (raporlar): tutarlar maskeli, gerçek tutar yok', rep.includes(MASKED()) && !rep.includes(mny(SPENT)) && !rep.includes(money0(SPENT)) && !rep.includes(mny(100)));
+    await id(p, 'tab-butce').click(); await p.waitForTimeout(600);
+    const bud = await text(p);
+    ok('gizli (bütçe): bütçe tutarı maskeli', !bud.includes(money0(1000)) && !bud.includes(mny(1000)) && !bud.includes(money0(825)));
+    await id(p, 'menu-open').click(); await p.waitForTimeout(450);
+    const menu = await text(p);
+    ok('gizli (yan menü): özet tutarlar maskeli', menu.includes(MASKED()) && !menu.includes(money0(SPENT)));
+    await p.keyboard.press('Escape');
+    // Ayarlar'daki Gizlilik anahtarı
+    const q = await open({ data: full() });
+    await id(q, 'tab-ayarlar').click(); await q.waitForTimeout(500);
+    ok('ayarlar: Gizlilik bölümü ve anahtar', await has(q, T('settings.hideAmounts')) && await has(q, T('settings.hideAmountsHint')) && (await id(q, 'hide-amounts-switch').count()) === 1);
+    await q.getByText(T('settings.hideAmounts'), { exact: true }).first().locator('xpath=following::*[@role="switch"][1]').click();
+    await q.waitForTimeout(500);
+    ok('ayarlar: anahtar tutarları gizler ve kaydeder', (await stored(q)).settings.hideBalance === true);
+    await id(q, 'tab-ozet').click(); await q.waitForTimeout(500);
+    ok('ayarlar: anahtar sonrası panelde maskeli', (await tid(q, 'bal-amount')) === MASKED());
+    // Dışa aktarılan/saklanan veri etkilenmez
+    ok('gizli: saklanan harcamalar ve gelirler aynen', JSON.stringify((await stored(q)).items) === JSON.stringify(items) && JSON.stringify((await stored(q)).incomes) === JSON.stringify(incomes));
+  }
+
+  /* 2c) "Bu aya dön" düğmesi */
+  {
+    const p = await open({ data: full() });
+    ok('bu aya dön: bu ayda görünmez', (await id(p, 'month-today').count()) === 0);
+    await p.getByLabel(T('month.prev')).first().click(); await p.waitForTimeout(400);
+    ok('bu aya dön: geçmiş ayda görünür', (await id(p, 'month-today').count()) === 1 && await has(p, T('month.backToCurrent')));
+    await id(p, 'month-today').click(); await p.waitForTimeout(400);
+    ok('bu aya dön: tıklayınca güncel aya döner, düğme kaybolur', (await id(p, 'month-today').count()) === 0 && (await tid(p, 'balance-card')).includes(mny(NET)));
+    await id(p, 'tab-harcamalar').click(); await p.waitForTimeout(400);
+    await p.getByLabel(T('month.prev')).first().click(); await p.waitForTimeout(400);
+    ok('bu aya dön: işlemler ekranında da görünür', (await id(p, 'month-today').count()) === 1);
+    await id(p, 'month-today').click(); await p.waitForTimeout(400);
+    ok('bu aya dön: işlemler ekranında geri döner', (await id(p, 'month-today').count()) === 0 && await has(p, 'Alpha'));
+    await id(p, 'tab-raporlar').click(); await p.waitForTimeout(500);
+    await p.getByLabel(T('month.prev')).first().click(); await p.waitForTimeout(400);
+    ok('bu aya dön: raporlarda görünür', (await id(p, 'month-today').count()) === 1);
+    await id(p, 'month-today').click(); await p.waitForTimeout(400);
+    ok('bu aya dön: raporlarda geri döner', (await id(p, 'month-today').count()) === 0);
   }
 
   /* 3) Gelir ekle / düzenle / sil (geri al) */

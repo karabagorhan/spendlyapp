@@ -7,10 +7,11 @@
  */
 import {
   CURRENCIES, Cur, PROVIDERS, RatesError, Rates, convert, excelMoneyFormat, fetchRates, fmtMoney, fromViewSettings, isStale, needsRates,
-  normalizeRates, round2, setMainCurrency, toMain, validateRates, viewData,
+  normalizeRates, round2, setHideAmounts, amountsHidden, maskedMoney, fmtShown, money, money0, moneyA11y, MASK, setMainCurrency, toMain, validateRates, viewData,
 } from '../src/currency';
 import { LANGS, Lang, fmtNumber, parseAmount, setLanguage, t } from '../src/i18n';
 import { Expense, Settings, Sub, analyse, insights, MIN_CHANGE, sum } from '../src/lib';
+import { buildExcel } from '../src/excel';
 import { Data, defaultSettings, merge, normalize } from '../src/store';
 
 let fail = 0, pass = 0;
@@ -270,6 +271,36 @@ const NOW = 1_800_000_000_000;
   const warns = (c: Cur) => insights(pair, '2026-10', mk(c)).filter((i) => i.kind === 'warn').length;
   eq('10 birim artış: TRY yorumsuz, EUR uyarılı', [warns('TRY'), warns('EUR')], [0, 1]);
   setMainCurrency('TRY');
+
+  /* ===== 8. Gizlilik kipi (Tutarları gizle): yalnızca ekrandaki tutarlar maskelenir ===== */
+  for (const l of ['tr', 'en', 'es', 'it', 'zh'] as Lang[]) {
+    setLanguage(l);
+    setMainCurrency('EUR');
+    setHideAmounts(false);
+    eq(`${l} gizlilik kapalı: money gerçek tutarı gösterir`, [money(1250.5), money0(1250.5)], [fmtMoney(1250.5, 'EUR'), fmtMoney(1250.5, 'EUR', 0)]);
+    setHideAmounts(true);
+    const sym = l === 'es' || l === 'it' ? `${MASK} €` : `€${MASK}`;
+    eq(`${l} gizlilik açık: money/money0 maskeli (simge yeri dile göre)`, [money(1250.5), money0(1250.5), money(-40, 0)], [sym, sym, sym]);
+    eq(`${l} gizlilik açık: gerçek rakam sızmaz`, /\d/.test(money(1250.5) + money0(99)), false);
+    eq(`${l} gizlilik açık: fmtShown özgün birimle maskeler`, fmtShown(5, 'USD'), maskedMoney('USD'));
+    eq(`${l} gizlilik açık: fmtMoney (bildirim/giriş/dışa aktarım yolu) maskelenmez`, fmtMoney(1250.5, 'EUR'), new Intl.NumberFormat(LANGS.find((x) => x.code === l)!.locale, { style: 'currency', currency: 'EUR', currencyDisplay: 'narrowSymbol' }).format(1250.5).replace('-', '−').replace(/ /g, ' '));
+    eq(`${l} gizlilik açık: ekran okuyucu "gizli tutar" der`, moneyA11y(5), t('amount.hidden'));
+    truthy(`${l} gizli tutar etiketi çevrilmiş`, t('amount.hidden') !== 'amount.hidden' && t('amount.hidden').length > 3);
+  }
+  setLanguage('en');
+  setMainCurrency('TRY');
+  setHideAmounts(true);
+  eq('gizlilik açık: ₺ ana birimi', [money(1250.5), money0(3)], ['₺••••', '₺••••']);
+  eq('gizlilik açık: bayrak okunur', amountsHidden(), true);
+  // Yorum metinleri (insights) maskeli tutar içerir, gerçek sayı içermez
+  const hiddenNotes = insights([ex('h1', 400, 'Market', '2026-10-02'), ex('h2', 100, 'Ulaşım', '2026-10-03')], '2026-10', { ...defaultSettings, catBudgets: { Market: 300 } });
+  truthy('gizlilik açık: yorum metinlerinde tutar maskeli', hiddenNotes.length > 0 && hiddenNotes.some((n) => n.text.includes('₺••••')) && hiddenNotes.every((n) => !/400|100\b/.test(n.text)));
+  // Excel dışa aktarımı gizlilik kipinden etkilenmez
+  const xl = JSON.stringify(buildExcel([ex('x1', 1250.5, 'Market', '2026-10-02')], [], '2026-10', 'TRY', null));
+  truthy('gizlilik açık: Excel hücreleri gerçek tutarı taşır, maske yok', xl.includes('1250.5') && !xl.includes(MASK));
+  setHideAmounts(false);
+  eq('gizlilik kapalı: money normale döner', money(1250.5), '₺1,250.50');
+  eq('gizlilik varsayılan olarak kapalıdır', amountsHidden(), false);
 
   console.log(`${pass} geçti, ${fail} başarısız`);
   process.exit(fail ? 1 : 0);

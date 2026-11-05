@@ -38,6 +38,7 @@ eq('eski veri: abonelik korunur', n0.subs.map((x) => [x.id, x.name, x.amount]), 
 eq('eski veri: ayarlar korunur (tema, vurgu, dil, para birimi, bütçe)', [n0.settings.theme, n0.settings.accent, n0.settings.tint, n0.settings.language, n0.settings.currency, n0.settings.budget, n0.settings.name], ['ivory', 'rose', 'plum', 'es', 'EUR', 5000, 'Orhan']);
 eq('eski veri: gizleme varsayılan kapalı', n0.settings.hideBalance, false);
 eq('çok eski kayıt (ayar alanları yok): eski varsayılanlar korunur, yenileri uygulanmaz', [normalize({ items: [] }).settings.theme, normalize({ items: [] }).settings.accent, normalize({ items: [] }).settings.tint], ['noir', 'gold', 'classic']);
+eq('yeni vurgu renkleri (mercan, yakut) kayıtlı ayarda korunur', [normalize({ items: [], settings: { accent: 'coral' } }).settings.accent, normalize({ items: [], settings: { accent: 'ruby' } }).settings.accent, normalize({ items: [], settings: { accent: 'pink' } }).settings.accent], ['coral', 'ruby', 'gold']);
 eq('yeni kurulum varsayılanı: referans görünüm', [defaultSettings.theme, defaultSettings.accent, defaultSettings.tint, defaultSettings.name, defaultSettings.hideBalance], ['system', 'sapphire', 'blue', '', false]);
 eq('eski yedek biçimi (yalnızca items + budget) içe aktarılır', normalize({ app: 'harcama-defteri', version: 1, items: legacy.items, subs: [], settings: { budget: 3000 } }).incomes, []);
 eq('normalize idempotent', normalize(JSON.parse(JSON.stringify(n0))), n0);

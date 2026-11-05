@@ -3,6 +3,7 @@ import { ComponentProps, useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
+import { MASK, amountsHidden } from './currency';
 import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
 import { contrast } from './palette';
 import { Analysis, Insight, catIndex, catName, compact, pad, subType, subTypeIndex } from './lib';
@@ -109,7 +110,7 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
             ))}
             {[0, 0.5, 1].map((f) => (
               <SvgText key={'l' + f} x={L - 6} y={y(max * f) + 3} fontSize={10} fill={t.muted} textAnchor="end">
-                {compact(max * f)}
+                {axisText(max * f)}
               </SvgText>
             ))}
             {vals.map((v, i) => {
@@ -155,12 +156,15 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
 /** Uzun tutar tek satırda kalsın diye yazı boyutunu metin uzunluğuna göre küçültür (web'de `adjustsFontSizeToFit` çalışmaz). `max`: bu uzunluğa kadar tam boyut. */
 export const fitFont = (text: string, base: number, max: number) => (text.length <= max ? base : Math.max(base * 0.55, (base * max) / text.length));
 
+/** Grafik ekseni/çubuk üstü kısa tutar: gizlilik kipinde sayı çizilmez (çubuklar kalır). */
+const axisText = (n: number) => (amountsHidden() ? '' : compact(n));
+
 export function Amount({ text, style, symbolColor, fit }: { text: string; style: StyleProp<TextStyle>; symbolColor?: string; fit?: boolean }) {
   const flat = StyleSheet.flatten(style) || {};
   const size = (flat.fontSize ?? 16) * 0.6;
   const parts = text.split(/([₺$€£¥])/);
   return (
-    <Text style={[style, { fontVariant: ['lining-nums'] }]} {...(fit ? { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 } : {})}>
+    <Text style={[style, { fontVariant: ['lining-nums'] }]} {...(text.includes(MASK) ? { accessibilityLabel: tr('amount.hidden') } : {})} {...(fit ? { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 } : {})}>
       {parts.map((p, i) =>
         SYMBOL_SET.includes(p) ? (
           <Text key={i} style={{ fontFamily: 'System', fontSize: size, fontWeight: '400', color: symbolColor ?? flat.color, letterSpacing: 0 }}>{p}</Text>
@@ -373,8 +377,8 @@ export function Bars({ data, selected, onSelect, t, height = 150 }: {
         return (
           <Pressable key={d.key} disabled={!onSelect} onPress={() => onSelect?.(d.key)}
             style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 4 }}
-            accessibilityLabel={`${d.label}: ${compact(d.value)}`}>
-            <Text style={{ fontSize: 11, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.value ? compact(d.value) : ''}</Text>
+            accessibilityLabel={amountsHidden() ? `${d.label}: ${tr('amount.hidden')}` : `${d.label}: ${compact(d.value)}`}>
+            <Text style={{ fontSize: 11, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.value ? axisText(d.value) : ''}</Text>
             <View style={{ width: '100%', maxWidth: 34, height: d.value ? Math.max(4, (d.value / max) * barMax) : 3, borderRadius: 7, backgroundColor: on ? t.accent : t.bar }} />
             <Text style={{ fontSize: 12, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.label}</Text>
           </Pressable>

@@ -1,6 +1,6 @@
 import { ReactNode, useRef, useState } from 'react';
 import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtStamp, money, symbolOf, toMain } from './currency';
+import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtShown, fmtStamp, money, symbolOf, toMain } from './currency';
 import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
 import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
 import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
@@ -190,7 +190,7 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], lastCat
                 <CatIcon cat={f.cat} t={t} size={28} />
                 <View>
                   <Text style={{ color: t.fg, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{f.note}</Text>
-                  <Text style={{ color: t.muted, fontSize: 12 }}>{fmtMoney(f.amount, main)}</Text>
+                  <Text style={{ color: t.muted, fontSize: 12 }}>{fmtShown(f.amount, main)}</Text>
                 </View>
               </Pressable>
             ))}
@@ -527,6 +527,15 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         </View>
         <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18 }}>{tr('tint.' + settings.tint)} · {tr('settings.colorsHint')}</Text>
       </Field>
+
+      <View style={{ gap: 0 }}>
+        <Label t={t}>{tr('settings.privacy')}</Label>
+        <View style={row}>
+          <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.hideAmounts')}</Text>
+          <Switch value={settings.hideBalance} onValueChange={(v) => onChange({ ...settings, hideBalance: v })} trackColor={{ true: t.accent }} accessibilityLabel={tr('settings.hideAmounts')} testID="hide-amounts-switch" />
+        </View>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18, paddingTop: 6 }}>{tr('settings.hideAmountsHint')}</Text>
+      </View>
 
       <View style={{ gap: 0 }}>
         <Label t={t}>{tr('settings.notifications')}</Label>

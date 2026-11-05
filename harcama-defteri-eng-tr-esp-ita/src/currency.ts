@@ -131,8 +131,26 @@ let main: Cur = 'TRY';
 export function setMainCurrency(c: Cur) {
   main = c;
 }
-export const money = (n: number, decimals = 2) => fmtMoney(n, main, decimals);
-export const money0 = (n: number) => fmtMoney(n, main, 0);
+
+// Gizlilik kipi ("Tutarları gizle"): çizim sırasında ayarlanır (dil ve ana para birimi gibi). Yalnızca EKRANDA gösterilen tutarları
+// maskeler; saklanan veri, Excel/yedek dışa aktarımı, bildirimler (`fmtMoney`) ve giriş alanları etkilenmez.
+let hidden = false;
+export function setHideAmounts(h: boolean) {
+  hidden = h;
+}
+export const amountsHidden = () => hidden;
+export const MASK = '••••';
+/** Gizli tutar: para simgesi + 4 nokta, simge yeri dile göre ("₺••••" / "•••• €"). */
+export function maskedMoney(cur: Cur) {
+  return langInfo().symbolAfter ? `${MASK} ${symbolOf(cur)}` : `${symbolOf(cur)}${MASK}`;
+}
+/** Ekranda gösterilen tutar: gizlilik kipi açıkken maskeli, değilse `fmtMoney`. Giriş alanları ve bildirimler `fmtMoney` kullanır. */
+export const fmtShown = (n: number, cur: Cur, decimals = 2) => (hidden ? maskedMoney(cur) : fmtMoney(n, cur, decimals));
+export const money = (n: number, decimals = 2) => fmtShown(n, main, decimals);
+export const money0 = (n: number) => fmtShown(n, main, 0);
+/** Erişilebilirlik etiketlerinde: gizliyken noktalar okunmasın, "gizli tutar" söylensin. */
+export const moneyA11y = (n: number, decimals = 2) => (hidden ? t('amount.hidden') : money(n, decimals));
+export const money0A11y = (n: number) => (hidden ? t('amount.hidden') : money0(n));
 
 /** Kurların güncellenme zamanı: "18 Eki 2026 14:32" / "Oct 18, 2026 2:32 PM". */
 export function fmtStamp(ts: number, fmtTime: (d: Date) => string, monthShort: (i: number) => string) {

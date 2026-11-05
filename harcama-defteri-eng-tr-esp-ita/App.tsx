@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Cur, fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
+import { Cur, amountsHidden, fmtMoney, fmtShown, fmtStamp, needsRates, setHideAmounts, setMainCurrency, viewData, fromViewSettings } from './src/currency';
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
 import { LanguageProvider, deviceLanguage, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
 import {
@@ -117,6 +117,8 @@ function Main() {
   // Ana para birimi de aynı şekilde çizim sırasında ayarlanır; ekranlar `money()` ile bu birimde gösterir.
   const main = data?.settings.currency ?? 'TRY';
   setMainCurrency(main);
+  // Gizlilik kipi de çizim sırasında ayarlanır: açıkken bütün ekranlardaki tutarlar maskelenir (veri ve dışa aktarım etkilenmez).
+  setHideAmounts(data?.settings.hideBalance ?? false);
   // Saklanan kayıtlar girildikleri para biriminde kalır; ekranlar için güncel kurla ana birime çevrilmiş görünüm üretilir.
   const view = useMemo(() => (data ? viewData(data, main, rs.rates) : null), [data, main, rs.rates]);
   const t = useTheme(data?.settings.theme, data?.settings.tint, data?.settings.accent);
@@ -302,7 +304,10 @@ function Main() {
   // Abonelik "ödendi" denetimi ise çevrilemeyen ödemeleri de görmelidir (yoksa aynı dönem yeniden ödenebilir görünür).
   const un = view.unconverted;
   const payItems = items.concat(un.items);
-  const amountOf = (x: { amount: number; cur?: Cur; unconv?: true }) => (x.unconv ? fmtMoney(x.amount, x.cur ?? 'TRY') : money(x.amount));
+  const amountOf = (x: { amount: number; cur?: Cur; unconv?: true }) => (x.unconv ? fmtShown(x.amount, x.cur ?? 'TRY') : money(x.amount));
+  // Ekran okuyucu etiketi: gizliyken "gizli tutar"; arama ise her zaman gerçek tutar metniyle eşleşir (yazılan şey zaten görünür)
+  const amountA11y = (x: { amount: number; cur?: Cur; unconv?: true }) => (amountsHidden() ? tr('amount.hidden') : amountOf(x));
+  const amountRaw = (x: { amount: number; cur?: Cur; unconv?: true }) => fmtMoney(x.amount, x.unconv ? x.cur ?? 'TRY' : main);
   const convSum = (xs: { amount: number; unconv?: true }[]) => sum(xs.filter((x) => !x.unconv));
   const stored = {
     item: (id: string) => data.items.find((x) => x.id === id),
@@ -336,7 +341,7 @@ function Main() {
     setExpSheet(null);
     setYm(e.date.slice(0, 7));
     buzz('success');
-    toast(isNew ? tr('toast.added', { amount: fmtMoney(e.amount, e.cur ?? main), cat: catName(e.cat) }) : tr('toast.updated'));
+    toast(isNew ? tr('toast.added', { amount: fmtShown(e.amount, e.cur ?? main), cat: catName(e.cat) }) : tr('toast.updated'));
   };
   const deleteExpense = (id: string) => {
     const removed = stored.item(id);
@@ -354,7 +359,7 @@ function Main() {
     setIncSheet(null);
     setYm(x.date.slice(0, 7));
     buzz('success');
-    toast(isNew ? tr('toast.incomeAdded', { amount: fmtMoney(x.amount, x.cur ?? main) }) : tr('toast.incomeUpdated'));
+    toast(isNew ? tr('toast.incomeAdded', { amount: fmtShown(x.amount, x.cur ?? main) }) : tr('toast.incomeUpdated'));
   };
   const deleteIncome = (id: string) => {
     const removed = stored.income(id);
@@ -454,14 +459,24 @@ function Main() {
 
   /* ---------- Ortak parçalar ---------- */
   const monthSwitcher = (
-    <View style={st.months}>
-      <Pressable style={st.mBtn} onPress={() => changeMonth(-1)} accessibilityLabel={tr('month.prev')}>
-        <Ionicons name="chevron-back" size={20} color={t.fg} />
-      </Pressable>
-      <Text style={st.mLabel}>{monthLabel(ym)}</Text>
-      <Pressable style={[st.mBtn, { opacity: a.isCur ? 0.35 : 1 }]} disabled={a.isCur} onPress={() => changeMonth(1)} accessibilityLabel={tr('month.next')}>
-        <Ionicons name="chevron-forward" size={20} color={t.fg} />
-      </Pressable>
+    <View style={{ gap: 8 }}>
+      <View style={st.months}>
+        <Pressable style={st.mBtn} onPress={() => changeMonth(-1)} accessibilityLabel={tr('month.prev')}>
+          <Ionicons name="chevron-back" size={20} color={t.fg} />
+        </Pressable>
+        <Text style={st.mLabel}>{monthLabel(ym)}</Text>
+        <Pressable style={[st.mBtn, { opacity: a.isCur ? 0.35 : 1 }]} disabled={a.isCur} onPress={() => changeMonth(1)} accessibilityLabel={tr('month.next')}>
+          <Ionicons name="chevron-forward" size={20} color={t.fg} />
+        </Pressable>
+      </View>
+      {/* Seçili ay içinde bulunulan ay değilse: tek dokunuşla bu aya dön */}
+      {a.isCur ? null : (
+        <Pressable testID="month-today" onPress={() => { setYm(todayIso().slice(0, 7)); setFilterDay(null); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={tr('month.backToCurrent')}
+          style={st.monthNow}>
+          <Ionicons name="return-up-back-outline" size={15} color={t.gold} />
+          <Text style={{ color: t.gold, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>{tr('month.backToCurrent')}</Text>
+        </Pressable>
+      )}
     </View>
   );
 
@@ -480,12 +495,12 @@ function Main() {
       key={x.id}
       onPress={() => setExpSheet({ key: Date.now(), initial: stored.item(x.id) ?? x })}
       style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountOf(x) })}
+      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountA11y(x) })}
     >
       <CatIcon cat={x.cat} t={t} />
       <View style={{ flex: 1 }}>
         <Text style={st.itemCat} numberOfLines={1}>{x.note || catName(x.cat)}</Text>
-        <Text style={st.meta} numberOfLines={1}>{[x.note ? catName(x.cat) : '', showDate ? dayLabel(x.date) : '', x.sub ? tr('expense.subscriptionTag') : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || catName(x.cat)}</Text>
+        <Text style={st.meta} numberOfLines={1}>{[x.note ? catName(x.cat) : '', showDate ? dayLabel(x.date) : '', x.sub ? tr('expense.subscriptionTag') : '', x.orig ? fmtShown(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || catName(x.cat)}</Text>
       </View>
       <Text style={st.itemAmt}>{amountOf(x)}</Text>
       <Ionicons name="chevron-forward" size={16} color={t.muted} />
@@ -516,12 +531,12 @@ function Main() {
       testID={`income-row-${i}`}
       onPress={() => setIncSheet({ key: Date.now(), initial: stored.income(x.id) ?? x })}
       style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: amountOf(x) })}
+      accessibilityLabel={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: amountA11y(x) })}
     >
       <IncomeIcon cat={x.cat} t={t} />
       <View style={{ flex: 1 }}>
         <Text style={st.itemCat} numberOfLines={1}>{x.note || incomeCatName(x.cat)}</Text>
-        <Text style={st.meta} numberOfLines={1}>{[x.note ? incomeCatName(x.cat) : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || incomeCatName(x.cat)}</Text>
+        <Text style={st.meta} numberOfLines={1}>{[x.note ? incomeCatName(x.cat) : '', x.orig ? fmtShown(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || incomeCatName(x.cat)}</Text>
       </View>
       <Amount text={`+${amountOf(x)}`} style={[st.itemAmt, { color: t.good }]} />
       <Ionicons name="chevron-forward" size={16} color={t.muted} />
@@ -630,7 +645,7 @@ function Main() {
     const listMonth = monthItems.concat(un.items.filter((x) => x.date.slice(0, 7) === ym));
     const pool = q ? payItems : listMonth;
     const shown = pool.filter((x) => (!filterCat || x.cat === filterCat) && (!filterDay || x.date === filterDay) &&
-      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || amountOf(x).includes(q)));
+      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || amountRaw(x).includes(q)));
     const groups: Record<string, Expense[]> = {};
     shown.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
     const days = Object.keys(groups).sort().reverse();
@@ -991,9 +1006,9 @@ function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; fi
           </View>
         </View>
         <Text style={st.itemAmt}>
-          {s.unconv ? fmtMoney(s.amount, s.cur ?? 'TRY') : money(s.amount)}
+          {s.unconv ? fmtShown(s.amount, s.cur ?? 'TRY') : money(s.amount)}
           <Text style={st.meta}>/{tr(s.freq === 'yearly' ? 'sub.perYear' : 'sub.perMonth')}</Text>
-          {s.orig ? <Text style={st.meta}>{'\n'}{fmtMoney(s.orig.amount, s.orig.cur)}</Text> : null}
+          {s.orig ? <Text style={st.meta}>{'\n'}{fmtShown(s.orig.amount, s.orig.cur)}</Text> : null}
         </Text>
       </Pressable>
       {x.state === 'pending' ? (
@@ -1159,6 +1174,7 @@ function makeStyles(t: Theme) {
     link: { color: t.gold, fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
     months: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     mBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
+    monthNow: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.accentSoft },
     mLabel: { fontSize: 19, fontFamily: FONTS.bold, color: t.fg },
     hero: { borderRadius: 26, padding: 22, gap: 16, borderWidth: 1, borderColor: 'rgba(201,168,106,0.45)', overflow: 'hidden' },
     heroTop: { flexDirection: 'row', justifyContent: 'space-between' },

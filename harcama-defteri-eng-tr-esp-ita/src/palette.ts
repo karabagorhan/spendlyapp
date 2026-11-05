@@ -1,4 +1,4 @@
-// Renk paleti: iki temel mod (Noir = koyu, Fildişi = açık), 8 vurgu rengi ve 4 zemin tonu.
+// Renk paleti: iki temel mod (Noir = koyu, Fildişi = açık), 10 vurgu rengi ve 4 zemin tonu.
 // React Native'e bağımlı değildir; kontrast testleri Node'da bu dosyadan çalışır.
 //
 // "Noir" — oniks siyahı zemin, vurgu rengi (varsayılan şampanya altını), fildişi yazı;
@@ -7,10 +7,10 @@
 // Kategori renkleri soluk mücevher tonlarıdır: zümrüt, kehribar, safir, arduvaz, yakut, ametist, gül, vizon.
 
 export type Mode = 'noir' | 'ivory';
-export type Accent = 'gold' | 'emerald' | 'sapphire' | 'amethyst' | 'rose' | 'copper' | 'teal' | 'silver';
+export type Accent = 'gold' | 'emerald' | 'sapphire' | 'amethyst' | 'rose' | 'copper' | 'coral' | 'ruby' | 'teal' | 'silver';
 export type Tint = 'classic' | 'blue' | 'green' | 'plum';
 
-export const ACCENTS: Accent[] = ['gold', 'emerald', 'sapphire', 'amethyst', 'rose', 'copper', 'teal', 'silver'];
+export const ACCENTS: Accent[] = ['gold', 'emerald', 'sapphire', 'amethyst', 'rose', 'copper', 'coral', 'ruby', 'teal', 'silver'];
 export const TINTS: Tint[] = ['classic', 'blue', 'green', 'plum'];
 export const isAccent = (v: unknown): v is Accent => typeof v === 'string' && ACCENTS.includes(v as Accent);
 export const isTint = (v: unknown): v is Tint => typeof v === 'string' && TINTS.includes(v as Tint);
@@ -42,6 +42,8 @@ export const ACCENT_COLORS: Record<Accent, Record<Mode, string>> = {
   amethyst: { noir: '#ae93e6', ivory: '#6d4c9f' },
   rose:     { noir: '#e594aa', ivory: '#a3405f' },
   copper:   { noir: '#df8f63', ivory: '#a14d24' },
+  coral:    { noir: '#ff7f6a', ivory: '#a93425' },
+  ruby:     { noir: '#f04a5a', ivory: '#b3162d' },
   teal:     { noir: '#4cc0cc', ivory: '#1a6b75' },
   silver:   { noir: '#c0c4cd', ivory: '#555c69' },
 };

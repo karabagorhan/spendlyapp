@@ -3,7 +3,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, G } from 'react-native-svg';
-import { CURRENCIES, Cur, Rates, currencyName, fmtMoney, money, money0, symbolOf } from './currency';
+import { CURRENCIES, Cur, Rates, currencyName, fmtShown, money, money0, money0A11y, moneyA11y, symbolOf } from './currency';
 import { fmtPercent, t as tr } from './i18n';
 import { Analysis, Balance, BudgetProgress, Expense, Sub, Txn, catIndex, catName, categorySlices, dayLabelShort, greetingKey, incomeCatName, iso, pad, shortDay, subStatus } from './lib';
 import { rgba } from './palette';
@@ -120,8 +120,6 @@ export function CurrencyMenu({ visible, t, current, rates, onPick, onClose }: { 
 }
 
 /* ---------- Bakiye kartı ---------- */
-const HIDDEN = '••••••';
-
 export function BalanceCard({ t, bal, hidden, onToggle, onAddIncome, vsLabel }: { t: Theme; bal: Balance; hidden: boolean; onToggle: () => void; onAddIncome: () => void; vsLabel: string }) {
   const showNet = bal.hasIncome;
   const big = showNet ? bal.net : bal.spent;
@@ -142,7 +140,7 @@ export function BalanceCard({ t, bal, hidden, onToggle, onAddIncome, vsLabel }: 
             </Pressable>
           </View>
           {hidden
-            ? <Text testID="bal-amount" style={{ color: t.heroFg, fontSize: 36, fontFamily: FONTS.display, letterSpacing: 2 }}>{HIDDEN}</Text>
+            ? <Text testID="bal-amount" accessibilityLabel={tr('amount.hidden')} style={{ color: t.heroFg, fontSize: 36, fontFamily: FONTS.display, letterSpacing: 2 }}>{money(big)}</Text>
             : <Amount fit text={money(big)} style={{ color: t.heroFg, fontSize: fitFont(money(big), 36, 8), fontFamily: FONTS.display, letterSpacing: -0.5 }} symbolColor={t.heroLabel} />}
           {!hidden && showNet && delta !== null ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -157,8 +155,8 @@ export function BalanceCard({ t, bal, hidden, onToggle, onAddIncome, vsLabel }: 
         </View>
         <View style={{ flex: 9, gap: 8, minWidth: 0 }}>
           <MiniStat t={t} icon="arrow-down" color={t.good} label={tr('bal.income')} testID="bal-income"
-            value={bal.hasIncome ? (hidden ? HIDDEN : money(bal.income)) : null} cta={tr('bal.addShort')} onCta={onAddIncome} />
-          <MiniStat t={t} icon="arrow-up" color={t.warn} label={tr('bal.expenses')} testID="bal-expenses" value={hidden ? HIDDEN : money(bal.spent)} />
+            value={bal.hasIncome ? money(bal.income) : null} cta={tr('bal.addShort')} onCta={onAddIncome} />
+          <MiniStat t={t} icon="arrow-up" color={t.warn} label={tr('bal.expenses')} testID="bal-expenses" value={money(bal.spent)} />
         </View>
       </View>
     </LinearGradient>
@@ -243,7 +241,7 @@ export function SpendingCard({ t, a, ym, todayAmount, monthTitle }: { t: Theme; 
               const active = pick === i;
               return (
                 <Pressable key={i} testID={`bar-${i + 1}`} onPress={() => setSel(active ? null : i)} hitSlop={{ top: 6, bottom: 6 }} accessibilityRole="button"
-                  accessibilityLabel={`${shortDay(days[i])}: ${money0(v)}`} style={s.barCell}>
+                  accessibilityLabel={`${shortDay(days[i])}: ${money0A11y(v)}`} style={s.barCell}>
                   <View style={{ width: '64%', height: h, borderRadius: 3, backgroundColor: active ? t.accent : v === max && v > 0 ? rgba(t.accent, 0.9) : v > 0 ? rgba(t.accent, 0.38) : future ? 'transparent' : rgba(t.muted, 0.25) }} />
                 </Pressable>
               );
@@ -402,7 +400,7 @@ export function BudgetOverview({ t, p, periodLabel }: { t: Theme; p: BudgetProgr
             {p.limits.map((r) => {
               const color = budgetColor(r.ratio, t);
               return (
-                <View key={r.cat} style={{ gap: 6 }} accessible accessibilityLabel={tr('budget.ov.rowA11y', { cat: catName(r.cat), spent: money0(r.spent), limit: money0(r.limit), pct: fmtPercent(Math.round(r.ratio * 100)) })}>
+                <View key={r.cat} style={{ gap: 6 }} accessible accessibilityLabel={tr('budget.ov.rowA11y', { cat: catName(r.cat), spent: money0A11y(r.spent), limit: money0A11y(r.limit), pct: fmtPercent(Math.round(r.ratio * 100)) })}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <CatIcon cat={r.cat} t={t} size={32} />
                     <View style={{ flex: 1, minWidth: 0 }}>
@@ -487,10 +485,10 @@ export function RecentCard({ t, list, onAll, onOpen }: { t: Theme; list: Txn[]; 
             const income = r.kind === 'income';
             const title = r.x.note || (income ? incomeCatName(r.x.cat) : catName(r.x.cat));
             // Başka para biriminde girilmiş kayıtta özgün tutar da gösterilir (çevrilmiş tutarın yanında)
-            const meta = [dayLabelShort(r.x.date), income ? incomeCatName(r.x.cat) : catName(r.x.cat), r.x.orig ? fmtMoney(r.x.orig.amount, r.x.orig.cur) : ''].filter(Boolean).join(' · ');
+            const meta = [dayLabelShort(r.x.date), income ? incomeCatName(r.x.cat) : catName(r.x.cat), r.x.orig ? fmtShown(r.x.orig.amount, r.x.orig.cur) : ''].filter(Boolean).join(' · ');
             return (
               <Pressable key={r.kind + r.x.id} onPress={() => onOpen(r)} testID={`recent-${i}`} accessibilityRole="button"
-                accessibilityLabel={income ? tr('income.rowA11y', { cat: incomeCatName(r.x.cat), amount: money(r.x.amount) }) : tr('expense.rowA11y', { cat: catName(r.x.cat), amount: money(r.x.amount) })}
+                accessibilityLabel={income ? tr('income.rowA11y', { cat: incomeCatName(r.x.cat), amount: moneyA11y(r.x.amount) }) : tr('expense.rowA11y', { cat: catName(r.x.cat), amount: moneyA11y(r.x.amount) })}
                 style={({ pressed }) => [s.txn, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.line }, pressed && { opacity: 0.8 }]}>
                 {income ? <IncomeIcon cat={r.x.cat} t={t} /> : <CatIcon cat={r.x.cat} t={t} />}
                 <View style={{ flex: 1, minWidth: 0 }}>

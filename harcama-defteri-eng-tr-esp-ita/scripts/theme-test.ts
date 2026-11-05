@@ -1,6 +1,6 @@
 /**
  * Renk paleti testi: `npx tsx scripts/theme-test.ts`
- * 2 mod × 4 zemin tonu × 8 vurgu rengi (64 tema) için WCAG kontrast oranları ve tutarlılık.
+ * 2 mod × 4 zemin tonu × 10 vurgu rengi (80 tema) için WCAG kontrast oranları ve tutarlılık.
  */
 import { ACCENTS, ACCENT_COLORS, BASE, Mode, TINTS, TINT_COLORS, contrast, isAccent, isTint, makeTheme, mix } from '../src/palette';
 
@@ -48,7 +48,7 @@ for (const mode of ['noir', 'ivory'] as Mode[]) {
   }
   for (const a of TINTS) for (const b of TINTS) if (a < b) check(`${mode}: ${a} ≠ ${b} zemin`, TINT_COLORS[a][mode].bg !== TINT_COLORS[b][mode].bg);
 }
-check('doğrulayıcılar', isAccent('rose') && !isAccent('pink') && isTint('plum') && !isTint('red') && !isAccent(undefined));
+check('doğrulayıcılar', isAccent('rose') && isAccent('coral') && isAccent('ruby') && !isAccent('pink') && isTint('plum') && !isTint('red') && !isAccent(undefined));
 check('mix uçları', mix('#000000', '#ffffff', 0) === '#000000' && mix('#000000', '#ffffff', 1) === '#ffffff' && mix('#000000', '#ffffff', 0.5) === '#808080');
 if (verbose) console.log(rows.join('\n'));
 console.log(`${pass} geçti, ${fail} başarısız`);
