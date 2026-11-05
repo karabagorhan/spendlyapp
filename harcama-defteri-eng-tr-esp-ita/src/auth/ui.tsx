@@ -4,6 +4,8 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t as tr } from '../i18n';
 import { FONTS, Theme } from '../theme';
+import { rgba } from '../palette';
+import { RADIUS } from '../design';
 import { Ionicons, Label } from '../ui';
 import { LegalKind } from '../legal/texts';
 import { AuthErrorCode, AuthFailure } from './types';
@@ -78,6 +80,7 @@ export function TextField({ label, value, onChangeText, t, error, hint, secure, 
   kind?: 'text' | 'email' | 'newPassword' | 'password' | 'name'; testID?: string; maxLength?: number; autoFocus?: boolean;
 }) {
   const [shown, setShown] = useState(false);
+  const [focus, setFocus] = useState(false);
   const isPw = kind === 'password' || kind === 'newPassword';
   const props =
     kind === 'email' ? { keyboardType: 'email-address' as const, autoCapitalize: 'none' as const, autoCorrect: false, autoComplete: 'email' as const, textContentType: 'emailAddress' as const }
@@ -94,7 +97,8 @@ export function TextField({ label, value, onChangeText, t, error, hint, secure, 
           testID={testID}
           value={value}
           onChangeText={onChangeText}
-          onBlur={onBlur}
+          onBlur={() => { setFocus(false); onBlur?.(); }}
+          onFocus={() => setFocus(true)}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
           secureTextEntry={secure ?? (isPw && !shown)}
@@ -102,7 +106,7 @@ export function TextField({ label, value, onChangeText, t, error, hint, secure, 
           autoFocus={autoFocus}
           placeholderTextColor={t.muted}
           accessibilityLabel={label}
-          style={[s.input, { backgroundColor: t.bg, borderColor: error ? t.warn : t.line, color: t.fg, paddingRight: isPw ? 48 : 14 }]}
+          style={[s.input, { backgroundColor: t.surface, borderColor: error ? t.warn : focus ? t.accent : t.line, color: t.fg, paddingRight: isPw ? 48 : 16 }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null, focus && !error ? ({ boxShadow: `0 0 0 3px ${rgba(t.accent, 0.22)}` } as object) : null]}
           {...props}
         />
         {isPw ? (
@@ -151,8 +155,8 @@ export function Banner({ kind, text, t, action }: { kind: 'error' | 'info' | 'go
 }
 
 /** Giriş ekranlarının ortak çerçevesi: güvenli alan, klavye, çevrimdışı uyarısı, isteğe bağlı üst çubuk. */
-export function AuthShell({ t, title, subtitle, children, onBack, backLabel, onClose, footer, banners }: {
-  t: Theme; title: string; subtitle?: string; children: ReactNode; onBack?: () => void; backLabel?: string; onClose?: () => void; footer?: ReactNode; banners?: ReactNode;
+export function AuthShell({ t, title, subtitle, children, onBack, backLabel, onClose, footer, banners, motif }: {
+  t: Theme; motif?: ReactNode; title: string; subtitle?: string; children: ReactNode; onBack?: () => void; backLabel?: string; onClose?: () => void; footer?: ReactNode; banners?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const offline = useOffline();
@@ -175,8 +179,9 @@ export function AuthShell({ t, title, subtitle, children, onBack, backLabel, onC
         </View>
         {offline ? <Banner kind="info" text={tr('auth.offline')} t={t} /> : null}
         {banners}
-        <View style={{ gap: 8 }}>
-          <Text accessibilityRole="header" style={{ color: t.fg, fontSize: 32, lineHeight: 38, fontFamily: FONTS.display }}>{title}</Text>
+        <View style={{ gap: 10 }}>
+          {motif ? <View style={{ marginBottom: 10 }}>{motif}</View> : null}
+          <Text accessibilityRole="header" style={{ color: t.fg, fontSize: 30, lineHeight: 36, fontFamily: FONTS.display, letterSpacing: -0.5 }}>{title}</Text>
           {subtitle ? <Text style={{ color: t.muted, fontSize: 16, lineHeight: 23 }}>{subtitle}</Text> : null}
         </View>
         <View style={{ gap: 16 }}>{children}</View>
@@ -193,7 +198,7 @@ export function BusyButton({ label, onPress, busy, t, kind = 'primary', disabled
 }) {
   const bg = kind === 'primary' ? t.accent : kind === 'danger' ? t.warn : kind === 'dark' ? t.fg : t.surface;
   const fg = kind === 'primary' ? t.accentFg : kind === 'danger' ? t.surface : kind === 'dark' ? t.bg : t.fg;
-  const border = kind === 'ghost' ? t.goldLine : bg;
+  const border = kind === 'ghost' ? t.line : bg;
   const off = disabled || busy;
   return (
     <Pressable
@@ -208,7 +213,7 @@ export function BusyButton({ label, onPress, busy, t, kind = 'primary', disabled
       {busy ? <ActivityIndicator color={fg} /> : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {icon}
-          <Text style={{ color: fg, fontWeight: '600', fontSize: 16, letterSpacing: 0.2 }}>{label}</Text>
+          <Text style={{ color: fg, fontFamily: FONTS.bold, fontSize: 16 }}>{label}</Text>
         </View>
       )}
     </Pressable>
@@ -224,10 +229,10 @@ export function LinkButton({ label, onPress, t, align = 'center', testID }: { la
 }
 
 const s = StyleSheet.create({
-  input: { height: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 17 },
+  input: { height: 54, borderWidth: 1.5, borderRadius: RADIUS.inner, paddingHorizontal: 16, fontSize: 17 },
   eye: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 48, alignItems: 'center', justifyContent: 'center' },
-  banner: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: 14, alignItems: 'flex-start' },
+  banner: { flexDirection: 'row', gap: 10, padding: 14, borderRadius: RADIUS.inner, alignItems: 'flex-start' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 },
   topBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -10 },
-  btn: { height: 52, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  btn: { height: 54, borderRadius: RADIUS.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
 });

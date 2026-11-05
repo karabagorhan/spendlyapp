@@ -21,7 +21,7 @@ export function DatePicker({ value, onChange, t }: { value: string; onChange: (d
   const atNow = ym >= today.slice(0, 7);
 
   return (
-    <View style={[s.box, { backgroundColor: t.bg, borderColor: t.line }]}>
+    <View style={[s.box, { backgroundColor: t.surface, borderColor: t.line }]}>
       <View style={s.head}>
         <Pressable onPress={() => setYm(addMonths(ym, -1))} style={s.nav} accessibilityRole="button" accessibilityLabel={tr('month.prev')}>
           <Text style={[s.navTxt, { color: t.fg }]}>‹</Text>
@@ -49,7 +49,7 @@ export function DatePicker({ value, onChange, t }: { value: string; onChange: (d
                 accessibilityRole="button"
                 accessibilityLabel={isToday ? `${tr('date.today')}, ${dayLabelLong(c)}` : dayLabelLong(c)}
                 accessibilityState={{ selected, disabled: future }}
-                style={[s.day, { backgroundColor: selected ? t.gold : 'transparent', borderColor: isToday && !selected ? t.gold : 'transparent', opacity: future ? 0.3 : 1 }]}
+                style={[s.day, { backgroundColor: selected ? t.accent : 'transparent', borderColor: isToday && !selected ? t.accent : 'transparent', opacity: future ? 0.3 : 1 }]}
               >
                 <Text style={{ color: selected ? t.accentFg : t.fg, fontSize: 15, fontWeight: selected || isToday ? '700' : '400', fontVariant: ['tabular-nums'] }}>{parseIso(c).getDate()}</Text>
               </Pressable>
@@ -71,7 +71,7 @@ function dayLabelLong(s: string) {
 }
 
 const s = StyleSheet.create({
-  box: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 6, paddingTop: 4, paddingBottom: 2 },
+  box: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 6, paddingTop: 4, paddingBottom: 2 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   nav: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   navTxt: { fontSize: 24, lineHeight: 28 },
