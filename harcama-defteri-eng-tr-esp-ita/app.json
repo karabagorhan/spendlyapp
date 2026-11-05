@@ -19,7 +19,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#3B4FEA",
+        "backgroundColor": "#0B0D0F",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -37,17 +37,22 @@
       "expo-web-browser",
       "expo-secure-store",
       "expo-apple-authentication",
-      ["expo-local-authentication", { "faceIDPermission": "Allow Monibo to use Face ID to unlock your data." }],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Monibo to use Face ID to unlock your data."
+        }
+      ],
       [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F4F6FB",
+          "backgroundColor": "#0B0D0F",
           "dark": {
             "image": "./assets/splash-icon.png",
-            "backgroundColor": "#0B1220"
+            "backgroundColor": "#0B0D0F"
           }
         }
       ]
