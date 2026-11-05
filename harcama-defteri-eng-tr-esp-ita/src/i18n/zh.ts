@@ -343,6 +343,11 @@ const zh: Catalog = {
   // Renk kartelaları
   'settings.accent': '强调色',
   'settings.tint': '背景色调',
+  'settings.presets': '现成主题',
+  'settings.presetA11y': '主题：{name}',
+  'preset.coral': '珊瑚',
+  'preset.cobalt': '钴蓝',
+  'preset.plum': '梅紫',
   'settings.colorsHint': '所选颜色同时适用于深色（黑曜）和浅色（象牙白）主题。',
   'accent.gold': '香槟金',
   'accent.emerald': '祖母绿',
@@ -354,10 +359,16 @@ const zh: Catalog = {
   'accent.ruby': '红宝石',
   'accent.teal': '青绿',
   'accent.silver': '银灰',
+  'accent.coralteal': '珊瑚 · 青绿',
+  'accent.cobaltlime': '钴蓝 · 青柠',
+  'accent.plumpeach': '梅紫 · 蜜桃',
   'tint.classic': '经典',
   'tint.blue': '蓝调',
   'tint.green': '森绿',
   'tint.plum': '梅紫',
+  'tint.midnight': '午夜梅',
+  'tint.deepsea': '深海青',
+  'tint.cobaltnight': '钴蓝夜',
 
   // 引导页
   'ob.skip': '跳过',

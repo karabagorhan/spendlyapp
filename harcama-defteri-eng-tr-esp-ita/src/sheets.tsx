@@ -3,11 +3,11 @@ import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal
 import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtShown, fmtStamp, money, symbolOf, toMain } from './currency';
 import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
 import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
-import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
+import { ACCENTS, ACCENT_COLORS, PRESETS, TINTS, TINT_COLORS, presetOf } from './palette';
 import { FONTS, Theme } from './theme';
 import { incomeIcon } from './dashboard';
 import { DatePicker } from './calendar';
-import { Button, CatIcon, Chip, IconName, Label, Swatch, catIconName, subTypeColor } from './ui';
+import { Button, CatIcon, Chip, IconName, Label, PresetCard, Swatch, catIconName, subTypeColor } from './ui';
 
 type SheetAction = { label: string; onPress: () => void; disabled?: boolean };
 
@@ -502,6 +502,14 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18 }}>{currencyName(settings.currency)} · {tr('settings.currencyHint')}</Text>
       </Field>
       <RatesBox main={settings.currency} rates={rates} refreshing={refreshing} failed={failed} onRefresh={onRefresh} t={t} />
+      <Field label={tr('settings.presets')} t={t}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {PRESETS.map((p) => (
+            <PresetCard key={p.id} colors={p.colors} name={tr('preset.' + p.id)} label={tr('settings.presetA11y', { name: tr('preset.' + p.id) })}
+              selected={presetOf(settings.accent, settings.tint) === p.id} onPress={() => onChange({ ...settings, accent: p.accent, tint: p.tint })} t={t} />
+          ))}
+        </View>
+      </Field>
       <Field label={tr('settings.appearance')} t={t}>
         <View style={st.chips}>
           <Chip label={tr('settings.themeNoir')} icon="moon-outline" active={settings.theme === 'noir'} onPress={() => onChange({ ...settings, theme: 'noir' })} t={t} />

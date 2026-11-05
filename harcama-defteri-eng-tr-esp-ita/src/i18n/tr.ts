@@ -330,6 +330,11 @@ const tr: Catalog = {
   // Renk kartelaları
   'settings.accent': 'Vurgu rengi',
   'settings.tint': 'Zemin tonu',
+  'settings.presets': 'Hazır temalar',
+  'settings.presetA11y': 'Tema: {name}',
+  'preset.coral': 'Coral',
+  'preset.cobalt': 'Kobalt',
+  'preset.plum': 'Erik',
   'settings.colorsHint': 'Seçtiğin renkler hem koyu (Noir) hem açık (Fildişi) temada geçerlidir.',
   'accent.gold': 'Şampanya',
   'accent.emerald': 'Zümrüt',
@@ -341,10 +346,16 @@ const tr: Catalog = {
   'accent.ruby': 'Yakut',
   'accent.teal': 'Turkuaz',
   'accent.silver': 'Gümüş',
+  'accent.coralteal': 'Mercan · Turkuaz',
+  'accent.cobaltlime': 'Kobalt · Misket',
+  'accent.plumpeach': 'Erik · Şeftali',
   'tint.classic': 'Klasik',
   'tint.blue': 'Mavi',
   'tint.green': 'Yeşil',
   'tint.plum': 'Erik',
+  'tint.midnight': 'Gece eriği',
+  'tint.deepsea': 'Derin deniz',
+  'tint.cobaltnight': 'Kobalt gecesi',
 
   // Tanıtım
   'ob.skip': 'Atla',

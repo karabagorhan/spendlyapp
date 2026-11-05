@@ -1,8 +1,9 @@
 /**
  * Renk paleti testi: `npx tsx scripts/theme-test.ts`
- * 2 mod × 4 zemin tonu × 10 vurgu rengi (80 tema) için WCAG kontrast oranları ve tutarlılık.
+ * 2 mod × 7 zemin tonu × 13 vurgu rengi (182 tema) için WCAG kontrast oranları ve tutarlılık.
  */
-import { ACCENTS, ACCENT_COLORS, BASE, Mode, TINTS, TINT_COLORS, contrast, isAccent, isTint, makeTheme, mix } from '../src/palette';
+import { normalize } from '../src/store';
+import { ACCENTS, PRESETS, presetOf, ACCENT_COLORS, BASE, Mode, TINTS, TINT_COLORS, contrast, isAccent, isTint, makeTheme, mix } from '../src/palette';
 
 let fail = 0, pass = 0;
 const check = (name: string, ok: boolean, detail = '') => { if (ok) pass++; else { fail++; console.log(`FAIL ${name} ${detail}`); } };
@@ -50,6 +51,30 @@ for (const mode of ['noir', 'ivory'] as Mode[]) {
 }
 check('doğrulayıcılar', isAccent('rose') && isAccent('coral') && isAccent('ruby') && !isAccent('pink') && isTint('plum') && !isTint('red') && !isAccent(undefined));
 check('mix uçları', mix('#000000', '#ffffff', 0) === '#000000' && mix('#000000', '#ffffff', 1) === '#ffffff' && mix('#000000', '#ffffff', 0.5) === '#808080');
+// Hazır temalar: beklenen eşleme, geçerli değerler, yalnızca birebir eşleşmede vurgulanır
+const want: Record<string, [string, string]> = { coral: ['coralteal', 'deepsea'], cobalt: ['cobaltlime', 'cobaltnight'], plum: ['plumpeach', 'midnight'] };
+check('hazır tema sayısı', PRESETS.length === 3 && PRESETS.map((p) => p.id).join() === 'coral,cobalt,plum');
+for (const p of PRESETS) {
+  check(`hazır tema ${p.id} eşlemesi`, p.accent === want[p.id][0] && p.tint === want[p.id][1], `${p.accent}/${p.tint}`);
+  check(`hazır tema ${p.id} geçerli`, isAccent(p.accent) && isTint(p.tint) && p.colors.every(hexOnly));
+  check(`hazır tema ${p.id} eşleşince seçili`, presetOf(p.accent, p.tint) === p.id);
+  check(`hazır tema ${p.id} yalnızca vurgu değişince seçili değil`, presetOf('gold', p.tint) === null && presetOf(p.accent, 'classic') === null);
+  // Normalize gidiş-dönüş: kayıtlı ayar korunur, mod değişmez
+  for (const theme of ['noir', 'ivory', 'system']) {
+    const n = normalize({ settings: { theme, accent: p.accent, tint: p.tint } }).settings;
+    check(`normalize ${p.id}/${theme} gidiş-dönüş`, n.accent === p.accent && n.tint === p.tint && n.theme === theme);
+    const again = normalize(JSON.parse(JSON.stringify({ settings: n }))).settings;
+    check(`normalize ${p.id}/${theme} ikinci tur`, again.accent === n.accent && again.tint === n.tint);
+  }
+}
+const old = normalize({ settings: { accent: 'coral', tint: 'plum', theme: 'ivory' } }).settings;
+check('eski kayıt (coral/plum) geçerli kalır', old.accent === 'coral' && old.tint === 'plum');
+const junk = normalize({ settings: { accent: 'neon', tint: 'x' } }).settings;
+check('geçersiz kayıt varsayılana düşer', junk.accent === 'gold' && junk.tint === 'classic');
+check('yeni değerler doğrulanır', ['coralteal', 'cobaltlime', 'plumpeach'].every(isAccent) && ['midnight', 'deepsea', 'cobaltnight'].every(isTint));
+check('boş kayıt: varsayılanlar değişmedi', normalize({}).settings.accent === 'gold' && normalize({}).settings.tint === 'classic');
+// İkinci renk özet kartında: gradyan ikinci renkten türer, etiket vurguda kalır
+check('coralteal özet kartı turkuaz', makeTheme('noir', 'deepsea', 'coralteal').heroGrad[0] !== makeTheme('noir', 'deepsea', 'coral').heroGrad[0]);
 if (verbose) console.log(rows.join('\n'));
 console.log(`${pass} geçti, ${fail} başarısız`);
 process.exit(fail ? 1 : 0);

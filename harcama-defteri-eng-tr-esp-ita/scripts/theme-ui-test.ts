@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core';
 import { createServer } from 'http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, createReadStream, statSync } from 'fs';
 import { extname, join } from 'path';
-import { ACCENTS, ACCENT_COLORS, Mode, TINTS, TINT_COLORS, makeTheme } from '../src/palette';
+import { ACCENTS, ACCENT_COLORS, Mode, PRESETS, TINTS, TINT_COLORS, makeTheme } from '../src/palette';
 
 // Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
 function findChromium(): string | undefined {
@@ -46,6 +46,7 @@ const cat = (key: string): string => {
   if (!m) throw new Error('katalogda yok: ' + key);
   return new Function('return ' + m[1])();
 };
+const LA = ACCENTS[ACCENTS.length - 1], LT = TINTS[TINTS.length - 1];
 const rgbOf = (h: string) => `rgb(${[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(', ')})`;
 
 const settings = (extra: Record<string, unknown> = {}) => ({ budget: 10000, remind: false, remindHour: 21, subRemind: false, catBudgets: { Market: 3000 }, theme: 'noir', name: 'Test User', language: lang, ...extra });
@@ -115,33 +116,48 @@ const data = (extra: Record<string, unknown> = {}) => ({
       ok(`[${label}] vurgu ${a}: kartela seçili işaretli`, (await swatch(cat('accent.' + a)).getAttribute('aria-selected')) === 'true');
       if (shots && ['emerald', 'rose', 'sapphire'].includes(a)) { mkdirSync(shots, { recursive: true }); await page.screenshot({ path: join(shots, `${lang}-tema-${mode}-${a}.png`) }); }
     }
-    ok(`[${label}] seçim kalıcı`, (await stored()).settings.accent === 'silver');
-    // 4 zemin tonu (vurgu = gümüş)
+    ok(`[${label}] seçim kalıcı`, (await stored()).settings.accent === LA);
+    // Tüm zemin tonları (vurgu = son vurgu)
     for (const k of TINTS) {
       await swatch(cat('tint.' + k)).click(); await page.waitForTimeout(350);
       const want = rgbOf(TINT_COLORS[k][mode].bg);
       const got = await pageBg();
       ok(`[${label}] zemin tonu ${k} uygulanıyor`, got === want, `${got} ≠ ${want}`);
-      ok(`[${label}] ton ${k}: vurgu rengi korunuyor`, (await accentNow(NATIVE[lang])) === rgbOf(makeTheme(mode, k, 'silver').accent));
+      ok(`[${label}] ton ${k}: vurgu rengi korunuyor`, (await accentNow(NATIVE[lang])) === rgbOf(makeTheme(mode, k, LA).accent));
       if (shots) { mkdirSync(shots, { recursive: true }); await page.screenshot({ path: join(shots, `${lang}-ton-${mode}-${k}.png`) }); }
     }
+    // Hazır temalar: dokununca vurgu + ton birlikte uygulanır, mod korunur, kalıcıdır, seçili işaretlenir
+    for (const p of PRESETS) {
+      await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.' + p.id))).click(); await page.waitForTimeout(400);
+      const sp = await stored();
+      ok(`[${label}] hazır tema ${p.id}: ayar kalıcı`, sp.settings.accent === p.accent && sp.settings.tint === p.tint && sp.settings.theme === mode, JSON.stringify(sp.settings));
+      ok(`[${label}] hazır tema ${p.id}: zemin uygulanıyor`, (await pageBg()) === rgbOf(TINT_COLORS[p.tint][mode].bg), await pageBg());
+      ok(`[${label}] hazır tema ${p.id}: vurgu uygulanıyor`, (await accentNow(NATIVE[lang])) === rgbOf(makeTheme(mode, p.tint, p.accent).accent));
+      ok(`[${label}] hazır tema ${p.id}: kart seçili`, (await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.' + p.id))).getAttribute('aria-selected')) === 'true');
+      for (const q of PRESETS.filter((x) => x !== p)) ok(`[${label}] hazır tema ${p.id}: ${q.id} seçili değil`, (await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.' + q.id))).getAttribute('aria-selected')) === 'false');
+      ok(`[${label}] hazır tema ${p.id}: tek tek seçiciler de seçili`, (await swatch(cat('accent.' + p.accent)).getAttribute('aria-selected')) === 'true' && (await swatch(cat('tint.' + p.tint)).getAttribute('aria-selected')) === 'true');
+      if (shots) { mkdirSync(shots, { recursive: true }); await page.screenshot({ path: join(shots, `${lang}-hazir-${mode}-${p.id}.png`) }); }
+    }
+    // Hazır temadan sonra tek tek seçim hazır temanın işaretini kaldırır; sonraki kontroller son vurgu/tonla devam eder
+    await swatch(cat('accent.' + LA)).click(); await swatch(cat('tint.' + LT)).click(); await page.waitForTimeout(350);
+    ok(`[${label}] ayrı seçim hazır tema işaretini kaldırır`, (await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.plum'))).getAttribute('aria-selected')) === 'false');
     // Her ekran seçili renklerle açılıyor (çökme/boş ekran yok)
     for (const n of [0, 2, 3, 4, 5]) {
       await menuBtn().click(); await page.waitForTimeout(400);
       await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(500);
-      ok(`[${label}] ekran ${n} seçili temada açılıyor`, (await pageBg()) === rgbOf(TINT_COLORS[TINTS[TINTS.length - 1]][mode].bg));
-      if (shots && n === 0) await page.screenshot({ path: join(shots, `${lang}-ozet-${mode}-plum-silver.png`) });
+      ok(`[${label}] ekran ${n} seçili temada açılıyor`, (await pageBg()) === rgbOf(TINT_COLORS[LT][mode].bg));
+      if (shots && n === 0) await page.screenshot({ path: join(shots, `${lang}-ozet-${mode}-${LT}-${LA}.png`) });
     }
     // Yeniden açılış ve dil değişimi renkleri korur
     await page.reload(); await page.waitForTimeout(1500);
-    ok(`[${label}] yeniden açılışta renkler kalıcı`, (await pageBg()) === rgbOf(TINT_COLORS.plum[mode].bg));
+    ok(`[${label}] yeniden açılışta renkler kalıcı`, (await pageBg()) === rgbOf(TINT_COLORS[LT][mode].bg));
     const st = await stored();
-    ok(`[${label}] saklanan tercihler`, st.settings.accent === 'silver' && st.settings.tint === 'plum' && st.settings.theme === mode, JSON.stringify([st.settings.accent, st.settings.tint, st.settings.theme]));
+    ok(`[${label}] saklanan tercihler`, st.settings.accent === LA && st.settings.tint === LT && st.settings.theme === mode, JSON.stringify([st.settings.accent, st.settings.tint, st.settings.theme]));
     ok(`[${label}] harcama verisi değişmedi`, st.items.length === 2 && st.items[0].amount === 400);
     await goSettings();
     const other = lang === 'tr' ? 'English' : 'Türkçe';
     await page.getByText(other, { exact: true }).first().click(); await page.waitForTimeout(600);
-    ok(`[${label}] dil değişince renkler değişmez`, (await pageBg()) === rgbOf(TINT_COLORS.plum[mode].bg) && (await stored()).settings.accent === 'silver');
+    ok(`[${label}] dil değişince renkler değişmez`, (await pageBg()) === rgbOf(TINT_COLORS[LT][mode].bg) && (await stored()).settings.accent === LA);
   }
 
   // "Telefona göre": cihaz açık/koyu ayarına uyar, seçili ton ve vurgu iki modda da geçerli

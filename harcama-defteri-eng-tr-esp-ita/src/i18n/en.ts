@@ -342,6 +342,11 @@ const en: Catalog = {
   // Renk kartelaları
   'settings.accent': 'Accent color',
   'settings.tint': 'Background tone',
+  'settings.presets': 'Ready-made themes',
+  'settings.presetA11y': 'Theme: {name}',
+  'preset.coral': 'Coral',
+  'preset.cobalt': 'Cobalt',
+  'preset.plum': 'Plum',
   'settings.colorsHint': 'Your choices apply to both the dark (Noir) and light (Ivory) themes.',
   'accent.gold': 'Champagne',
   'accent.emerald': 'Emerald',
@@ -353,10 +358,16 @@ const en: Catalog = {
   'accent.ruby': 'Ruby',
   'accent.teal': 'Teal',
   'accent.silver': 'Silver',
+  'accent.coralteal': 'Coral · Teal',
+  'accent.cobaltlime': 'Cobalt · Lime',
+  'accent.plumpeach': 'Plum · Peach',
   'tint.classic': 'Classic',
   'tint.blue': 'Blue',
   'tint.green': 'Green',
   'tint.plum': 'Plum',
+  'tint.midnight': 'Midnight plum',
+  'tint.deepsea': 'Deep teal',
+  'tint.cobaltnight': 'Cobalt night',
 
   // Onboarding
   'ob.skip': 'Skip',

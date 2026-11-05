@@ -46,6 +46,25 @@ export function Swatch({ fill, inner, line, selected, label, onPress, t }: {
   );
 }
 
+/**
+ * Hazır tema kartı: iki renkli örnek (birincil + ikincil) ve ad; seçiliyken vurgu rengiyle çerçevelenir.
+ * Dokunmak vurgu + zemin tonunu birlikte ayarlar, açık/koyu moda dokunmaz.
+ */
+export function PresetCard({ colors, name, label, selected, onPress, t }: {
+  colors: [string, string]; name: string; label: string; selected: boolean; onPress: () => void; t: Theme;
+}) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} aria-selected={selected}
+      style={({ pressed }) => ({ flex: 1, minHeight: 76, borderRadius: 14, borderWidth: selected ? 2 : 1, borderColor: selected ? t.accent : t.line, backgroundColor: selected ? t.accentSoft : t.bg, alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, opacity: pressed ? 0.7 : 1 })}>
+      <View style={{ flexDirection: 'row' }}>
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors[0], borderWidth: 1, borderColor: t.line }} />
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors[1], borderWidth: 1, borderColor: t.line, marginLeft: -8 }} />
+      </View>
+      <Text numberOfLines={1} style={{ color: t.fg, fontSize: 13, fontWeight: selected ? '700' : '500' }}>{name}</Text>
+    </Pressable>
+  );
+}
+
 export function Pill({ kind, label, t }: { kind: 'up' | 'down' | 'flat'; label: string; t: Theme }) {
   const bg = kind === 'up' ? t.warnSoft : kind === 'down' ? t.goodSoft : t.bg;
   const fg = kind === 'up' ? t.warn : kind === 'down' ? t.good : t.muted;

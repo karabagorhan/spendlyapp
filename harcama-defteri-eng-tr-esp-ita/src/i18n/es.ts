@@ -343,6 +343,11 @@ const es: Catalog = {
   // Renk kartelaları
   'settings.accent': 'Color de acento',
   'settings.tint': 'Tono de fondo',
+  'settings.presets': 'Temas listos',
+  'settings.presetA11y': 'Tema: {name}',
+  'preset.coral': 'Coral',
+  'preset.cobalt': 'Cobalto',
+  'preset.plum': 'Ciruela',
   'settings.colorsHint': 'Tu elección se aplica tanto al tema oscuro (Noir) como al claro (Marfil).',
   'accent.gold': 'Champán',
   'accent.emerald': 'Esmeralda',
@@ -354,10 +359,16 @@ const es: Catalog = {
   'accent.ruby': 'Rubí',
   'accent.teal': 'Turquesa',
   'accent.silver': 'Plata',
+  'accent.coralteal': 'Coral · Turquesa',
+  'accent.cobaltlime': 'Cobalto · Lima',
+  'accent.plumpeach': 'Ciruela · Melocotón',
   'tint.classic': 'Clásico',
   'tint.blue': 'Azul',
   'tint.green': 'Verde',
   'tint.plum': 'Ciruela',
+  'tint.midnight': 'Ciruela noche',
+  'tint.deepsea': 'Mar profundo',
+  'tint.cobaltnight': 'Noche cobalto',
 
   // Presentación
   'ob.skip': 'Omitir',

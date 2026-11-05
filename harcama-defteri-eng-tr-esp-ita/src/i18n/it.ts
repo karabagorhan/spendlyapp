@@ -343,6 +343,11 @@ const it: Catalog = {
   // Renk kartelaları
   'settings.accent': 'Colore di accento',
   'settings.tint': 'Tono dello sfondo',
+  'settings.presets': 'Temi pronti',
+  'settings.presetA11y': 'Tema: {name}',
+  'preset.coral': 'Corallo',
+  'preset.cobalt': 'Cobalto',
+  'preset.plum': 'Prugna',
   'settings.colorsHint': 'La scelta vale sia per il tema scuro (Noir) sia per quello chiaro (Avorio).',
   'accent.gold': 'Champagne',
   'accent.emerald': 'Smeraldo',
@@ -354,10 +359,16 @@ const it: Catalog = {
   'accent.ruby': 'Rubino',
   'accent.teal': 'Turchese',
   'accent.silver': 'Argento',
+  'accent.coralteal': 'Corallo · Turchese',
+  'accent.cobaltlime': 'Cobalto · Lime',
+  'accent.plumpeach': 'Prugna · Pesca',
   'tint.classic': 'Classico',
   'tint.blue': 'Blu',
   'tint.green': 'Verde',
   'tint.plum': 'Prugna',
+  'tint.midnight': 'Prugna notte',
+  'tint.deepsea': 'Mare profondo',
+  'tint.cobaltnight': 'Notte cobalto',
 
   // Presentazione
   'ob.skip': 'Salta',

@@ -7,11 +7,11 @@
 // Kategori renkleri soluk mücevher tonlarıdır: zümrüt, kehribar, safir, arduvaz, yakut, ametist, gül, vizon.
 
 export type Mode = 'noir' | 'ivory';
-export type Accent = 'gold' | 'emerald' | 'sapphire' | 'amethyst' | 'rose' | 'copper' | 'coral' | 'ruby' | 'teal' | 'silver';
-export type Tint = 'classic' | 'blue' | 'green' | 'plum';
+export type Accent = 'gold' | 'emerald' | 'sapphire' | 'amethyst' | 'rose' | 'copper' | 'coral' | 'ruby' | 'teal' | 'silver' | 'coralteal' | 'cobaltlime' | 'plumpeach';
+export type Tint = 'classic' | 'blue' | 'green' | 'plum' | 'midnight' | 'deepsea' | 'cobaltnight';
 
-export const ACCENTS: Accent[] = ['gold', 'emerald', 'sapphire', 'amethyst', 'rose', 'copper', 'coral', 'ruby', 'teal', 'silver'];
-export const TINTS: Tint[] = ['classic', 'blue', 'green', 'plum'];
+export const ACCENTS: Accent[] = ['gold', 'emerald', 'sapphire', 'amethyst', 'rose', 'copper', 'coral', 'ruby', 'teal', 'silver', 'coralteal', 'cobaltlime', 'plumpeach'];
+export const TINTS: Tint[] = ['classic', 'blue', 'green', 'plum', 'midnight', 'deepsea', 'cobaltnight'];
 export const isAccent = (v: unknown): v is Accent => typeof v === 'string' && ACCENTS.includes(v as Accent);
 export const isTint = (v: unknown): v is Tint => typeof v === 'string' && TINTS.includes(v as Tint);
 
@@ -41,11 +41,25 @@ export const ACCENT_COLORS: Record<Accent, Record<Mode, string>> = {
   sapphire: { noir: '#7aa5e6', ivory: '#3158a0' },
   amethyst: { noir: '#ae93e6', ivory: '#6d4c9f' },
   rose:     { noir: '#e594aa', ivory: '#a3405f' },
-  copper:   { noir: '#df8f63', ivory: '#a14d24' },
+  copper:   { noir: '#df8f63', ivory: '#9a4821' },
   coral:    { noir: '#ff7f6a', ivory: '#a93425' },
-  ruby:     { noir: '#f04a5a', ivory: '#b3162d' },
+  ruby:     { noir: '#fb7480', ivory: '#b3162d' },
   teal:     { noir: '#4cc0cc', ivory: '#1a6b75' },
   silver:   { noir: '#c0c4cd', ivory: '#555c69' },
+  // İki renkli çiftler: her modda zemine karşı kontrastı geçen renk (koyuda açık olan, açıkta koyu olan) vurgu olur
+  coralteal:  { noir: '#ff6b5a', ivory: '#0d6e66' },
+  cobaltlime: { noir: '#c8ff3d', ivory: '#1f4fe6' },
+  plumpeach:  { noir: '#ffb39a', ivory: '#542a52' },
+};
+
+/**
+ * İkinci renk: çiftin vurgu olmayan rengi (turkuaz / kobalt / erik). Yalnızca özet kartının gradyanında kullanılır;
+ * k = siyaha karışım oranları (kart üstü, orta, alt). Etiket ve dolgu yine vurgu renginde kalır.
+ */
+export const SECONDARY: Partial<Record<Accent, { color: string; k: [number, number, number] }>> = {
+  coralteal:  { color: '#14b8a6', k: [0.78, 0.86, 0.92] },
+  cobaltlime: { color: '#2457ff', k: [0.6, 0.76, 0.88] },
+  plumpeach:  { color: '#542a52', k: [0.2, 0.5, 0.7] },
 };
 
 /* ---------- Zemin tonları ---------- */
@@ -67,7 +81,30 @@ export const TINT_COLORS: Record<Tint, Record<Mode, Surfaces>> = {
     noir:  { bg: '#100b12', surface: '#171119', raised: '#1e1722', line: '#2c2231' },
     ivory: { bg: '#f6eff3', surface: '#fffbfd', raised: '#faf3f7', line: '#e8d9e1' },
   },
+  // 6 basamaklı ölçeklerden: Midnight Plum (#17121D #302538 #51405F …) ve Deep Teal (#071C27 #123747 #245568 …)
+  midnight: {
+    noir:  { bg: '#17121d', surface: '#241c2c', raised: '#302538', line: '#51405f' },
+    ivory: { bg: '#f4eef6', surface: '#fdfbfe', raised: '#f7f1f9', line: '#e8ddeb' },
+  },
+  deepsea: {
+    noir:  { bg: '#071c27', surface: '#0d2a37', raised: '#123747', line: '#245568' },
+    ivory: { bg: '#eef5f5', surface: '#fbfefe', raised: '#f3f9f8', line: '#dce9e8' },
+  },
+  cobaltnight: {
+    noir:  { bg: '#070c1c', surface: '#0d1428', raised: '#131c36', line: '#1f2c52' },
+    ivory: { bg: '#eaf0fe', surface: '#fafcff', raised: '#f1f5ff', line: '#d3ddf5' },
+  },
 };
+
+/** Hazır temalar: vurgu + zemin tonu birlikte; açık/koyu mod seçimine dokunmaz. colors = örnekteki iki renk (birincil, ikincil). */
+export type PresetId = 'coral' | 'cobalt' | 'plum';
+export const PRESETS: { id: PresetId; accent: Accent; tint: Tint; colors: [string, string] }[] = [
+  { id: 'coral', accent: 'coralteal', tint: 'deepsea', colors: ['#ff6b5a', '#14b8a6'] },
+  { id: 'cobalt', accent: 'cobaltlime', tint: 'cobaltnight', colors: ['#2457ff', '#c8ff3d'] },
+  { id: 'plum', accent: 'plumpeach', tint: 'midnight', colors: ['#542a52', '#ffb39a'] },
+];
+/** Geçerli vurgu + ton bir hazır temayla birebir eşleşiyorsa onu verir. */
+export const presetOf = (accent: Accent, tint: Tint): PresetId | null => PRESETS.find((p) => p.accent === accent && p.tint === tint)?.id ?? null;
 
 const noir = {
   name: 'noir' as Mode,
@@ -145,6 +182,7 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
   const a = accent === 'gold' && mode === 'ivory' ? '#7b5c22' : ACCENT_COLORS[accent][mode];
   const heroA = ACCENT_COLORS[accent].noir;
   const dark = mode === 'noir';
+  const sec = SECONDARY[accent];
   return {
     ...base,
     ...surf,
@@ -154,7 +192,8 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
     accentSoft: mix(a, surf.bg, dark ? 0.84 : 0.9),
     bar: rgba(a, dark ? 0.32 : 0.28),
     goldLine: rgba(a, 0.35),
-    heroGrad: accent === 'gold' ? base.heroGrad : [mix(heroA, '#000000', 0.8), mix(heroA, '#000000', 0.89), mix(heroA, '#000000', 0.94)],
+    heroGrad: sec ? sec.k.map((k) => mix(sec.color, '#000000', k)) as [string, string, string]
+      : accent === 'gold' ? base.heroGrad : [mix(heroA, '#000000', 0.8), mix(heroA, '#000000', 0.89), mix(heroA, '#000000', 0.94)],
     heroLabel: accent === 'gold' ? base.heroLabel : heroA,
     heroFill: accent === 'gold' ? base.heroFill : heroA,
     heroTrack: accent === 'gold' ? base.heroTrack : rgba(heroA, 0.18),
