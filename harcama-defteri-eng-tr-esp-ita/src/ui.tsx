@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ComponentProps, useEffect, useRef, useState } from 'react';
+import { ComponentProps, ReactNode, useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
-import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Line, Rect, Text as SvgText } from 'react-native-svg';
 import { MASK, amountsHidden } from './currency';
 import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
-import { contrast } from './palette';
+import { contrast, rgba } from './palette';
 import { Analysis, Insight, catIndex, catName, compact, pad, subType, subTypeIndex } from './lib';
 import { FONTS, Theme } from './theme';
 
@@ -168,25 +168,38 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
   );
 }
 
-/**
- * Tutar metni: rakamlar serif yazı tipinde, para simgesi (₺ $ € £ ¥; yazı tipinde ₺ bulunmadığı için) sistem yazı tipinde
- * ve daha küçük yazılır. Simge sayının önünde (₺1.250) ya da sonunda (1250 €) olabilir.
- */
+
 /** Uzun tutar tek satırda kalsın diye yazı boyutunu metin uzunluğuna göre küçültür (web'de `adjustsFontSizeToFit` çalışmaz). `max`: bu uzunluğa kadar tam boyut. */
 export const fitFont = (text: string, base: number, max: number) => (text.length <= max ? base : Math.max(base * 0.55, (base * max) / text.length));
+
+/**
+ * Genişliğe göre yazı boyutu: tutar metninin `base` boyutundaki yaklaşık genişliği (rakam ~0,64 em, ayraç ~0,3 em, küçük para simgesi ~0,42 em)
+ * `width`'i aşarsa boyut orantılı küçültülür. `track`: harf başına harf aralığı (px). Web'de `adjustsFontSizeToFit` olmadığı için.
+ */
+export function fitWidth(text: string, base: number, width: number, track = 0) {
+  if (!(width > 0)) return base;
+  let em = 0;
+  for (const ch of text) em += /\d/.test(ch) ? 0.64 : /[.,'   ]/.test(ch) ? 0.3 : /[₺$€£¥]/.test(ch) ? 0.42 : ch === '•' ? 0.5 : 0.62;
+  const w = base * em + track * text.length;
+  return w <= width ? base : Math.max(base * 0.5, Math.floor(((width - track * text.length) / em) * 10) / 10);
+}
 
 /** Grafik ekseni/çubuk üstü kısa tutar: gizlilik kipinde sayı çizilmez (çubuklar kalır). */
 const axisText = (n: number) => (amountsHidden() ? '' : compact(n));
 
-export function Amount({ text, style, symbolColor, fit }: { text: string; style: StyleProp<TextStyle>; symbolColor?: string; fit?: boolean }) {
+/**
+ * Tutar metni: rakamlar başlık yazı tipinde (sabit genişlikli), para simgesi (₺ $ € £ ¥; yazı tipinde ₺ bulunmadığı için) sistem yazı tipinde
+ * ve daha küçük yazılır. Simge sayının önünde (₺1.250) ya da sonunda (1250 €) olabilir.
+ */
+export function Amount({ text, style, symbolColor, fit, testID }: { text: string; style: StyleProp<TextStyle>; symbolColor?: string; fit?: boolean; testID?: string }) {
   const flat = StyleSheet.flatten(style) || {};
   const size = (flat.fontSize ?? 16) * 0.6;
   const parts = text.split(/([₺$€£¥])/);
   return (
-    <Text style={[style, { fontVariant: ['lining-nums'] }]} {...(text.includes(MASK) ? { accessibilityLabel: tr('amount.hidden') } : {})} {...(fit ? { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 } : {})}>
+    <Text testID={testID} style={[style, { fontVariant: ['lining-nums', 'tabular-nums'] }]} {...(text.includes(MASK) ? { accessibilityLabel: tr('amount.hidden') } : {})} {...(fit ? { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 } : {})}>
       {parts.map((p, i) =>
         SYMBOL_SET.includes(p) ? (
-          <Text key={i} style={{ fontFamily: 'System', fontSize: size, fontWeight: '400', color: symbolColor ?? flat.color, letterSpacing: 0 }}>{p}</Text>
+          <Text key={i} style={{ fontFamily: 'System', fontSize: size, fontWeight: '600', color: symbolColor ?? flat.color, letterSpacing: 0, marginHorizontal: 1 }}>{p}</Text>
         ) : (
           <Text key={i}>{p}</Text>
         ),
@@ -409,25 +422,98 @@ export function Bars({ data, selected, onSelect, t, height = 150 }: {
 
 const CAT_ICONS: IconName[] = ['bag-handle-outline', 'restaurant-outline', 'car-outline', 'receipt-outline', 'medkit-outline', 'film-outline', 'shirt-outline', 'ellipsis-horizontal'];
 
-/** Kategori simgesi: kategorinin renginde yumuşak bir daire içinde. */
-export function CatIcon({ cat, t, size = 36 }: { cat: string; t: Theme; size?: number }) {
-  const color = t.cats[catIndex(cat)];
+/** Simge kutusu: rengin %16'sı zeminli yuvarlatılmış kare, simge tam renkte (kategori, gelir ve abonelik türü simgeleri). */
+export function IconBox({ icon, color, t, size = 36 }: { icon: IconName; color: string; t: Theme; size?: number }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 1, borderColor: color + '66', backgroundColor: color + '14', alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={CAT_ICONS[catIndex(cat)]} size={size * 0.46} color={color} />
+    <View style={{ width: size, height: size, borderRadius: Math.round(size * 0.32), backgroundColor: rgba(color, t.name === 'ivory' ? 0.14 : 0.18), alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={icon} size={Math.round(size * 0.5)} color={color} />
     </View>
   );
 }
 
+/** Kategori simgesi: kategorinin renginde yumuşak kutu içinde. */
+export function CatIcon({ cat, t, size = 36 }: { cat: string; t: Theme; size?: number }) {
+  return <IconBox icon={CAT_ICONS[catIndex(cat)]} color={t.cats[catIndex(cat)]} t={t} size={size} />;
+}
+
 /** Abonelik türü simgesi (kategori simgesiyle aynı görünüm). */
 export function SubTypeIcon({ type, t, size = 36 }: { type: string | undefined; t: Theme; size?: number }) {
-  const color = t.cats[subTypeIndex(type) % t.cats.length];
+  return <IconBox icon={subType(type).icon as IconName} color={t.cats[subTypeIndex(type) % t.cats.length]} t={t} size={size} />;
+}
+
+const INCOME_ICON: Record<string, IconName> = { salary: 'cash-outline', freelance: 'laptop-outline', investment: 'trending-up-outline', gift: 'gift-outline', other: 'ellipsis-horizontal-circle-outline' };
+export const incomeIcon = (c: string): IconName => INCOME_ICON[c] ?? 'cash-outline';
+
+/** Gelir kategorisi simgesi: gelir renginde. */
+export function IncomeIcon({ cat, t, size = 36 }: { cat: string; t: Theme; size?: number }) {
+  return <IconBox icon={incomeIcon(cat)} color={t.good} t={t} size={size} />;
+}
+
+/**
+ * Ortak işlem satırı (DESIGN-2 §6): 44'lük simge kutusu, başlık 15/600, alt yazı 13, sağda tutar 15/700 sabit genişlikli rakamlarla.
+ * Gelir `good` renginde "+", gider yazı renginde "−" ile; başka para biriminde girilmiş kayıtta özgün tutar tutarın altında.
+ * `amount` biçimlenmiş (gerekirse maskelenmiş) tutardır; erişilebilirlik etiketi çağıran tarafından verilir.
+ */
+export function TxnRow({ t, kind, cat, title, subtitle, amount, orig, onPress, first, testID, a11y }: {
+  t: Theme; kind: 'expense' | 'income'; cat: string; title: string; subtitle: string; amount: string; orig?: string;
+  onPress?: () => void; first?: boolean; testID?: string; a11y?: string;
+}) {
+  const income = kind === 'income';
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 1, borderColor: color + '66', backgroundColor: color + '14', alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={subType(type).icon as IconName} size={size * 0.46} color={color} />
+    <Pressable onPress={onPress} disabled={!onPress} testID={testID} accessibilityRole="button" accessibilityLabel={a11y}
+      style={({ pressed }) => [s.txn, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.line }, pressed && { opacity: 0.75 }]}>
+      {income ? <IncomeIcon cat={cat} t={t} size={44} /> : <CatIcon cat={cat} t={t} size={44} />}
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text style={{ color: t.fg, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{title}</Text>
+        <Text style={{ color: t.muted, fontSize: 13 }} numberOfLines={1}>{subtitle}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 0, maxWidth: '50%' }}>
+        <Amount text={`${income ? '+' : '−'}${amount}`} style={{ color: income ? t.good : t.fg, fontSize: 15, fontWeight: '700' }} />
+        {orig ? <Text style={{ color: t.muted, fontSize: 12, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{orig}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+export type Ring = { key: string; share: number; color: string };
+
+/**
+ * Eşmerkezli yaylar (DESIGN-2 §5, §8): her halka bir kategori; ince çizgi renginde iz, üstünde payı (0–1) kadar uzunlukta
+ * yuvarlak uçlu yay. Dıştan içe sırayla çizilir; ortaya `children` (ör. toplam) yerleşir. Panel ve Raporlar ortak kullanır.
+ */
+export function RingsChart({ rings, size, stroke = 8, gap = 4, track, children, a11y }: {
+  rings: Ring[]; size: number; stroke?: number; gap?: number; track: string; children?: ReactNode; a11y?: string;
+}) {
+  const c = size / 2;
+  const inner = c - stroke / 2 - (rings.length - 1) * (stroke + gap) - stroke / 2; // en içteki halkanın iç yarıçapı
+  return (
+    <View style={{ width: size, height: size }} accessibilityLabel={a11y} role="img">
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <G rotation={-90} origin={`${c}, ${c}`}>
+          {rings.map((rg, i) => {
+            const r = c - stroke / 2 - i * (stroke + gap);
+            const C = 2 * Math.PI * r;
+            // Yuvarlak uçlar yayı iki yandan yarım kalınlık uzatır: oran dürüst kalsın diye uzunluktan düşülür
+            const full = rg.share >= 0.999;
+            const len = full ? C : Math.max(0.01, rg.share * C - stroke);
+            return (
+              <G key={rg.key}>
+                <Circle cx={c} cy={c} r={r} stroke={track} strokeWidth={stroke} fill="none" />
+                {rg.share > 0 ? <Circle cx={c} cy={c} r={r} stroke={rg.color} strokeWidth={stroke} fill="none" strokeLinecap={full ? 'butt' : 'round'} strokeDasharray={`${len} ${C}`} /> : null}
+              </G>
+            );
+          })}
+        </G>
+      </Svg>
+      {children ? (
+        <View pointerEvents="none" style={{ position: 'absolute', left: c - inner, top: c - inner, width: inner * 2, height: inner * 2, alignItems: 'center', justifyContent: 'center' }}>
+          {children}
+        </View>
+      ) : null}
     </View>
   );
 }
+
 export const subTypeColor = (type: string | undefined, t: Theme) => t.cats[subTypeIndex(type) % t.cats.length];
 
 /** Otomatik yorumlar listesi. */
@@ -464,6 +550,7 @@ export function Progress({ value, max, t, color }: { value: number; max: number;
 }
 
 const s = StyleSheet.create({
+  txn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   menu: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRightWidth: 1, paddingHorizontal: 14, gap: 8, borderTopRightRadius: 28, borderBottomRightRadius: 28 },
   account: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1 },
   monogram: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

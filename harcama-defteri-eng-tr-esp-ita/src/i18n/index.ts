@@ -118,6 +118,19 @@ export const decimalText = (n: number) => String(n).replace('.', langInfo().deci
 /** Yüzde metni seçili dilin sırasıyla: Türkçe "%165", İngilizce "165%" (katalogdaki `fmt.percent`). */
 export const fmtPercent = (n: number | string) => t('fmt.percent', { n });
 
+/** Türkçede sayıya gelen iyelik eki (okunuşun son sözcüğüne göre): 30 → "u" (otuzu), 65 → "i" (altmış beşi), 60 → "ı", 2 → "si". */
+const trPossSuffix = (n: number) => {
+  const ones = ['ı', 'i', 'si', 'ü', 'ü', 'i', 'sı', 'si', 'i', 'u'];
+  const tens = ['', 'u', 'si', 'u', 'ı', 'si', 'ı', 'i', 'i', 'ı'];
+  n = Math.abs(Math.round(n));
+  if (n === 0) return 'ı';
+  if (n % 10) return ones[n % 10];
+  if (n % 100) return tens[(n % 100) / 10];
+  return n % 1000 ? 'ü' : 'i';
+};
+/** "Bütçenin %65'i" gibi iyelik bağlamında yüzde: Türkçede kesme işaretli ek eklenir, diğer dillerde düz yüzde. */
+export const fmtPercentPoss = (n: number) => (current === 'tr' ? `${fmtPercent(n)}'${trPossSuffix(n)}` : fmtPercent(n));
+
 /**
  * Kullanıcının yazdığı tutarı sayıya çevirir; geçersiz ya da sıfırsa 0.
  * İki ayraç da varsa sonuncusu ondalıktır ("1.250,50", "1,250.50").

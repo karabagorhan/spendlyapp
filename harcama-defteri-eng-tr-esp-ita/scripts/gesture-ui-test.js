@@ -77,9 +77,9 @@ const data = {
   const menuOpen = async () => (await page.locator('[role="menuitem"]').count()) > 0;
   const openMenu = async () => { if (!(await menuOpen())) { await page.getByTestId('menu-open').click(); await page.waitForTimeout(500); } };
   const closeMenuByTap = async () => { await page.mouse.click(370, 400); await page.waitForTimeout(500); };
-  // Üst başlık (34 px yazı)
+  // Ekran başlığı (screen-title); Ana sayfada üst başlık yerine selamlama var, marka adı sayfa sonundaki imzada (home-brand)
   const title = () => page.evaluate(() => {
-    const el = Array.from(document.querySelectorAll('div,h1,h2')).find((e) => getComputedStyle(e).fontSize === '34px' && e.childNodes.length === 1 && e.firstChild.nodeType === 3);
+    const el = document.querySelector('[data-testid="screen-title"]') || document.querySelector('[data-testid="home-brand"]');
     return el ? el.textContent : '';
   });
   const goto = async (n) => { await openMenu(); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(600); };

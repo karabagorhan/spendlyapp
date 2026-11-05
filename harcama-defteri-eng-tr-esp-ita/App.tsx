@@ -1,5 +1,6 @@
-import { PlayfairDisplay_600SemiBold } from '@expo-google-fonts/playfair-display/600SemiBold';
-import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700Bold';
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
+import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
+import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
 import { useFonts } from 'expo-font';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
@@ -26,9 +27,10 @@ import { useAccount } from './src/auth/AccountProvider';
 import { Gate } from './src/auth/Gate';
 import { Amount, Bars, Button, CatIcon, SubTypeIcon, subTypeColor, DailyChart, InsightList, Ionicons, Label, MenuSection, Pill, Progress, SideMenu } from './src/ui';
 import {
-  BalanceCard, BudgetCard, BudgetOverview, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, IncomeIcon, InlineNotice, Pair, QuickActions,
-  RecentCard, SpendingCard, SubsCard, TAB_BAR_H, TabBar,
+  BalanceCard, BudgetCard, BudgetOverview, CardHead, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, HomeBrand, IncomeIcon, InlineNotice, Pair, QuickActions,
+  RecentCard, SpendingCard, SubsCard, TabBar, tabBarSpace,
 } from './src/dashboard';
+import { SPACE, cardBase, cardShadow } from './src/design';
 
 /** Web: tarayıcının kenardan "geri git" kaydırması uygulamanın kendi geri hareketiyle çakışmasın. */
 function useWebOverscroll() {
@@ -44,7 +46,7 @@ function useWebOverscroll() {
 export default function App() {
   useWebOverscroll();
   // Yazı tipi yüklenemezse sistem yazı tipiyle devam edilir
-  const [fontsLoaded, fontError] = useFonts({ PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold });
+  const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold });
   if (!fontsLoaded && !fontError) return null;
   return (
     <SafeAreaProvider>
@@ -554,9 +556,9 @@ function Main() {
     const slices = recentTransactions(items, incomes, 4);
     body = (
       <View style={st.dashBody}>
-        <DashHeader t={t} name={settings.name} initials={initials(settings.name)} currency={main} onCurrency={() => setCurMenu(true)} onMenu={() => setMenuOpen(true)} alertDot={!!(pendingSubs || limitAlerts)} />
+        <DashHeader t={t} name={settings.name} initials={initials(settings.name)} currency={main} onCurrency={() => setCurMenu(true)} onMenu={() => setMenuOpen(true)} onSettings={() => go('ayarlar')} alertDot={!!(pendingSubs || limitAlerts)} />
         {monthSwitcher}
-        <BalanceCard t={t} bal={bal} hidden={settings.hideBalance} vsLabel={tr('bal.vsLast')} onAddIncome={openAddIncome}
+        <BalanceCard t={t} bal={bal} hidden={settings.hideBalance} vsLabel={tr('bal.vsLast')} onAddIncome={openAddIncome} budget={budget}
           onToggle={() => changeSettings({ ...settings, hideBalance: !settings.hideBalance })} />
         <QuickActions t={t} onExpense={openAdd} onIncome={openAddIncome} onReports={() => go('raporlar')} onBudgets={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
         {converting && (rs.failed || (!rs.rates && (un.count > 0 || un.limits > 0))) ? (
@@ -576,10 +578,7 @@ function Main() {
         </Pair>
         {pending.length ? (
           <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.pendingSubs')}</Label>
-              <Pressable onPress={() => go('abonelikler')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable>
-            </View>
+            <CardHead t={t} title={tr('section.pendingSubs')} action={tr('common.all')} onAction={() => go('abonelikler')} />
             {pending.map(({ s }, i) => (
               <SubRow key={s.id} s={s} ctx={ctx} first={i === 0} onEdit={() => setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s })} onPay={() => paySub(s)} onSkip={() => skipSub(s)} />
             ))}
@@ -587,16 +586,14 @@ function Main() {
         ) : null}
         {notes.length ? (
           <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.highlights')}</Label>
-              {notes.length > 3 ? <Pressable onPress={() => go('raporlar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
-            </View>
+            <CardHead t={t} title={tr('section.highlights')} action={notes.length > 3 ? tr('common.all') : undefined} onAction={() => go('raporlar')} />
             <InsightList list={notes.slice(0, 3)} t={t} />
           </View>
         ) : null}
         <Tiles ctx={ctx} />
         <RecentCard t={t} list={slices} onAll={() => go('harcamalar')}
           onOpen={(r) => (r.kind === 'income' ? setIncSheet({ key: Date.now(), initial: stored.income(r.x.id) ?? r.x }) : setExpSheet({ key: Date.now(), initial: stored.item(r.x.id) ?? r.x }))} />
+        <HomeBrand t={t} />
       </View>
     );
   } else if (screen === 'harcamalar' && txnTab === 'income') {
@@ -827,9 +824,8 @@ function Main() {
     );
   }
 
-  // Hızlı "Ekle" düğmesi: panelde hızlı eylemler var; Harcamalar ekranının Gelirler sekmesinde gelir ekler
-  const showFab = screen === 'harcamalar' || screen === 'raporlar';
-  const barH = TAB_BAR_H + insets.bottom;
+  // Ekleme artık sekme çubuğunun ortasındaki "+" ile (her ekranda; Harcama / Gelir seçimi); ayrı ekran düğmesi yok
+  const barH = tabBarSpace(insets.bottom);
 
   /* ---------- Yan menü verisi (her zaman içinde bulunulan ay) ---------- */
   const menuSections: MenuSection[] = [
@@ -860,10 +856,10 @@ function Main() {
             <Ionicons name="menu" size={24} color={t.fg} />
             {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
           </Pressable>
-          <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screenTitle(screen)}</Text>
+          <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit accessibilityRole="header" testID="screen-title">{screenTitle(screen)}</Text>
         </View>
       ) : null}
-      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, screen === 'ozet' && { paddingTop: insets.top + 8 }, { paddingBottom: barH + (showFab ? 96 : 28) }]} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, screen === 'ozet' && { paddingTop: insets.top + 8 }, { paddingBottom: barH + 32 }]} keyboardShouldPersistTaps="handled">
         <View style={st.wrap}>
           {/* Veri sorunları kalıcı bandla bildirilir (kısa bir bildirim gözden kaçabilir): kurtarılan bozuk kayıt / yazılamayan değişiklik */}
           {recovered && !recoveredSeen ? <InlineNotice t={t} kind="warn" text={tr('state.recovered')} action={tr('state.dismiss')} onAction={() => setRecoveredSeen(true)} /> : null}
@@ -872,13 +868,8 @@ function Main() {
         </View>
       </ScrollView>
 
-      {showFab ? (
-        <View style={[st.fabBar, { bottom: barH, paddingBottom: 10 }]} pointerEvents="box-none">
-          <Button label={screen === 'harcamalar' && txnTab === 'income' ? `+  ${tr('qa.income')}` : tr('fab.add')} kind="primary" onPress={screen === 'harcamalar' && txnTab === 'income' ? openAddIncome : openAdd} t={t} style={st.fab} />
-        </View>
-      ) : null}
       </Animated.View>
-      <TabBar t={t} current={screen} onSelect={(k) => go(k)} bottomInset={insets.bottom} />
+      <TabBar t={t} current={screen} onSelect={(k) => go(k)} bottomInset={insets.bottom} onAddExpense={openAdd} onAddIncome={openAddIncome} />
       {/* Geri hareketi sırasında kenardan beliren ok: bırakınca ne olacağını gösterir (geri ya da ana ekranda menü) */}
       {swiping ? (
       <Animated.View pointerEvents="none" style={[st.backHint, {
@@ -890,7 +881,7 @@ function Main() {
       ) : null}
 
       {toastMsg ? (
-        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: barH + (showFab ? 82 : 18) }]}>
+        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: barH + 36 }]}>
           <Text style={{ color: t.fg, fontSize: 14, flexShrink: 1 }}>{toastMsg}</Text>
           {toastAction ? (
             <Pressable hitSlop={10} onPress={() => { toastAction.run(); setToastMsg(''); setToastAction(null); buzz(); }}>
@@ -1162,20 +1153,20 @@ function CatChange({ cur, prev, t }: { cur: number; prev: number; t: Theme }) {
 function makeStyles(t: Theme) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: t.bg },
-    topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 8, backgroundColor: t.bg },
+    topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SPACE.edge, paddingBottom: 8, backgroundColor: t.bg },
     menuDot: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: t.gold, borderWidth: 2 },
-    menuBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
-    scroll: { paddingHorizontal: 16, paddingTop: 8 },
+    menuBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
+    scroll: { paddingHorizontal: SPACE.edge, paddingTop: 8 },
     wrap: { width: '100%', maxWidth: DASH_MAX, alignSelf: 'center', gap: 16 },
-    dashBody: { gap: 14 },
+    dashBody: { gap: SPACE.gap },
     seg: { flexDirection: 'row', borderWidth: 1, borderRadius: 99, padding: 4, gap: 4 },
     segBtn: { flex: 1, minHeight: 40, borderRadius: 99, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
-    h1: { fontSize: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.3 },
+    h1: { fontSize: 28, lineHeight: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.6 },
     link: { color: t.gold, fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
     months: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    mBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
+    mBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
     monthNow: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.accentSoft },
-    mLabel: { fontSize: 19, fontFamily: FONTS.bold, color: t.fg },
+    mLabel: { fontSize: 17, fontFamily: FONTS.bold, color: t.fg, letterSpacing: -0.2 },
     hero: { borderRadius: 26, padding: 22, gap: 16, borderWidth: 1, borderColor: 'rgba(201,168,106,0.45)', overflow: 'hidden' },
     heroTop: { flexDirection: 'row', justifyContent: 'space-between' },
     heroBrand: { color: t.heroLabel, fontSize: 10, letterSpacing: 2.4, fontWeight: '600' },
@@ -1183,7 +1174,6 @@ function makeStyles(t: Theme) {
     heroRule: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(201,168,106,0.4)' },
     heroBudget: { borderWidth: 1, borderColor: 'rgba(201,168,106,0.5)', borderRadius: 99, paddingVertical: 6, paddingHorizontal: 12 },
     heroBudgetTxt: { color: t.heroLabel, fontSize: 13, fontWeight: '600' },
-    fab: { height: 56, borderRadius: 28, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
     heroBig: { color: t.heroFg, fontSize: 48, fontFamily: FONTS.display, marginTop: 6, letterSpacing: -0.5 },
     heroMid: { color: t.heroFg, fontSize: 26, fontFamily: FONTS.bold, marginTop: 2 },
     heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8 },
@@ -1191,10 +1181,10 @@ function makeStyles(t: Theme) {
     track: { height: 4, borderRadius: 99, backgroundColor: t.heroTrack, overflow: 'hidden' },
     fill: { height: '100%', borderRadius: 99 },
     tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    tile: { flexGrow: 1, flexBasis: '45%', backgroundColor: t.surface, borderWidth: 1, borderColor: t.line, borderRadius: 20, padding: 16, gap: 6 },
-    tileVal: { fontSize: 24, fontFamily: FONTS.bold, color: t.fg },
+    tile: { flexGrow: 1, flexBasis: '45%', ...cardBase(t), padding: 16, gap: 6 },
+    tileVal: { fontSize: 22, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
     tileSub: { fontSize: 13, color: t.muted },
-    card: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.line, borderRadius: 22, padding: 18, gap: 14 },
+    card: { ...cardBase(t), gap: 14 },
     cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
     summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: 4 },
     summaryVal: { fontSize: 28, fontFamily: FONTS.display, color: t.fg },
@@ -1227,7 +1217,6 @@ function makeStyles(t: Theme) {
     meta: { fontSize: 13, color: t.muted },
     empty: { alignItems: 'center', paddingVertical: 28, gap: 4 },
     emptyTitle: { fontSize: 22, fontFamily: FONTS.bold, color: t.fg, marginTop: 6 },
-    fabBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 10, backgroundColor: 'transparent' },
     toast: { position: 'absolute', alignSelf: 'center', maxWidth: '92%', backgroundColor: t.raised, borderWidth: 1, borderColor: t.goldLine, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
     search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 23, borderWidth: 1, borderColor: t.line, backgroundColor: t.surface, paddingHorizontal: 12 },
     searchInput: { flex: 1, fontSize: 16, color: t.fg, height: '100%' },

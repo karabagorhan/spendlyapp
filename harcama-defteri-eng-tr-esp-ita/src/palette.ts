@@ -127,6 +127,10 @@ const noir = {
   heroMuted: 'rgba(244,238,226,0.62)',
   heroTrack: 'rgba(201,168,106,0.18)',
   heroFill: '#c9a86a',
+  // Özet kartı geometrik motifinin ikinci rengi ve kart üstündeki gelir/gider renkleri (kart her iki modda da koyu)
+  heroAlt: '#6f8fc9',
+  heroGood: '#9cc4a6',
+  heroWarn: '#e0866b',
   warn: '#e0866b',
   warnSoft: '#33211b',
   good: '#9cc4a6',
@@ -156,6 +160,9 @@ const ivory: typeof noir = {
   heroMuted: 'rgba(244,238,226,0.62)',
   heroTrack: 'rgba(212,180,122,0.2)',
   heroFill: '#d4b47a',
+  heroAlt: '#6f8fc9',
+  heroGood: '#9cc4a6',
+  heroWarn: '#e0866b',
   warn: '#b2502f',
   warnSoft: '#f5e2d9',
   good: '#3d7a57',
@@ -197,5 +204,12 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
     heroLabel: accent === 'gold' ? base.heroLabel : heroA,
     heroFill: accent === 'gold' ? base.heroFill : heroA,
     heroTrack: accent === 'gold' ? base.heroTrack : rgba(heroA, 0.18),
+    heroAlt: heroAltFor(accent, sec?.color),
   };
+}
+
+/** Motifin ikinci rengi: hazır temada çiftin öbür rengi, yoksa vurguyla uyumlu bir kategori tonu; koyu karta karşı seçilebilir olsun diye gerekirse açılır. */
+function heroAltFor(accent: Accent, secondary?: string): string {
+  const c = secondary ?? (['emerald', 'sapphire', 'teal', 'amethyst'].includes(accent) ? '#d1a256' : '#6f8fc9');
+  return contrast(c, '#000000') < 3 ? mix(c, '#ffffff', 0.35) : c;
 }

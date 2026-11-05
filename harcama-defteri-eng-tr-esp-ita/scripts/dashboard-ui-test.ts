@@ -184,7 +184,9 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     const p = await open({ data: full() });
     const t0 = await text(p);
     ok('marka adı Monibo', t0.includes('Monibo'));
-    ok('selamlama saate uygun ve adı içerir', (await tid(p, 'dash-greeting')) === T('dash.greetName', { greeting: T('dash.greeting.' + greetingKey(new Date().getHours())), name: 'Orhan' }), await tid(p, 'dash-greeting'));
+    // Selamlama iki satırdır ("İyi akşamlar," / kalın "Orhan"): satır sonu ve boşluklar yok sayılarak karşılaştırılır
+    const nows = (x: string) => x.replace(/\s+/g, '');
+    ok('selamlama saate uygun ve adı içerir', nows(await tid(p, 'dash-greeting')) === nows(T('dash.greetName', { greeting: T('dash.greeting.' + greetingKey(new Date().getHours())), name: 'Orhan' })), await tid(p, 'dash-greeting'));
     const card = await tid(p, 'balance-card');
     ok('net durum = gelir − gider', card.includes(mny(NET)), card);
     ok('aylık gelir kutusu', (await tid(p, 'bal-income')).includes(mny(INCOME)), await tid(p, 'bal-income'));
@@ -201,7 +203,9 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     const r0 = await tid(p, 'recent-0');
     ok('son işlemler: en yeni gelir + işaretiyle başta', r0.includes('+') && r0.includes(mny(1000)), r0);
     ok('son işlemler: gider − işaretiyle', (await tid(p, 'recent-1')).includes('−'), await tid(p, 'recent-1'));
-    ok('sekme çubuğu: 5 sekme, Ana sayfa seçili', (await p.locator('[data-testid^="tab-"][role="tab"]').count()) === 5 && (await id(p, 'tab-ozet').getAttribute('aria-selected')) === 'true');
+    // Tasarım değişikliği: Ayarlar artık sekme değil (başlıktaki dişli + yan menü); ortada "+" düğmesi
+    ok('sekme çubuğu: 4 sekme + ortada "+", Ana sayfa seçili', (await p.locator('[data-testid^="tab-"][role="tab"]').count()) === 4 && (await id(p, 'fab-add').count()) === 1 && (await id(p, 'tab-ozet').getAttribute('aria-selected')) === 'true');
+    ok('başlıkta Ayarlar dişlisi', (await id(p, 'open-settings').count()) === 1);
     await audit(p, 'panel');
     const rep = await contrastReport(p, '[data-testid="card-spending"], [data-testid="card-categories"], [data-testid="card-budget"], [data-testid="card-subs"], [data-testid="card-recent"]');
     ok(`[panel/açık] kart metinleri WCAG AA kontrastlı (${rep.n} metin)`, rep.bad.length === 0, rep.bad.slice(0, 5).join(' | '));
@@ -255,7 +259,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await p.keyboard.press('Escape');
     // Ayarlar'daki Gizlilik anahtarı
     const q = await open({ data: full() });
-    await id(q, 'tab-ayarlar').click(); await q.waitForTimeout(500);
+    await id(q, 'open-settings').click(); await q.waitForTimeout(500);
     ok('ayarlar: Gizlilik bölümü ve anahtar', await has(q, T('settings.hideAmounts')) && await has(q, T('settings.hideAmountsHint')) && (await id(q, 'hide-amounts-switch').count()) === 1);
     await q.getByText(T('settings.hideAmounts'), { exact: true }).first().locator('xpath=following::*[@role="switch"][1]').click();
     await q.waitForTimeout(500);
@@ -398,7 +402,8 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
   /* 6) Gezinme: sekmeler, hızlı eylemler, menü */
   {
     const p = await open({ data: full() });
-    const title = () => p.evaluate(() => { const el = Array.from(document.querySelectorAll('div,h1,h2')).find((e) => getComputedStyle(e).fontSize === '34px' && e.childNodes.length === 1 && e.firstChild!.nodeType === 3); return el ? el.textContent : ''; });
+    // Ekran başlığı (screen-title); Ana sayfada üst başlık yerine selamlama var, marka adı sayfa sonundaki imzada (home-brand)
+    const title = () => p.evaluate(() => { const el = document.querySelector('[data-testid="screen-title"]') ?? document.querySelector('[data-testid="home-brand"]'); return el ? el.textContent : ''; });
     await id(p, 'tab-harcamalar').click(); await p.waitForTimeout(500);
     ok('sekme: İşlemler → Harcamalar ekranı', (await title()) === T('title.harcamalar'), String(await title()));
     ok('İşlemler: Harcamalar | Gelirler anahtarı', (await id(p, 'txn-tab-expenses').count()) === 1 && (await id(p, 'txn-tab-income').count()) === 1);
@@ -407,9 +412,15 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     ok('Gelirler sekmesi: bu ayın geliri listelenir', await has(p, 'Pay') && await has(p, '+' + mny(1000)) && !(await has(p, 'OldPay')));
     ok('Gelirler: ay toplamı', (await text(p)).includes(mny(1000)));
     ok('Gelirler sekmesinde ekran başlığı sekme adıyla (İşlemler) aynı kalır', (await title()) === T('tab.transactions'), String(await title()));
-    ok('Gelirler sekmesinde hızlı düğme gelir ekler', await has(p, '+  ' + T('qa.income')));
+    // Tasarım değişikliği: ekran altındaki ayrı "+ Gelir ekle" düğmesi yerine sekme çubuğundaki "+" seçim balonu (Harcama / Gelir)
     await audit(p, 'işlemler-gelir');
-    await p.getByText('+  ' + T('qa.income'), { exact: true }).first().click();
+    await id(p, 'fab-add').click(); await p.waitForTimeout(400);
+    ok('"+" seçim balonu Harcama ve Gelir sunar', (await id(p, 'fab-expense').count()) === 1 && (await id(p, 'fab-income').count()) === 1 && await has(p, T('fab.expense')) && await has(p, T('fab.income')));
+    await audit(p, 'ekle-balonu');
+    await id(p, 'fab-scrim').click({ position: { x: 20, y: 120 } }); await p.waitForTimeout(400);
+    ok('balon dışına dokununca kapanır, form açılmaz', (await id(p, 'fab-income').count()) === 0 && !(await has(p, T('income.newTitle'))) && !(await has(p, T('expense.newTitle'))));
+    await id(p, 'fab-add').click(); await p.waitForTimeout(400);
+    await id(p, 'fab-income').click();
     ok('hızlı düğme gelir formunu açar', await wait(p, T('income.newTitle')));
     await p.waitForTimeout(600);
     await p.getByText(T('common.cancel'), { exact: true }).first().click(); await p.waitForTimeout(500);
@@ -419,8 +430,10 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     ok('Bütçe ekranı: bu ay ilerleme kartı ve limit listesi üstte', (await id(p, 'budget-overview').count()) === 1 && (await id(p, 'budget-limits').count()) === 1);
     await id(p, 'tab-raporlar').click(); await p.waitForTimeout(500);
     ok('sekme: Raporlar', (await title()) === T('title.raporlar'), String(await title()));
-    await id(p, 'tab-ayarlar').click(); await p.waitForTimeout(500);
-    ok('sekme: Ayarlar', (await title()) === T('title.ayarlar'), String(await title()));
+    // Ayarlar artık sekme değil: Ana sayfa başlığındaki dişliden açılır
+    await id(p, 'tab-ozet').click(); await p.waitForTimeout(400);
+    await id(p, 'open-settings').click(); await p.waitForTimeout(500);
+    ok('dişli: Ayarlar', (await title()) === T('title.ayarlar'), String(await title()));
     ok('Ayarlar: yasal bağlantılar korunmuş', (await id(p, 'legal-privacy').count()) === 1);
     await audit(p, 'ayarlar');
     await id(p, 'tab-ozet').click(); await p.waitForTimeout(500);
@@ -516,8 +529,9 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     const sideBySide = !!a && !!b && Math.abs(a.y - b.y) < 4;
     ok(`[${w}px] ikili kartlar ${w < 340 ? 'alt alta' : 'yan yana'}`, w < 340 ? !!a && !!b && b.y > a.y + a.height - 2 : sideBySide, JSON.stringify({ a, b }));
     ok(`[${w}px] içerik sütunu ≤ 920 px ve ortalı`, !!wrap && wrap.width <= 921 && Math.abs(wrap.x + wrap.width / 2 - w / 2) < 14, JSON.stringify(wrap));
+    // Tasarım değişikliği: yüzen hap — alttan 10 px (web'de güvenli alan 0), kenarlardan en az 12 px, ortalı
     const tb = await id(p, 'tab-bar').boundingBox();
-    ok(`[${w}px] sekme çubuğu ekranın altında`, !!tb && Math.abs(tb.y + tb.height - h) < 3, JSON.stringify(tb));
+    ok(`[${w}px] sekme çubuğu altta yüzüyor`, !!tb && Math.abs(tb.y + tb.height - (h - 10)) < 3 && tb.x >= 11 && Math.abs(tb.x + tb.width / 2 - w / 2) < 2, JSON.stringify(tb));
     await audit(p, `${w}px`);
   }
 
