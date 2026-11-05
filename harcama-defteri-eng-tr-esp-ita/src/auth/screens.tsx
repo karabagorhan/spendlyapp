@@ -4,7 +4,8 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LANGS, Lang, t as tr } from '../i18n';
 import { FONTS, Theme } from '../theme';
-import { Chip, Ionicons } from '../ui';
+import { Ionicons } from '../ui';
+import { OnboardingArt, WelcomeMotif } from '../illustrations';
 import { AUTH_MOCK } from './config';
 import { useLegal } from './legalSheet';
 import { useAccount } from './AccountProvider';
@@ -17,29 +18,38 @@ const emailMsg = (e: ReturnType<typeof validateEmail>) => (e === 'empty' ? tr('a
 const pwMsg = (e: ReturnType<typeof validatePassword>) =>
   e === 'short' ? tr('auth.val.pwShort', { n: MIN_PASSWORD }) : e === 'long' ? tr('auth.val.pwLong') : e === 'common' ? tr('auth.val.pwCommon') : e === 'email' ? tr('auth.val.pwEmail') : null;
 
-/* ---------- Tanıtım ---------- */
-const SLIDES = [
-  { icon: 'wallet-outline', key: 'ob.1' },
-  { icon: 'pie-chart-outline', key: 'ob.2' },
-  { icon: 'shield-checkmark-outline', key: 'ob.3' },
-] as const;
+/* ---------- Tanıtım (Monibo 2.0: her kipte koyu zemin, geometrik illüstrasyon, sola dayalı başlık) ---------- */
+const SLIDES = [{ key: 'ob.1' }, { key: 'ob.2' }, { key: 'ob.3' }] as const;
+const OB = { bg: '#0B0B0F', fg: '#FFFFFF', muted: 'rgba(255,255,255,0.64)', line: 'rgba(255,255,255,0.22)', dim: 'rgba(255,255,255,0.28)' };
 
-export function Onboarding({ t, lang, onLang, onDone, accountsEnabled }: { t: Theme; lang: Lang; onLang?: (l: Lang) => void; onDone: () => void; accountsEnabled: boolean }) {
+export function Onboarding({ t: _t, lang, onLang, onDone, accountsEnabled }: { t: Theme; lang: Lang; onLang?: (l: Lang) => void; onDone: () => void; accountsEnabled: boolean }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const ref = useRef<ScrollViewInstance>(null);
   const [i, setI] = useState(0);
+  const [art, setArt] = useState({ w: 0, h: 0 });
+  const [pageH, setPageH] = useState(0);
   const last = i === SLIDES.length - 1;
+  const narrow = width < 360;
   const go = (n: number) => { setI(n); ref.current?.scrollTo({ x: n * width, animated: true }); };
+  const artSize = Math.max(80, Math.min(art.w, art.h, 380));
   return (
-    <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 20 }}>
+    <View style={{ flex: 1, backgroundColor: OB.bg, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 20 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, minHeight: 44 }}>
         <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, flexWrap: 'wrap' }}>
-          {onLang ? LANGS.map((l) => <Chip key={l.code} label={l.native} active={lang === l.code} onPress={() => onLang(l.code)} t={t} />) : null}
+          {onLang ? LANGS.map((l) => {
+            const on = lang === l.code;
+            return (
+              <Pressable key={l.code} onPress={() => onLang(l.code)} accessibilityRole="button" accessibilityState={{ selected: on }} aria-selected={on}
+                style={{ height: 30, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: on ? OB.fg : OB.line, backgroundColor: on ? OB.fg : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: on ? OB.bg : OB.fg, fontSize: 12.5, fontFamily: FONTS.semi }}>{l.native}</Text>
+              </Pressable>
+            );
+          }) : null}
         </View>
         {!last ? (
           <Pressable onPress={onDone} testID="ob-skip" hitSlop={10} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 12 }}>
-            <Text style={{ color: t.muted, fontSize: 16, fontWeight: '600' }}>{tr('ob.skip')}</Text>
+            <Text style={{ color: OB.muted, fontSize: 15, fontFamily: FONTS.semi }}>{tr('ob.skip')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -50,24 +60,35 @@ export function Onboarding({ t, lang, onLang, onDone, accountsEnabled }: { t: Th
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => setI(Math.round(e.nativeEvent.contentOffset.x / width))}
         style={{ flex: 1 }}
+        onLayout={(e) => setPageH(e.nativeEvent.layout.height)}
       >
         {SLIDES.map((sl, idx) => (
-          <View key={sl.key} style={{ width, paddingHorizontal: 30, alignItems: 'center', justifyContent: 'center', gap: 22 }} accessible={false} testID={`ob-slide-${idx}`}>
-            <View style={{ width: 132, height: 132, borderRadius: 66, backgroundColor: t.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name={sl.icon} size={62} color={t.accent} />
+          <View key={sl.key} style={{ width, height: pageH || undefined, paddingHorizontal: 24, gap: 20 }} accessible={false} testID={`ob-slide-${idx}`}>
+            <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingTop: 8 }} onLayout={idx === 0 ? (e) => setArt({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }) : undefined}>
+              <OnboardingArt slide={idx} size={artSize} />
             </View>
-            <Text accessibilityRole="header" style={{ color: t.fg, fontSize: 30, lineHeight: 37, fontFamily: FONTS.display, textAlign: 'center', maxWidth: CONTENT_MAX }}>{tr(sl.key + '.title')}</Text>
-            <Text style={{ color: t.muted, fontSize: 17, lineHeight: 25, textAlign: 'center', maxWidth: CONTENT_MAX }}>
-              {tr(sl.key === 'ob.3' && !accountsEnabled ? 'ob.3.bodyLocal' : sl.key + '.body')}
-            </Text>
+            <View style={{ gap: 10, width: '100%', maxWidth: CONTENT_MAX }}>
+              <Text accessibilityRole="header" style={{ color: OB.fg, fontSize: narrow ? 28 : 32, lineHeight: narrow ? 34 : 38, fontFamily: FONTS.display, letterSpacing: -0.5 }}>{tr(sl.key + '.title')}</Text>
+              <Text style={{ color: OB.muted, fontSize: narrow ? 15 : 16, lineHeight: narrow ? 22 : 24 }}>
+                {tr(sl.key === 'ob.3' && !accountsEnabled ? 'ob.3.bodyLocal' : sl.key + '.body')}
+              </Text>
+            </View>
           </View>
         ))}
       </ScrollView>
-      <View style={{ paddingHorizontal: 22, gap: 18, width: '100%', maxWidth: CONTENT_MAX + 44, alignSelf: 'center' }}>
-        <View accessible accessibilityLabel={tr('ob.page', { n: i + 1, total: SLIDES.length })} style={{ flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
-          {SLIDES.map((_, idx) => <View key={idx} style={{ width: idx === i ? 22 : 8, height: 8, borderRadius: 4, backgroundColor: idx === i ? t.accent : t.line }} />)}
+      <View style={{ paddingHorizontal: 24, width: '100%', maxWidth: CONTENT_MAX + 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20 }}>
+        <View accessible accessibilityLabel={tr('ob.page', { n: i + 1, total: SLIDES.length })} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          {SLIDES.map((_, idx) => <View key={idx} style={{ width: idx === i ? 28 : 8, height: 8, borderRadius: 4, backgroundColor: idx === i ? OB.fg : OB.dim }} />)}
         </View>
-        <BusyButton label={tr(last ? 'ob.start' : 'ob.next')} onPress={() => (last ? onDone() : go(i + 1))} t={t} testID="ob-next" />
+        <Pressable
+          testID="ob-next"
+          onPress={() => (last ? onDone() : go(i + 1))}
+          accessibilityRole="button"
+          accessibilityLabel={tr(last ? 'ob.start' : 'ob.next')}
+          style={({ pressed }) => ({ width: 56, height: 56, borderRadius: 28, backgroundColor: OB.fg, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}
+        >
+          <Ionicons name={last ? 'checkmark' : 'arrow-forward'} size={26} color={OB.bg} />
+        </Pressable>
       </View>
     </View>
   );
@@ -86,6 +107,7 @@ export function Welcome({ t, closable }: { t: Theme; closable: boolean }) {
   return (
     <AuthShell
       t={t}
+      motif={<WelcomeMotif t={t} />}
       title={tr('auth.welcome.title')}
       subtitle={tr('auth.welcome.sub')}
       onClose={closable ? () => dispatch({ type: 'CLOSE_AUTH' }) : undefined}
@@ -102,9 +124,9 @@ export function Welcome({ t, closable }: { t: Theme; closable: boolean }) {
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
               buttonStyle={t.name === 'noir' ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-              cornerRadius={26}
+              cornerRadius={27}
               onPress={() => { if (!a.busy) social(() => service.signInWithApple(meta()))(); }}
-              style={{ height: 52, width: '100%' }}
+              style={{ height: 54, width: '100%' }}
             />
           </View>
         ) : (
@@ -294,7 +316,7 @@ export function Verify({ t, email }: { t: Theme; email: string }) {
       </>}
     >
       <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-        <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: t.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 96, height: 96, borderRadius: 30, backgroundColor: t.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="mail-open-outline" size={44} color={t.accent} />
         </View>
       </View>

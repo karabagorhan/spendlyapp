@@ -46,7 +46,7 @@ function Phases({ children }: { children: ReactNode }) {
   const p = state.phase;
   return (
     <LanguageProvider value={lang}>
-      <StatusBar style={t.statusBar} />
+      <StatusBar style={p.name === 'onboarding' ? 'light' : t.statusBar} />
       {AUTH_MOCK ? <View testID="auth-mock" style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} /> : null}
       {p.name === 'onboarding' ? (
         <Onboarding t={t} lang={lang} accountsEnabled={service.configured} onDone={finishOnboarding} onLang={(l) => { setLangPref(l); setLook({ ...look, language: l }); }} />
