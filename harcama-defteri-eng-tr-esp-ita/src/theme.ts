@@ -3,12 +3,12 @@ import { Accent, Theme, ThemeMode, Tint, makeTheme } from './palette';
 
 export type { Theme, ThemeMode, Accent, Tint };
 
-// Başlıklar ve büyük tutarlar: Plus Jakarta Sans (800 ExtraBold, 700 Bold, 600 SemiBold). Metinler sistem yazı tipinde.
+// Başlıklar ve tutarlar: Plus Jakarta Sans 600 (hiyerarşi boyuttan ve renkten gelir, kalınlıktan değil); 500 orta vurgu. Metinler sistem yazı tipinde.
 // Özel yazı tipi ailesiyle birlikte fontWeight verilmez (Android'de aile adı kalınlığı zaten belirler).
 export const FONTS = {
-  display: 'PlusJakartaSans_800ExtraBold',
-  bold: 'PlusJakartaSans_700Bold',
-  semi: 'PlusJakartaSans_600SemiBold',
+  display: 'PlusJakartaSans_600SemiBold',
+  bold: 'PlusJakartaSans_600SemiBold',
+  semi: 'PlusJakartaSans_500Medium',
 };
 
 /** Seçili mod ("Telefona göre" ise cihazın açık/koyu ayarı) + zemin tonu + vurgu rengi. */

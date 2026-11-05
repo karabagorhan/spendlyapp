@@ -9,7 +9,7 @@ import { RADIUS, cardBase, cardTitle } from './design';
 import { incomeIcon } from './dashboard';
 import { DatePicker } from './calendar';
 import { Button, CatIcon, Chip, IconBox, IconName, Ionicons, Label, PresetCard, Swatch, catIconName, subTypeColor } from './ui';
-import { bigAmount } from './design';
+import { bigAmount, selectedFill, selectedLine } from './design';
 
 type SheetAction = { label: string; headerLabel?: string; onPress: () => void; disabled?: boolean };
 
@@ -65,7 +65,7 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
             </Pressable>
             <Pressable onPress={action.onPress} disabled={action.disabled} accessibilityRole="button"
               style={[st.accessorySave, { backgroundColor: t.accent, opacity: action.disabled ? 0.4 : 1 }]}>
-              <Text style={{ color: t.accentFg, fontSize: 16, fontWeight: '700' }}>{action.label}</Text>
+              <Text style={{ color: t.accentFg, fontSize: 16, fontWeight: '600' }}>{action.label}</Text>
             </Pressable>
           </View>
         </InputAccessoryView>
@@ -76,7 +76,7 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
 
 function Field({ label, children, t }: { label: string; children: ReactNode; t: Theme }) {
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: 8 }}>
       <Label t={t}>{label}</Label>
       {children}
     </View>
@@ -85,19 +85,19 @@ function Field({ label, children, t }: { label: string; children: ReactNode; t: 
 
 /** Form bileşenlerinin stilleri (Monibo 2.0: 16'lık köşe, yüzey rengi, hap düğmeler). */
 const sh = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 20, paddingTop: 16, minHeight: 60 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 20, paddingTop: 16, minHeight: 60 },
   headSide: { minHeight: 44, minWidth: 44, justifyContent: 'center', flexShrink: 0 },
   headTitle: { flex: 1, textAlign: 'center', fontSize: 17, lineHeight: 22, fontFamily: FONTS.bold },
-  headSave: { borderWidth: 1, borderRadius: 999, height: 38, paddingHorizontal: 18, justifyContent: 'center', flexShrink: 0 },
+  headSave: { borderWidth: 1, borderRadius: 12, height: 40, paddingHorizontal: 16, justifyContent: 'center', flexShrink: 0 },
   body: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 48, gap: 24 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pillsC: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-  pill: { height: 34, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
-  field: { height: 52, borderWidth: 1, borderRadius: 16, paddingHorizontal: 16, fontSize: 16 },
-  stepper: { height: 52, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
-  freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 10, maxWidth: 200 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  btn: { height: 54, borderRadius: 999, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 22 },
+  pillsC: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  pill: { height: 36, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  field: { height: 52, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, fontSize: 16 },
+  stepper: { height: 52, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, maxWidth: 200 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  btn: { height: 52, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
 });
 
 const fieldStyle = (t: Theme) => [sh.field, { backgroundColor: t.surface, borderColor: t.line, color: t.fg }, Platform.OS === 'web' ? ({ outlineColor: t.accent } as object) : null];
@@ -106,14 +106,14 @@ const fieldStyle = (t: Theme) => [sh.field, { backgroundColor: t.surface, border
 function Pill({ label, active, onPress, t, disabled, color, icon }: { label: string; active: boolean; onPress: () => void; t: Theme; disabled?: boolean; color?: string; icon?: IconName }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityState={{ selected: active, disabled }} aria-selected={active}
-      style={({ pressed }) => [sh.pill, { backgroundColor: active ? t.accent : t.surface, borderColor: active ? t.accent : t.line, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}>
-      {icon ? <Ionicons name={icon} size={15} color={active ? t.accentFg : color ?? t.fg} /> : null}
-      <Text style={{ color: active ? t.accentFg : t.fg, fontSize: 14, fontFamily: FONTS.semi }}>{label}</Text>
+      style={({ pressed }) => [sh.pill, { backgroundColor: active ? selectedFill(t) : t.surface, borderColor: active ? selectedLine(t) : t.line, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}>
+      {icon ? <Ionicons name={icon} size={16} color={color ?? t.fg} /> : null}
+      <Text style={{ color: t.fg, fontSize: 14, fontFamily: active ? FONTS.bold : FONTS.semi }}>{label}</Text>
     </Pressable>
   );
 }
 
-/** Sayfanın ana eylemi: 54 yüksekliğinde hap. */
+/** Sayfanın ana eylemi: 52 yüksekliğinde, 12 köşeli düğme. */
 function PrimaryButton({ label, onPress, disabled, t }: { label: string; onPress: () => void; disabled?: boolean; t: Theme }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }}
@@ -199,19 +199,19 @@ const softWrap = (s: string) => s.split(' ').map((w) => (w.length >= 11 ? w.slic
 
 type Tile = { key: string; label: string; icon: IconName; color: string };
 
-/** 4 sütunlu ikon ızgarası: 56'lık renkli ikon kutusu + altında ad; seçili = vurgu halkası + kalın ad. */
+/** 4 sütunlu ikon ızgarası: 56'lık nötr kutuda kategori renginde ikon + altında ad; seçili = vurgu halkası + kalın ad. */
 function TileGrid({ items, value, onChange, t }: { items: Tile[]; value: string; onChange: (k: string) => void; t: Theme }) {
   const { width } = useWindowDimensions();
   const narrow = width < 360;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, marginHorizontal: -2 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16, marginHorizontal: -2 }}>
       {items.map((it) => {
         const on = value === it.key;
         return (
           <Pressable key={it.key} onPress={() => onChange(it.key)} accessibilityRole="button" accessibilityLabel={it.label} accessibilityState={{ selected: on }} aria-selected={on}
-            style={({ pressed }) => ({ width: '25%', alignItems: 'center', gap: 6, paddingHorizontal: 1, opacity: pressed ? 0.7 : 1 })}>
-            <View style={{ width: 64, height: 64, borderRadius: 22, borderWidth: 2, borderColor: on ? t.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-              <IconBox icon={it.icon} color={it.color} t={t} size={54} />
+            style={({ pressed }) => ({ width: '25%', alignItems: 'center', gap: 8, paddingHorizontal: 2, opacity: pressed ? 0.7 : 1 })}>
+            <View style={{ width: 64, height: 64, borderRadius: 20, borderWidth: 2, borderColor: on ? t.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+              <IconBox icon={it.icon} color={it.color} t={t} size={56} />
             </View>
             <Text style={{ fontSize: narrow ? 11 : 12, lineHeight: 15, textAlign: 'center', color: on ? t.fg : t.muted, fontFamily: on ? FONTS.bold : FONTS.semi }}>{softWrap(it.label)}</Text>
           </Pressable>
@@ -468,10 +468,10 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
   const limitTotal = Object.values(settings.catBudgets).reduce((a, b) => a + b, 0);
   // İki kart: aylık bütçe tutarı ve kategori limitleri; başlıklar kart başlığı biçiminde (16/700)
   return (
-    <View style={{ gap: 14 }}>
+    <View style={{ gap: 16 }}>
       <View style={[cardBase(t), { gap: 12 }]}>
         <Text style={cardTitle(t)} accessibilityRole="header">{tr('budget.field', { sym: symbolOf(settings.currency) })}</Text>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           <TextInput
             value={budget}
             onChangeText={setBudget}
@@ -486,14 +486,14 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
             style={[st.panelInput, { flex: 1, minWidth: 0, backgroundColor: t.bg, borderColor: t.line, color: t.fg }]}
             accessibilityLabel={tr('budget.a11y')}
           />
-          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); saveBudget(); }} t={t} style={{ height: 50, borderRadius: 25 }} />
+          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); saveBudget(); }} t={t} style={{ height: 52 }} />
         </View>
         <AmountError value={budgetRaw} t={t} />
       </View>
 
       <View style={[cardBase(t), { gap: 4, paddingBottom: 8 }]}>
         <Text style={cardTitle(t)} accessibilityRole="header">{tr('budget.limitsTitle')}</Text>
-        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 19, paddingBottom: 6 }}>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 19, paddingBottom: 8 }}>
           {tr('budget.limitsHint')}
           {limitTotal ? ` ${tr('budget.limitsTotal', { amount: money(limitTotal) })}` : ''}
         </Text>
@@ -558,7 +558,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
       </Field>
       <RatesBox main={settings.currency} rates={rates} refreshing={refreshing} failed={failed} onRefresh={onRefresh} t={t} />
       <Field label={tr('settings.presets')} t={t}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           {PRESETS.map((p) => (
             <PresetCard key={p.id} colors={p.colors} name={tr('preset.' + p.id)} label={tr('settings.presetA11y', { name: tr('preset.' + p.id) })}
               selected={presetOf(settings.accent, settings.tint) === p.id} onPress={() => onChange({ ...settings, accent: p.accent, tint: p.tint })} t={t} />
@@ -597,7 +597,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.hideAmounts')}</Text>
           <Switch value={settings.hideBalance} onValueChange={(v) => onChange({ ...settings, hideBalance: v })} trackColor={{ true: t.accent }} accessibilityLabel={tr('settings.hideAmounts')} testID="hide-amounts-switch" />
         </View>
-        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18, paddingTop: 6 }}>{tr('settings.hideAmountsHint')}</Text>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18, paddingTop: 8 }}>{tr('settings.hideAmountsHint')}</Text>
       </View>
 
       <View style={{ gap: 0 }}>
@@ -609,7 +609,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         {settings.remind ? (
           <View style={row}>
             <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.time')}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               <Pressable hitSlop={10} onPress={() => onChange({ ...settings, remindHour: (settings.remindHour + 23) % 24 })} accessibilityLabel={tr('settings.hourEarlier')}>
                 <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
               </Pressable>
@@ -629,7 +629,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           <Switch value={settings.notifAmounts} onValueChange={(v) => onChange({ ...settings, notifAmounts: v })} trackColor={{ true: t.accent }} />
         </View>
         {notifWarn ? (
-          <View style={{ gap: 8, paddingTop: 10 }} testID="notif-warn">
+          <View style={{ gap: 8, paddingTop: 12 }} testID="notif-warn">
             <Text style={{ color: t.warn, fontSize: 13, lineHeight: 18 }}>{tr(notifWarn.canAskAgain ? 'settings.notifOff' : 'settings.notifOffSystem')}</Text>
             <Button label={tr(notifWarn.canAskAgain ? 'settings.notifAllow' : 'settings.notifOpenSettings')} kind="ghost" onPress={notifWarn.onFix} t={t} />
           </View>
@@ -645,13 +645,13 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         </View>
       ) : null}
 
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: 12 }}>
         <Label t={t}>{tr('settings.excel')}</Label>
         <Button label={tr('settings.exportMonth', { month: monthLabel })} kind="ghost" onPress={() => onExport(ym)} t={t} />
         <Button label={tr('settings.exportAll')} kind="ghost" onPress={() => onExport(null)} t={t} />
       </View>
 
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: 12 }}>
         <Label t={t}>{tr('settings.backup')}</Label>
         <Text style={{ color: t.muted, fontSize: 14, lineHeight: 20 }}>
           {tr('settings.backupHint')}
@@ -710,7 +710,7 @@ function CatLimitRow({ cat, value, onChange, first, t }: { cat: string; value: n
     <View style={st.limitRow}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
         <CatIcon cat={cat} t={t} size={narrow ? 32 : 36} />
-        <Text style={[st.rowTxt, { color: t.fg, fontSize: narrow ? 14 : 15, fontWeight: '600', minWidth: 0, paddingRight: 0 }]} numberOfLines={1}>{catName(cat)}</Text>
+        <Text style={[st.rowTxt, { color: t.fg, fontSize: narrow ? 14 : 15, fontWeight: '500', minWidth: 0, paddingRight: 0 }]} numberOfLines={1}>{catName(cat)}</Text>
       </View>
       <TextInput
         value={text}
@@ -719,7 +719,7 @@ function CatLimitRow({ cat, value, onChange, first, t }: { cat: string; value: n
         keyboardType="decimal-pad"
         placeholder={tr('budget.limitNone')}
         placeholderTextColor={t.muted}
-        style={[st.limitInput, narrow && { width: 86, paddingHorizontal: 10, fontSize: 14 }, { backgroundColor: t.bg, borderColor: value ? t.goldLine : t.line, color: t.fg }]}
+        style={[st.limitInput, narrow && { width: 88, paddingHorizontal: 12, fontSize: 14 }, { backgroundColor: t.bg, borderColor: value ? t.goldLine : t.line, color: t.fg }]}
         maxLength={AMOUNT_MAXLEN}
         accessibilityLabel={tr('budget.limitA11y', { cat: catName(cat) })}
       />
@@ -730,22 +730,22 @@ function CatLimitRow({ cat, value, onChange, first, t }: { cat: string; value: n
 }
 
 const st = StyleSheet.create({
-  freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 10, maxWidth: 200 },
+  freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, maxWidth: 200 },
   limitInput: { width: 116, height: 44, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 12, fontSize: 15, textAlign: 'right' },
-  limitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, minHeight: 60, paddingVertical: 8 },
-  panelInput: { height: 50, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 16, fontSize: 17, fontWeight: '600' },
+  limitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, minHeight: 60, paddingVertical: 8 },
+  panelInput: { height: 52, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 16, fontSize: 17, fontWeight: '600' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, minHeight: 56 },
-  topSave: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 18, flexShrink: 1, marginLeft: 12 },
+  topSave: { borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 16, flexShrink: 1, marginLeft: 12 },
   accessory: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  accessorySave: { flex: 1, maxWidth: 260, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  accessorySave: { flex: 1, maxWidth: 260, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 28, fontFamily: FONTS.display, paddingHorizontal: 20, paddingTop: 4 },
-  body: { padding: 20, gap: 18, paddingBottom: 48 },
-  input: { height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 17 },
-  big: { height: 64, fontSize: 32, fontWeight: '700' },
+  body: { padding: 20, gap: 16, paddingBottom: 48 },
+  input: { height: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, fontSize: 17 },
+  big: { height: 64, fontSize: 32, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  stepper: { height: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
+  swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  stepper: { height: 48, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   dateBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   stepBtn: { width: 40, alignItems: 'center' },
   stepTxt: { fontSize: 24, lineHeight: 28 },

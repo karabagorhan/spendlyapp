@@ -22,15 +22,15 @@ export function LegalSheet({ kind, onClose, t }: { kind: LegalKind | null; onClo
             <Ionicons name="close" size={26} color={t.fg} />
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40, gap: 18 }}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40, gap: 20 }}>
           {!hasLegalTranslation(lang) ? (
             <View style={{ backgroundColor: t.accentSoft, borderRadius: 14, padding: 12 }}>
               <Text style={{ color: t.fg, fontSize: 14, lineHeight: 20 }}>{tr('legal.noTranslation')}</Text>
             </View>
           ) : null}
           {doc?.sections.map((sec, i) => (
-            <View key={i} style={{ gap: 6 }}>
-              <Text accessibilityRole="header" style={{ color: t.fg, fontSize: 17, fontWeight: '700' }}>{i + 1}. {sec.title}</Text>
+            <View key={i} style={{ gap: 8 }}>
+              <Text accessibilityRole="header" style={{ color: t.fg, fontSize: 17, fontWeight: '600' }}>{i + 1}. {sec.title}</Text>
               {sec.body.map((p, j) => <Text key={j} style={{ color: t.fg, fontSize: 15, lineHeight: 22, opacity: 0.9 }}>{p}</Text>)}
             </View>
           ))}

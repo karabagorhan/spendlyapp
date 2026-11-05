@@ -1,6 +1,5 @@
+import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/500Medium';
 import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
-import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
-import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
 import { useFonts } from 'expo-font';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
@@ -30,7 +29,7 @@ import {
   BalanceCard, BudgetCard, BudgetOverview, CardHead, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, HomeBrand, IncomeIcon, InlineNotice, Pair, QuickActions,
   RecentCard, SpendingCard, SubsCard, SubsHero, TabBar, tabBarSpace,
 } from './src/dashboard';
-import { RADIUS, SPACE, bigAmount, cardBase, cardShadow, trackOf } from './src/design';
+import { RADIUS, SPACE, bigAmount, cardBase, cardShadow, selectedFill, selectedLine, trackOf } from './src/design';
 
 /** Web: tarayıcının kenardan "geri git" kaydırması uygulamanın kendi geri hareketiyle çakışmasın. */
 function useWebOverscroll() {
@@ -46,7 +45,7 @@ function useWebOverscroll() {
 export default function App() {
   useWebOverscroll();
   // Yazı tipi yüklenemezse sistem yazı tipiyle devam edilir
-  const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold });
+  const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold });
   if (!fontsLoaded && !fontError) return null;
   return (
     <SafeAreaProvider>
@@ -476,8 +475,8 @@ function Main() {
       {a.isCur ? null : (
         <Pressable testID="month-today" onPress={() => { setYm(todayIso().slice(0, 7)); setFilterDay(null); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={tr('month.backToCurrent')}
           style={st.monthNow}>
-          <Ionicons name="return-up-back-outline" size={15} color={t.gold} />
-          <Text style={{ color: t.gold, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>{tr('month.backToCurrent')}</Text>
+          <Ionicons name="return-up-back-outline" size={16} color={t.muted} />
+          <Text style={{ color: t.fg, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{tr('month.backToCurrent')}</Text>
         </Pressable>
       )}
     </View>
@@ -555,7 +554,7 @@ function Main() {
     const slices = recentTransactions(items, incomes, 4);
     body = (
       <View style={st.dashBody}>
-        <DashHeader t={t} name={settings.name} initials={initials(settings.name)} currency={main} onCurrency={() => setCurMenu(true)} onMenu={() => setMenuOpen(true)} onSettings={() => go('ayarlar')} alertDot={!!(pendingSubs || limitAlerts)} />
+        <DashHeader t={t} initials={initials(settings.name)} currency={main} onCurrency={() => setCurMenu(true)} onMenu={() => setMenuOpen(true)} onSettings={() => go('ayarlar')} alertDot={!!(pendingSubs || limitAlerts)} />
         {monthSwitcher}
         <BalanceCard t={t} bal={bal} hidden={settings.hideBalance} vsLabel={tr('bal.vsLast')} onAddIncome={openAddIncome} budget={budget}
           onToggle={() => changeSettings({ ...settings, hideBalance: !settings.hideBalance })} />
@@ -605,7 +604,7 @@ function Main() {
         {txnToggle}
         {monthSwitcher}
         {rateNote}
-        {monthIncomes.length ? summaryCard('income', tr('list.count', { n: monthIncomes.length }), money(convSum(monthIncomes))) : null}
+        {monthIncomes.length ? summaryCard('income', tr('list.count', { n: monthIncomes.length }), money0(convSum(monthIncomes))) : null}
         {days.length ? (
           <>
             <Text style={st.hint}>{tr('txn.incomeHint')}</Text>
@@ -646,7 +645,7 @@ function Main() {
         {q ? null : monthSwitcher}
         {rateNote}
         {/* Boş ayda özet kartı yok (boş durum kartı anlatır); arama ya da filtre sonucu 0 olsa da gösterilir */}
-        {q || listMonth.length ? summaryCard('expense', q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length }), money(convSum(shown))) : null}
+        {q || listMonth.length ? summaryCard('expense', q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length }), money0(convSum(shown))) : null}
         {cats.length > 1 ? (
           <View onStartShouldSetResponderCapture={() => { touchX.current.start = 99999; return false; }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -654,9 +653,9 @@ function Main() {
               const on = c === filterCat;
               return (
                 <Pressable key={c ?? '_all'} onPress={() => setFilterCat(c === null || on ? null : c)} accessibilityRole="button" accessibilityState={{ selected: on }} aria-selected={on}
-                  style={({ pressed }) => [st.catChip, on ? { backgroundColor: t.accent, borderColor: t.accent } : { backgroundColor: t.surface, borderColor: t.line }, pressed && { opacity: 0.8 }, !c && { paddingLeft: 14 }]}>
-                  {c ? <IconBox icon={catIconName(c)} color={on ? t.accentFg : t.cats[catIndex(c)]} t={t} size={24} /> : null}
-                  <Text style={{ color: on ? t.accentFg : t.fg, fontSize: 14, lineHeight: 18, fontFamily: FONTS.semi }}>{c ? catName(c) : tr('common.all')}</Text>
+                  style={({ pressed }) => [st.catChip, on ? { backgroundColor: selectedFill(t), borderColor: selectedLine(t) } : { backgroundColor: t.surface, borderColor: t.line }, pressed && { opacity: 0.8 }, !c && { paddingLeft: 16 }]}>
+                  {c ? <IconBox icon={catIconName(c)} color={t.cats[catIndex(c)]} t={t} size={24} /> : null}
+                  <Text style={{ color: t.fg, fontSize: 14, lineHeight: 18, fontFamily: on ? FONTS.bold : FONTS.semi }}>{c ? catName(c) : tr('common.all')}</Text>
                 </Pressable>
               );
             })}
@@ -668,7 +667,7 @@ function Main() {
             <Text style={st.filterLbl}>{tr('filter.day')}</Text>
             <Pressable style={st.fchip} onPress={() => setFilterDay(null)} accessibilityRole="button" accessibilityLabel={`${tr('filter.clear')}: ${shortDay(filterDay)}`}>
               <Text style={st.fchipTxt}>{shortDay(filterDay)}</Text>
-              <Ionicons name="close" size={14} color={t.accentFg} />
+              <Ionicons name="close" size={16} color={t.muted} />
             </Pressable>
           </View>
         ) : null}
@@ -721,7 +720,7 @@ function Main() {
       <>
         {rateNote}
         {subs.length ? (
-          <SubsHero t={t} monthly={money(monthly)} yearly={money0(monthly * 12)} share={budget ? fmtPercent(Math.round((monthly / budget) * 100)) : null} pending={pendingCount} />
+          <SubsHero t={t} monthly={money0(monthly)} yearly={money0(monthly * 12)} share={budget ? fmtPercent(Math.round((monthly / budget) * 100)) : null} pending={pendingCount} />
         ) : null}
         {groups.length > 1 && monthly > 0 ? (
           <View style={st.card} testID="subs-types">
@@ -736,7 +735,7 @@ function Main() {
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <View style={st.nameLine}>
                       <Text style={[st.itemCat, { flex: 1, minWidth: 0 }]}>{subLabel(g.tp.key)}</Text>
-                      <Amount text={money(g.total)} style={st.itemAmt} />
+                      <Amount text={money0(g.total)} style={st.itemAmt} />
                     </View>
                     <Text style={st.meta}>{tr('subs.countShare', { n: g.list.length, pct: Math.round((g.total / monthly) * 100) })}</Text>
                   </View>
@@ -858,7 +857,7 @@ function Main() {
           <Text style={{ color: t.fg, fontSize: 14, flexShrink: 1 }}>{toastMsg}</Text>
           {toastAction ? (
             <Pressable hitSlop={10} onPress={() => { toastAction.run(); setToastMsg(''); setToastAction(null); buzz(); }}>
-              <Text style={{ color: t.gold, fontSize: 14, fontWeight: '700' }}>{toastAction.label}</Text>
+              <Text style={{ color: t.gold, fontSize: 14, fontWeight: '600' }}>{toastAction.label}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -943,7 +942,7 @@ function Tiles({ ctx }: { ctx: Ctx }) {
       {tiles.map((x) => (
         <View key={x.label} style={st.tile}>
           <Text style={st.tileLbl}>{x.label}</Text>
-          <Amount text={x.value} style={st.tileVal} symbolColor={t.accent} />
+          <Amount text={x.value} style={st.tileVal} symbolColor={t.muted} />
           {x.sub}
         </View>
       ))}
@@ -1045,16 +1044,16 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
       <View style={st.card} testID="reports-rings">
         <CardHead t={t} title={tr('reports.overview')} sub={monthLabel(ym)} />
         {catRows.length ? (
-          <View style={[{ gap: 18, alignItems: 'center' }, side && { flexDirection: 'row' }]} onLayout={(e) => setRingW(e.nativeEvent.layout.width)}>
+          <View style={[{ gap: 20, alignItems: 'center' }, side && { flexDirection: 'row' }]} onLayout={(e) => setRingW(e.nativeEvent.layout.width)}>
             <RingsChart rings={ringTop.map((c) => ({ key: c, share: a.total ? by[c] / a.total : 0, color: t.cats[catIndex(c)] }))} size={ringSize} stroke={ringStroke} gap={ringGap}
               track={trackOf(t)} a11y={tr('dash.donutA11y')}>
               <Text style={{ color: t.muted, fontSize: 11, lineHeight: 14 }} numberOfLines={1}>{tr('dash.totalSpent')}</Text>
-              <Amount fit text={totalText} style={{ color: t.fg, fontSize: fitWidth(totalText, 18, hole - 14, -0.3), fontFamily: FONTS.display, letterSpacing: -0.3 }} symbolColor={t.accent} />
+              <Amount fit text={totalText} style={{ color: t.fg, fontSize: fitWidth(totalText, 18, hole - 14, -0.3), fontFamily: FONTS.display }} symbolColor={t.muted} />
             </RingsChart>
             <View style={[{ gap: 12, alignSelf: 'stretch', justifyContent: 'center' }, side ? { flex: 1, minWidth: 0 } : { paddingHorizontal: 4 }]}>
               {legend.map((r) => (
-                <View key={r.key} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: r.color, marginTop: 4 }} />
+                <View key={r.key} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: r.color, marginTop: 4 }} />
                   <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
                     <Text style={{ color: t.fg, fontSize: 13, lineHeight: 18, fontWeight: '600' }}>{r.label}</Text>
                     <Text style={{ color: t.muted, fontSize: 12, lineHeight: 16, fontVariant: ['tabular-nums'] }}>
@@ -1067,7 +1066,7 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
           </View>
         ) : (
           <View style={st.cardEmpty}>
-            <IconBox icon="pie-chart-outline" color={t.accent} t={t} size={48} />
+            <IconBox icon="pie-chart-outline" color={t.muted} t={t} size={48} />
             <Text style={[st.meta, { textAlign: 'center' }]}>{tr('reports.noExpenses')}</Text>
           </View>
         )}
@@ -1110,7 +1109,7 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
         </View>
       ) : null}
 
-      <View style={[st.card, { gap: 6 }]}>
+      <View style={[st.card, { gap: 8 }]}>
         <CardHead t={t} title={tr('reports.byCategory')} sub={monthItems.length ? tr('list.count', { n: monthItems.length }) : undefined} />
         {catRows.length ? (
           <View>
@@ -1123,7 +1122,7 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
                       <Text style={st.itemCat}>{catName(c)}</Text>
                       <CatChange cur={cur[c] || 0} prev={prev[c] || 0} t={t} />
                     </View>
-                    <Amount text={money(by[c])} style={st.itemAmt} />
+                    <Amount text={money0(by[c])} style={st.itemAmt} />
                   </View>
                   <Text style={st.meta}>
                     {tr('reports.catLine', { pct: Math.round((by[c] / a.total) * 100), n: cnt[c] })}
@@ -1140,7 +1139,7 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
       </View>
 
       {top.length ? (
-        <View style={[st.card, { gap: 6 }]}>
+        <View style={[st.card, { gap: 8 }]}>
           <CardHead t={t} title={tr('reports.top')} />
           <View>
             {top.map((x, i) => (
@@ -1174,52 +1173,52 @@ function makeStyles(t: Theme) {
     scroll: { paddingHorizontal: SPACE.edge, paddingTop: 8 },
     wrap: { width: '100%', maxWidth: DASH_MAX, alignSelf: 'center', gap: 16 },
     dashBody: { gap: SPACE.gap },
-    h1: { fontSize: 28, lineHeight: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.6 },
-    link: { color: t.gold, fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
+    h1: { fontSize: 28, lineHeight: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.5 },
+    link: { color: t.gold, fontSize: 14, fontWeight: '600' },
     months: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    mBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
-    monthNow: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.accentSoft },
-    mLabel: { fontSize: 17, fontFamily: FONTS.bold, color: t.fg, letterSpacing: -0.2 },
-    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    tile: { flexGrow: 1, flexBasis: '45%', ...cardBase(t), padding: 16, gap: 6 },
-    tileVal: { fontSize: 22, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    mBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
+    monthNow: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1, borderColor: t.line, backgroundColor: trackOf(t) },
+    mLabel: { fontSize: 17, fontFamily: FONTS.bold, color: t.fg },
+    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    tile: { flexGrow: 1, flexBasis: '45%', ...cardBase(t), padding: 16, gap: 8 },
+    tileVal: { fontSize: 22, fontFamily: FONTS.display, color: t.fg, fontVariant: ['tabular-nums'] },
     tileSub: { fontSize: 13, color: t.muted },
     tileLbl: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.muted },
-    card: { ...cardBase(t), gap: 14 },
-    sumCard: { ...cardBase(t), flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+    card: { ...cardBase(t), gap: 16 },
+    sumCard: { ...cardBase(t), flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16 },
     sumLbl: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted },
-    sumVal: { ...bigAmount, fontSize: 24, lineHeight: 31, color: t.fg, letterSpacing: -0.6 },
-    catChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.pill, minHeight: 38, paddingVertical: 6, paddingLeft: 7, paddingRight: 14 },
-    subWrap: { gap: 10, paddingVertical: 12 },
+    sumVal: { ...bigAmount, fontSize: 24, lineHeight: 31, color: t.fg },
+    catChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.pill, minHeight: 40, paddingVertical: 4, paddingLeft: 8, paddingRight: 16 },
+    subWrap: { gap: 12, paddingVertical: 12 },
     subRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     nameLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
     subFoot: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingLeft: 56 },
     backHint: { position: 'absolute', left: 0, top: '45%', width: 40, height: 40, borderRadius: 20, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-    rateNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
+    rateNote: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
     metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
     topLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.line },
     legend: { flexDirection: 'row', gap: 12 },
-    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     legendTxt: { fontSize: 12, color: t.muted },
-    dash: { width: 14, height: 0, borderTopWidth: 2, borderStyle: 'dashed' },
-    stack: { flexDirection: 'row', height: 12, borderRadius: RADIUS.pill, overflow: 'hidden', gap: 3 },
+    dash: { width: 16, height: 0, borderTopWidth: 2, borderStyle: 'dashed' },
+    stack: { flexDirection: 'row', height: 12, borderRadius: RADIUS.pill, overflow: 'hidden', gap: 4 },
     catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-    cardEmpty: { alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14 },
+    cardEmpty: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 16 },
     filters: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
     filterLbl: { fontSize: 13, fontWeight: '600', color: t.muted },
-    fchip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.accent, borderRadius: RADIUS.pill, paddingVertical: 6, paddingLeft: 12, paddingRight: 10 },
-    fchipTxt: { color: t.accentFg, fontSize: 14, fontFamily: FONTS.semi },
-    dayCard: { ...cardBase(t), paddingTop: 14, paddingBottom: 4 },
+    fchip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: selectedFill(t), borderWidth: 1, borderColor: selectedLine(t), borderRadius: RADIUS.pill, paddingVertical: 4, paddingLeft: 12, paddingRight: 8 },
+    fchipTxt: { color: t.fg, fontSize: 14, fontFamily: FONTS.semi },
+    dayCard: { ...cardBase(t), paddingTop: 16, paddingBottom: 4 },
     dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 },
     dayLbl: { flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted },
     dayTot: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted, fontVariant: ['tabular-nums'], textAlign: 'right' },
     itemCat: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: t.fg },
-    itemAmt: { textAlign: 'right', fontSize: 15, fontWeight: '700', color: t.fg, fontVariant: ['tabular-nums'] },
+    itemAmt: { textAlign: 'right', fontSize: 15, fontWeight: '600', color: t.fg, fontVariant: ['tabular-nums'] },
     meta: { fontSize: 13, lineHeight: 18, color: t.muted },
-    hint: { fontSize: 12.5, lineHeight: 17, color: t.muted, paddingHorizontal: 4 },
-    section: { fontSize: 18, lineHeight: 24, fontFamily: FONTS.bold, color: t.fg, letterSpacing: -0.2, paddingHorizontal: 4, marginTop: 6 },
-    toast: { position: 'absolute', alignSelf: 'center', maxWidth: '92%', backgroundColor: t.raised, borderWidth: 1, borderColor: t.goldLine, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
-    search: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, borderRadius: RADIUS.inner, backgroundColor: t.surface, paddingHorizontal: 14, ...cardShadow(t) },
+    hint: { fontSize: 13, lineHeight: 18, color: t.muted, paddingHorizontal: 4 },
+    section: { fontSize: 18, lineHeight: 24, fontFamily: FONTS.bold, color: t.fg, paddingHorizontal: 4, marginTop: 4 },
+    toast: { position: 'absolute', alignSelf: 'center', maxWidth: '92%', backgroundColor: t.raised, borderWidth: 1, borderColor: t.goldLine, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
+    search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, borderRadius: 12, backgroundColor: t.surface, paddingHorizontal: 16, ...cardShadow(t) },
     searchInput: { flex: 1, minWidth: 0, fontSize: 15, color: t.fg, height: '100%' },
     searchClear: { width: 22, height: 22, borderRadius: 11, backgroundColor: t.muted, alignItems: 'center', justifyContent: 'center' },
   });

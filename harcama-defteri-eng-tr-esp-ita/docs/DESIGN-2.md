@@ -32,7 +32,7 @@ Amaç: referansların **ortak** güçlü yanlarını Monibo'nun mevcut mimarisin
 1. **Alt çubuk:** yüzen hap (kenarlardan 16, altta güvenli alan + 10), yükseklik 64, `surface` + kenar, 4 sekme + ortada 56'lık vurgu daire "+".
    Sekmeler: Ana sayfa · İşlemler · [+] · Bütçe · Raporlar. "+" dokunuşu küçük bir seçim balonu açar: Harcama / Gelir.
    Ayarlar: ana ekran başlığındaki dişli ve yan menü. Seçili sekme: vurgu yumuşak hap + vurgu ikon/yazı.
-2. **Ana sayfa başlığı:** solda avatar (baş harf) + "İyi akşamlar," / kalın ad; sağda para birimi hapı + dişli (Ayarlar). Marka yazısı küçük.
+2. **Ana sayfa başlığı:** solda avatar (baş harf, menü düğmesi) + sayfa adı "Özet" (selamlama yok); sağda para birimi hapı + dişli (Ayarlar). Marka yazısı ve tek cümlelik ürün özeti sayfa sonunda.
 3. **Bakiye kartı:** geometrik motif sağ üstte; etiket + göz; 40'lık tutar; değişim çipi; altta ikiye bölünmüş Gelir | Gider (renkli ok çipleri, ince dikey ayırıcı);
    bütçe varsa en altta ince ilerleme çubuğu + "Bütçenin %30'u kullanıldı · iyi gidiyor / dikkat / aşıldı".
 4. **Hızlı eylemler:** 4 eşit, 56'lık yuvarlak-kare ikon + altında etiket (dolgu: kendi rengi %16), daha az yer kaplar.
@@ -49,3 +49,5 @@ Amaç: referansların **ortak** güçlü yanlarını Monibo'nun mevcut mimarisin
 
 Veri modeli, para birimi/kur mantığı, 5 dil, gizlilik kipi, kilit, erişilebilirlik etiketleri, `testID`'ler (gerekirse yeni yere taşınır),
 WCAG kontrast testleri (tüm vurgu × zemin × kip), mevcut gezinme hareketleri.
+
+Cila geçişi: unslop yöntemi, Damir Sokolovsky (@heydamir), CC BY 4.0, https://github.com/heydamir/unslop

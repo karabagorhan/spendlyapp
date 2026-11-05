@@ -51,7 +51,7 @@ export function DatePicker({ value, onChange, t }: { value: string; onChange: (d
                 accessibilityState={{ selected, disabled: future }}
                 style={[s.day, { backgroundColor: selected ? t.accent : 'transparent', borderColor: isToday && !selected ? t.accent : 'transparent', opacity: future ? 0.3 : 1 }]}
               >
-                <Text style={{ color: selected ? t.accentFg : t.fg, fontSize: 15, fontWeight: selected || isToday ? '700' : '400', fontVariant: ['tabular-nums'] }}>{parseIso(c).getDate()}</Text>
+                <Text style={{ color: selected ? t.accentFg : t.fg, fontSize: 15, fontWeight: selected || isToday ? '600' : '400', fontVariant: ['tabular-nums'] }}>{parseIso(c).getDate()}</Text>
               </Pressable>
             </View>
           );

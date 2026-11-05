@@ -18,7 +18,7 @@ export function AccountSection({ t }: { t: Theme }) {
   return (
     <>
       {service.configured ? (
-        <View style={{ gap: 10 }} testID="account-section">
+        <View style={{ gap: 12 }} testID="account-section">
           <Label t={t}>{tr('acct.title')}</Label>
           {user ? (
             <>
@@ -36,7 +36,7 @@ export function AccountSection({ t }: { t: Theme }) {
           )}
         </View>
       ) : null}
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: 12 }}>
         <Label t={t}>{tr('acct.legal')}</Label>
         <BusyButton testID="legal-privacy" kind="ghost" label={tr('legal.privacy')} t={t} onPress={() => openLegal('privacy')} />
         <BusyButton testID="legal-terms" kind="ghost" label={tr('legal.terms')} t={t} onPress={() => openLegal('terms')} />
@@ -74,7 +74,7 @@ function DeleteSheet({ visible, user, onClose, t }: { visible: boolean; user: Au
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} transparent={Platform.OS === 'web'}>
       <View style={{ flex: 1, backgroundColor: t.bg }} accessibilityViewIsModal>
-        <ScrollView contentContainerStyle={{ padding: 22, paddingTop: Platform.OS === 'ios' ? 28 : insets.top + 16, paddingBottom: insets.bottom + 30, gap: 18 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: Platform.OS === 'ios' ? 28 : insets.top + 16, paddingBottom: insets.bottom + 30, gap: 20 }} keyboardShouldPersistTaps="handled">
           <Text accessibilityRole="header" style={{ color: t.fg, fontSize: 28, fontFamily: FONTS.display }}>{tr('del.title')}</Text>
           {a.error ? <Banner kind="error" text={tr('auth.err.' + a.error)} t={t} /> : null}
           <Text style={{ color: t.fg, fontSize: 16, lineHeight: 23 }}>{tr('del.body')}</Text>

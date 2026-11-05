@@ -8,7 +8,7 @@ import { buildExcel as buildDesc } from '../src/excel';
 import { XlWorkbook, writeXlsx } from '../src/xlsxWriter';
 import { CATALOGS, LANGS, Lang, setLanguage } from '../src/i18n';
 import { Cur, Rates, needsRates, setMainCurrency, viewData } from '../src/currency';
-import { Expense, INCOME_CATS, Income, balanceFor, budgetProgress, categorySlices, dayLabel, dayLabelShort, greetingKey, recentTransactions, shortDay, todayIso, addDays } from '../src/lib';
+import { Expense, INCOME_CATS, Income, balanceFor, budgetProgress, categorySlices, dayLabel, dayLabelShort, recentTransactions, shortDay, todayIso, addDays } from '../src/lib';
 import { Data, defaultSettings, merge, normalize } from '../src/store';
 
 let pass = 0, fail = 0;
@@ -174,9 +174,7 @@ eq('son işlemler: tarihe sonra zamana göre, gelir+gider karışık', rt.map((r
 eq('son işlemler: sınır', recentTransactions([], [], 4), []);
 eq('son işlemler: yalnızca gelir', recentTransactions([], [inc('i', '2026-10-01', 1)], 4).map((r) => r.kind), ['income']);
 
-/* ---------- Selamlama ve tarih ---------- */
-const g: Record<number, string> = { 0: 'night', 4: 'night', 5: 'morning', 11: 'morning', 12: 'afternoon', 17: 'afternoon', 18: 'evening', 21: 'evening', 22: 'night', 23: 'night' };
-for (const h of Object.keys(g)) eq(`selamlama ${h}:00`, greetingKey(+h), g[+h]);
+/* ---------- Tarih ---------- */
 eq('kompakt tarih: bugün adıyla', dayLabelShort(todayIso()), dayLabel(todayIso()));
 eq('kompakt tarih: dün adıyla', dayLabelShort(addDays(todayIso(), -1)), dayLabel(addDays(todayIso(), -1)));
 eq('kompakt tarih: eski tarih kısa biçimde', dayLabelShort('2026-01-05'), shortDay('2026-01-05'));
@@ -231,7 +229,7 @@ eq('yedekte lock/notifAmounts korunur', (({ lock, notifAmounts }) => [lock, noti
 
 /* ---------- Dinamik çeviri anahtarları her dilde var ---------- */
 const dyn = [
-  ...['morning', 'afternoon', 'evening', 'night'].map((k) => 'dash.greeting.' + k),
+  'title.ozet',
   ...INCOME_CATS.map((c) => 'incat.' + c),
   'xl.sheet.income', 'txn.expenses', 'txn.income', 'tab.home', 'tab.transactions', 'tab.budget', 'tab.reports', 'tab.settings',
 ];

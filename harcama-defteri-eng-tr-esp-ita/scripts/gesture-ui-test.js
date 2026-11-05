@@ -77,14 +77,14 @@ const data = {
   const menuOpen = async () => (await page.locator('[role="menuitem"]').count()) > 0;
   const openMenu = async () => { if (!(await menuOpen())) { await page.getByTestId('menu-open').click(); await page.waitForTimeout(500); } };
   const closeMenuByTap = async () => { await page.mouse.click(370, 400); await page.waitForTimeout(500); };
-  // Ekran başlığı (screen-title); Ana sayfada üst başlık yerine selamlama var, marka adı sayfa sonundaki imzada (home-brand)
+  // Ekran başlığı (screen-title): Ana sayfada da sayfa adı (Özet); marka adı sayfa sonundaki imzada (home-brand)
   const title = () => page.evaluate(() => {
     const el = document.querySelector('[data-testid="screen-title"]') || document.querySelector('[data-testid="home-brand"]');
     return el ? el.textContent : '';
   });
   const goto = async (n) => { await openMenu(); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(600); };
-  // Panelde (Özet) üst başlık markadır (Monibo); diğer ekranlarda ekran adı
-  const T = (k) => (k === 'ozet' ? cat('app.name') : cat('title.' + k));
+  // Üst başlık her ekranda sayfa adıdır (Özet dahil)
+  const T = (k) => cat('title.' + k);
 
   /* ---- Yan menü ---- */
   await openMenu();

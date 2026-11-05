@@ -90,15 +90,11 @@ const data = (extra: Record<string, unknown> = {}) => ({
     });
     return best;
   });
-  // Seçili dil çipinin arka planı = vurgu rengi
-  const accentNow = (native: string) => page.evaluate((txt) => {
-    const el = Array.from(document.querySelectorAll('div,span')).find((e) => e.childNodes.length === 1 && e.firstChild?.nodeType === 3 && e.textContent === txt);
-    for (let p: Element | null = el ?? null; p; p = p.parentElement) {
-      const c = getComputedStyle(p).backgroundColor;
-      if (c !== 'rgba(0, 0, 0, 0)') return c;
-    }
-    return '';
-  }, native);
+  // Vurgu rengi: ortadaki "+" düğmesinin (fab-add) arka planı. Seçili dil çipi artık vurgu dolgusu taşımaz (unslop cilası: seçili = yüzey basamağı + ince çizgi), bu yüzden kalıcı vurgu öğesine bakılır
+  const accentNow = (_native: string) => page.evaluate(() => {
+    const el = document.querySelector('[data-testid="fab-add"]');
+    return el ? getComputedStyle(el).backgroundColor : '';
+  });
   const swatch = (label: string) => page.locator(`[role="button"][aria-label="${label}"]`).first();
 
   for (const mode of ['noir', 'ivory'] as Mode[]) {

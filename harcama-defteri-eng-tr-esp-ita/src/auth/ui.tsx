@@ -89,7 +89,7 @@ export function TextField({ label, value, onChangeText, t, error, hint, secure, 
     : kind === 'name' ? { autoCapitalize: 'words' as const, autoComplete: 'name' as const, textContentType: 'name' as const }
     : {};
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: 8 }}>
       <Label t={t}>{label}</Label>
       <View>
         <TextInput
@@ -124,8 +124,8 @@ export function TextField({ label, value, onChangeText, t, error, hint, secure, 
 export function StrengthMeter({ level, t }: { level: 0 | 1 | 2 | 3; t: Theme }) {
   const color = level === 0 ? t.warn : level === 1 ? t.gold : t.good;
   return (
-    <View accessible accessibilityLabel={tr('auth.strength', { level: tr('auth.strength.' + level) })} style={{ gap: 6 }}>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
+    <View accessible accessibilityLabel={tr('auth.strength', { level: tr('auth.strength.' + level) })} style={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
         {[0, 1, 2].map((i) => (
           <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i < Math.max(1, level) ? color : t.line }} />
         ))}
@@ -146,7 +146,7 @@ export function Banner({ kind, text, t, action }: { kind: 'error' | 'info' | 'go
         <Text style={{ color: t.fg, fontSize: 14, lineHeight: 20 }}>{text}</Text>
         {action ? (
           <Pressable onPress={action.onPress} accessibilityRole="button" hitSlop={6}>
-            <Text style={{ color: fg, fontWeight: '700', fontSize: 14 }}>{action.label}</Text>
+            <Text style={{ color: fg, fontWeight: '600', fontSize: 14 }}>{action.label}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -162,7 +162,7 @@ export function AuthShell({ t, title, subtitle, children, onBack, backLabel, onC
   const offline = useOffline();
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 28, paddingHorizontal: 22, flexGrow: 1, alignItems: 'center' }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 28, paddingHorizontal: 24, flexGrow: 1, alignItems: 'center' }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {/* Tablet ve geniş ekranlarda içerik okunaklı bir sütunda kalır */}
         <View style={{ width: '100%', maxWidth: CONTENT_MAX, flexGrow: 1, gap: 20 }}>
         <View style={s.topRow}>
@@ -179,13 +179,13 @@ export function AuthShell({ t, title, subtitle, children, onBack, backLabel, onC
         </View>
         {offline ? <Banner kind="info" text={tr('auth.offline')} t={t} /> : null}
         {banners}
-        <View style={{ gap: 10 }}>
-          {motif ? <View style={{ marginBottom: 10 }}>{motif}</View> : null}
+        <View style={{ gap: 12 }}>
+          {motif ? <View style={{ marginBottom: 12 }}>{motif}</View> : null}
           <Text accessibilityRole="header" style={{ color: t.fg, fontSize: 30, lineHeight: 36, fontFamily: FONTS.display, letterSpacing: -0.5 }}>{title}</Text>
           {subtitle ? <Text style={{ color: t.muted, fontSize: 16, lineHeight: 23 }}>{subtitle}</Text> : null}
         </View>
         <View style={{ gap: 16 }}>{children}</View>
-        {footer ? <View style={{ gap: 14, marginTop: 'auto', paddingTop: 8 }}>{footer}</View> : null}
+        {footer ? <View style={{ gap: 16, marginTop: 'auto', paddingTop: 8 }}>{footer}</View> : null}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -211,7 +211,7 @@ export function BusyButton({ label, onPress, busy, t, kind = 'primary', disabled
       style={({ pressed }) => [s.btn, { backgroundColor: bg, borderColor: border, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 }]}
     >
       {busy ? <ActivityIndicator color={fg} /> : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {icon}
           <Text style={{ color: fg, fontFamily: FONTS.bold, fontSize: 16 }}>{label}</Text>
         </View>
@@ -231,7 +231,7 @@ export function LinkButton({ label, onPress, t, align = 'center', testID }: { la
 const s = StyleSheet.create({
   input: { height: 54, borderWidth: 1.5, borderRadius: RADIUS.inner, paddingHorizontal: 16, fontSize: 17 },
   eye: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 48, alignItems: 'center', justifyContent: 'center' },
-  banner: { flexDirection: 'row', gap: 10, padding: 14, borderRadius: RADIUS.inner, alignItems: 'flex-start' },
+  banner: { flexDirection: 'row', gap: 12, padding: 16, borderRadius: RADIUS.inner, alignItems: 'flex-start' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 },
   topBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -10 },
   btn: { height: 54, borderRadius: RADIUS.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },

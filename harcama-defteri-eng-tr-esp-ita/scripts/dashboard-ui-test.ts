@@ -12,7 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CATALOGS, Lang, fmtPercent, setLanguage, t as tr } from '../src/i18n';
 import { fmtMoney, maskedMoney, setMainCurrency } from '../src/currency';
-import { catName, greetingKey } from '../src/lib';
+import { catName } from '../src/lib';
 
 // Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
 function findChromium(): string | undefined {
@@ -39,6 +39,8 @@ setMainCurrency('TRY');
 const sp = (s: string) => s.replace(/[\u00a0\u202f]/g, ' ');
 const T = (k: string, p: Record<string, string | number> = {}) => sp(tr(k, p));
 const mny = (n: number, cur: 'TRY' | 'USD' = 'TRY', d = 2) => sp(fmtMoney(n, cur, d));
+// Özet kartları (bakiye kartı) tam birimle gösterilir (unslop cilası: özet ekranlarda tek biçim)
+const mny0 = (n: number, cur: 'TRY' | 'USD' = 'TRY') => mny(n, cur, 0);
 const pc = (n: number | string) => sp(fmtPercent(n));
 const MASKED = () => sp(maskedMoney('TRY')); // gizlilik kipinde her tutarın görünümü ("₺••••")
 
@@ -184,13 +186,13 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     const p = await open({ data: full() });
     const t0 = await text(p);
     ok('marka adı Monibo', t0.includes('Monibo'));
-    // Selamlama iki satırdır ("İyi akşamlar," / kalın "Orhan"): satır sonu ve boşluklar yok sayılarak karşılaştırılır
-    const nows = (x: string) => x.replace(/\s+/g, '');
-    ok('selamlama saate uygun ve adı içerir', nows(await tid(p, 'dash-greeting')) === nows(T('dash.greetName', { greeting: T('dash.greeting.' + greetingKey(new Date().getHours())), name: 'Orhan' })), await tid(p, 'dash-greeting'));
+    // Selamlama kaldırıldı (unslop cilası): ana sayfa üst başlığı sayfa adıdır ("Özet"), avatar menü düğmesi olarak yanında
+    ok('ana sayfa başlığı sayfa adı (Özet)', (await tid(p, 'screen-title')) === T('title.ozet'), await tid(p, 'screen-title'));
+    ok('ana sayfada selamlama öğesi yok', (await id(p, 'dash-greeting').count()) === 0);
     const card = await tid(p, 'balance-card');
-    ok('net durum = gelir − gider', card.includes(mny(NET)), card);
-    ok('aylık gelir kutusu', (await tid(p, 'bal-income')).includes(mny(INCOME)), await tid(p, 'bal-income'));
-    ok('aylık gider kutusu', (await tid(p, 'bal-expenses')).includes(mny(SPENT)), await tid(p, 'bal-expenses'));
+    ok('net durum = gelir − gider', card.includes(mny0(NET)), card);
+    ok('aylık gelir kutusu', (await tid(p, 'bal-income')).includes(mny0(INCOME)), await tid(p, 'bal-income'));
+    ok('aylık gider kutusu', (await tid(p, 'bal-expenses')).includes(mny0(SPENT)), await tid(p, 'bal-expenses'));
     ok('geçen aya göre değişim (+%175)', (await tid(p, 'bal-delta')) === `+${pc(175)}`, await tid(p, 'bal-delta'));
     ok('hızlı eylemler (4)', (await Promise.all(['expense', 'income', 'reports', 'budgets'].map((k) => id(p, 'qa-' + k).count()))).every((c) => c === 1));
     ok('günlük çubuklar: ayın gün sayısı kadar', (await p.locator('[data-testid^="bar-"]').count()) === daysInMonth, String(await p.locator('[data-testid^="bar-"]').count()));
@@ -222,20 +224,20 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await id(p, 'bal-eye').click();
     // Davranış değişikliği: gizleme artık yalnızca bakiye kartında değil her ekranda; kartta da "••••••" yerine "₺••••" (dile göre "•••• €") görünür
     ok('gizle: bakiye ' + MASKED(), (await tid(p, 'bal-amount')) === MASKED(), await tid(p, 'bal-amount'));
-    ok('gizle: gelir/gider kutuları gizli, gerçek tutar görünmez', !(await tid(p, 'balance-card')).includes(mny(NET)) && !(await tid(p, 'balance-card')).includes(mny(INCOME)));
+    ok('gizle: gelir/gider kutuları gizli, gerçek tutar görünmez', !(await tid(p, 'balance-card')).includes(mny0(NET)) && !(await tid(p, 'balance-card')).includes(mny0(INCOME)));
     ok('gizle: kalıcı kaydedildi', (await stored(p)).settings.hideBalance === true);
     ok('gizle: veri değişmedi', JSON.stringify((await stored(p)).items) === JSON.stringify(items) && JSON.stringify((await stored(p)).incomes) === JSON.stringify(incomes));
     await p.reload(); await p.waitForTimeout(1200);
     ok('gizle: yenilemeden sonra da gizli', (await tid(p, 'bal-amount')) === MASKED());
     await id(p, 'bal-eye').click();
-    ok('göster: tutar geri gelir', (await tid(p, 'balance-card')).includes(mny(NET)));
+    ok('göster: tutar geri gelir', (await tid(p, 'balance-card')).includes(mny0(NET)));
   }
 
   /* 2b) Gizlilik kipi uygulama geneli: panel, işlem listesi, raporlar, bütçe, abonelikler, yan menü; Ayarlar anahtarı */
   {
     const p = await open({ data: full({ hideBalance: true }) });
     const dash = await text(p);
-    ok('gizli (panel): gerçek tutarlar görünmez', ![mny(NET), mny(SPENT), mny(INCOME), money0(SPENT)].some((x) => dash.includes(x)));
+    ok('gizli (panel): gerçek tutarlar görünmez', ![mny(NET), mny0(NET), mny(SPENT), mny(INCOME), mny0(INCOME), money0(SPENT)].some((x) => dash.includes(x)));
     ok('gizli (panel): maskeli tutarlar görünür', dash.includes(MASKED()), MASKED());
     ok('gizli (panel): maskeli tutarın erişilebilirlik etiketi "' + T('amount.hidden') + '"', (await p.locator(`[aria-label="${T('amount.hidden')}"]`).count()) > 0);
     await id(p, 'tab-harcamalar').click(); await p.waitForTimeout(500);
@@ -277,7 +279,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await p.getByLabel(T('month.prev')).first().click(); await p.waitForTimeout(400);
     ok('bu aya dön: geçmiş ayda görünür', (await id(p, 'month-today').count()) === 1 && await has(p, T('month.backToCurrent')));
     await id(p, 'month-today').click(); await p.waitForTimeout(400);
-    ok('bu aya dön: tıklayınca güncel aya döner, düğme kaybolur', (await id(p, 'month-today').count()) === 0 && (await tid(p, 'balance-card')).includes(mny(NET)));
+    ok('bu aya dön: tıklayınca güncel aya döner, düğme kaybolur', (await id(p, 'month-today').count()) === 0 && (await tid(p, 'balance-card')).includes(mny0(NET)));
     await id(p, 'tab-harcamalar').click(); await p.waitForTimeout(400);
     await p.getByLabel(T('month.prev')).first().click(); await p.waitForTimeout(400);
     ok('bu aya dön: işlemler ekranında da görünür', (await id(p, 'month-today').count()) === 1);
@@ -303,8 +305,8 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     const s1 = await stored(p);
     ok('gelir kalıcı kaydedildi (2 → 3)', s1.incomes.length === 3 && s1.incomes.some((x: any) => x.amount === 250.5 && x.cat === 'gift' && x.cur === 'TRY'), JSON.stringify(s1.incomes));
     ok('mevcut gelir ve harcamalar bozulmadı', JSON.stringify(s1.items) === JSON.stringify(items) && s1.incomes.filter((x: any) => x.id === 'i1' || x.id === 'i0').length === 2);
-    ok('net durum güncellendi (825 + 250,50)', (await tid(p, 'balance-card')).includes(mny(NET + 250.5)), await tid(p, 'balance-card'));
-    ok('gelir kutusu güncellendi', (await tid(p, 'bal-income')).includes(mny(INCOME + 250.5)));
+    ok('net durum güncellendi (825 + 250,50)', (await tid(p, 'balance-card')).includes(mny0(NET + 250.5)), await tid(p, 'balance-card'));
+    ok('gelir kutusu güncellendi', (await tid(p, 'bal-income')).includes(mny0(INCOME + 250.5)));
     // Düzenle
     await id(p, 'recent-0').click();
     ok('düzenleme formu açılır', await wait(p, T('income.editTitle')));
@@ -312,7 +314,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await p.getByText(T('common.confirmDelete'), { exact: true }).first().click();
     ok('silme bildirimi + geri al', await wait(p, T('toast.incomeDeleted')) && await has(p, T('toast.undo')));
     ok('silinince kayıttan çıkar', (await stored(p)).incomes.length === 2);
-    ok('silinince net durum eski değerine döner', (await tid(p, 'balance-card')).includes(mny(NET)));
+    ok('silinince net durum eski değerine döner', (await tid(p, 'balance-card')).includes(mny0(NET)));
     await p.getByText(T('toast.undo'), { exact: true }).first().click(); await p.waitForTimeout(500);
     ok('geri al kaydı özgün haliyle döndürür', (await stored(p)).incomes.length === 3 && (await stored(p)).incomes.some((x: any) => x.amount === 250.5));
     await audit(p, 'gelir-eklendi');
@@ -341,7 +343,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await p.locator('input').first().fill('40');
     await p.getByText(T('common.save'), { exact: true }).last().click();
     ok('harcama eklendi', (await stored(p)).items.length === 5);
-    ok('gider ve net durum güncellendi', (await tid(p, 'bal-expenses')).includes(mny(SPENT + 40)) && (await tid(p, 'balance-card')).includes(mny(NET - 40)));
+    ok('gider ve net durum güncellendi', (await tid(p, 'bal-expenses')).includes(mny0(SPENT + 40)) && (await tid(p, 'balance-card')).includes(mny0(NET - 40)));
   }
 
   /* 5) Para birimi: geçiş, doğruluk, veri bütünlüğü */
@@ -352,8 +354,8 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     ok('para birimi menüsü: 5 seçenek', (await p.locator('[data-testid^="cur-opt-"]').count()) === 5);
     await audit(p, 'para-birimi-menüsü');
     await id(p, 'cur-opt-USD').click(); await p.waitForTimeout(900);
-    ok('USD: net durum (kayıt bazlı çevrilmiş gelir − gider)', (await tid(p, 'balance-card')).includes(mny(usdNet, 'USD')), await tid(p, 'balance-card'));
-    ok('USD: gelir ve gider dönüştürüldü', (await tid(p, 'bal-income')).includes(mny(usdIncome, 'USD')) && (await tid(p, 'bal-expenses')).includes(mny(usdSpent, 'USD')));
+    ok('USD: net durum (kayıt bazlı çevrilmiş gelir − gider)', (await tid(p, 'balance-card')).includes(mny0(usdNet, 'USD')), await tid(p, 'balance-card'));
+    ok('USD: gelir ve gider dönüştürüldü', (await tid(p, 'bal-income')).includes(mny0(usdIncome, 'USD')) && (await tid(p, 'bal-expenses')).includes(mny0(usdSpent, 'USD')));
     ok('USD: bütçe halkası aynı oran (%18)', (await tid(p, 'budget-pct')) === pc(18));
     ok('USD: başlıktaki seçici güncellendi', (await tid(p, 'cur-pill')).includes('USD'));
     const s = await stored(p);
@@ -361,7 +363,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await id(p, 'recent-0').click(); await wait(p, T('income.editTitle')); await p.waitForTimeout(600);
     await p.getByText(T('common.cancel'), { exact: true }).first().click(); await p.waitForTimeout(500);
     await id(p, 'cur-pill').click(); await id(p, 'cur-opt-TRY').click(); await p.waitForTimeout(900);
-    ok('TRY\'ye dönünce tutarlar aynen eski (kayma yok)', (await tid(p, 'balance-card')).includes(mny(NET)) && (await tid(p, 'bal-expenses')).includes(mny(SPENT)));
+    ok('TRY\'ye dönünce tutarlar aynen eski (kayma yok)', (await tid(p, 'balance-card')).includes(mny0(NET)) && (await tid(p, 'bal-expenses')).includes(mny0(SPENT)));
     const after = await stored(p);
     const b0 = JSON.parse(before!);
     ok('gidiş-dönüşte harcama/gelir/abonelik verisi bayt bayt aynı', JSON.stringify([after.items, after.subs, after.incomes]) === JSON.stringify([b0.items, b0.subs, b0.incomes]));
@@ -402,7 +404,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
   /* 6) Gezinme: sekmeler, hızlı eylemler, menü */
   {
     const p = await open({ data: full() });
-    // Ekran başlığı (screen-title); Ana sayfada üst başlık yerine selamlama var, marka adı sayfa sonundaki imzada (home-brand)
+    // Ekran başlığı (screen-title): Ana sayfada da sayfa adı (Özet); marka adı sayfa sonundaki imzada (home-brand)
     const title = () => p.evaluate(() => { const el = document.querySelector('[data-testid="screen-title"]') ?? document.querySelector('[data-testid="home-brand"]'); return el ? el.textContent : ''; });
     await id(p, 'tab-harcamalar').click(); await p.waitForTimeout(500);
     ok('sekme: İşlemler → Harcamalar ekranı', (await title()) === T('title.harcamalar'), String(await title()));
@@ -437,7 +439,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     ok('Ayarlar: yasal bağlantılar korunmuş', (await id(p, 'legal-privacy').count()) === 1);
     await audit(p, 'ayarlar');
     await id(p, 'tab-ozet').click(); await p.waitForTimeout(500);
-    ok('sekme: Ana sayfa', (await title()) === 'Monibo', String(await title()));
+    ok('sekme: Ana sayfa', (await title()) === T('title.ozet'), String(await title()));
     await id(p, 'qa-reports').click(); await p.waitForTimeout(500);
     ok('hızlı eylem: Raporlar', (await title()) === T('title.raporlar'));
     await id(p, 'tab-ozet').click(); await id(p, 'qa-budgets').click(); await p.waitForTimeout(500);
@@ -462,9 +464,9 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
       const cs = getComputedStyle(el); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.25;
       return Math.round(el.getBoundingClientRect().height / lh);
     }, needle);
-    const netText = mny(1234567.89 - 98765.43);
+    const netText = mny0(1234567.89 - 98765.43);
     ok(`[${w}px] büyük net tutar tek satır (${netText})`, (await lines(netText)) === 1, String(await lines(netText)));
-    ok(`[${w}px] büyük gelir kutusu tek satır`, (await lines(mny(1234567.89))) === 1, String(await lines(mny(1234567.89))));
+    ok(`[${w}px] büyük gelir kutusu tek satır`, (await lines(mny0(1234567.89))) === 1, String(await lines(mny0(1234567.89))));
     ok(`[${w}px] halka ortası toplam tek satır`, (await lines(money0(98765.43))) <= 1, String(await lines(money0(98765.43))));
     await audit(p, `büyük-tutar-${w}px`);
   }
@@ -480,7 +482,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     ok('boş: bütçe belirleme çağrısı', await has(p, T('dash.budgetEmpty')) && await has(p, T('dash.budgetSet')));
     ok('boş: abonelik boş durumu + ekle', await has(p, T('dash.subsEmpty')) && await has(p, T('dash.subsAdd')));
     ok('boş: son işlemler boş durumu', (await tid(p, 'recent-empty')) === T('dash.recentEmpty'));
-    ok('boş: selamlama adsız', !(await tid(p, 'dash-greeting')).includes(','));
+    ok('boş: başlık yine sayfa adı', (await tid(p, 'screen-title')) === T('title.ozet'));
     ok('boş: değişim yüzdesi yok', (await id(p, 'bal-delta').count()) === 0);
     await audit(p, 'boş');
     await p.getByText(T('dash.budgetSet'), { exact: true }).first().click(); await p.waitForTimeout(500);
@@ -494,7 +496,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
   {
     const p = await open({ data: { items, subs: [], incomes: [], settings: settings() } });
     const c = await tid(p, 'balance-card');
-    ok('gelirsiz: büyük tutar harcanan toplamıdır, net değil', c.startsWith(T('bal.spentTitle')) && c.includes(mny(SPENT)), c);
+    ok('gelirsiz: büyük tutar harcanan toplamıdır, net değil', c.startsWith(T('bal.spentTitle')) && c.includes(mny0(SPENT)), c);
     ok('gelirsiz: değişim yüzdesi gösterilmez', (await id(p, 'bal-delta').count()) === 0);
     ok('gelirsiz: gelir kutusu ekle çağrısı, sahte tutar yok', (await id(p, 'bal-add-income').count()) === 1 && !(await tid(p, 'bal-income')).match(/\d/));
     await id(p, 'bal-add-income').click();
@@ -559,7 +561,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
     await p.evaluate(() => { (window as any).__failRead = false; });
     await p.getByText(T('state.retry'), { exact: true }).click(); await p.waitForTimeout(1200);
     ok('okuma hatası: tekrar dene → panel açılır', await waitId(p, 'balance-card'));
-    ok('okuma hatası: veri eksiksiz geri geldi', (await tid(p, 'balance-card')).includes(mny(NET)));
+    ok('okuma hatası: veri eksiksiz geri geldi', (await tid(p, 'balance-card')).includes(mny0(NET)));
     ok('okuma hatası sonrası da kayıt değişmedi', (await p.evaluate(() => localStorage.getItem('harcama-defteri:v1'))) === JSON.stringify(full()));
   }
   {
@@ -586,7 +588,7 @@ const contrastReport = (p: Page, selector: string) => p.evaluate((sel) => {
   {
     const legacy = { items, subs, settings: { budget: 1000, theme: 'noir', accent: 'gold', tint: 'classic', name: 'Eski', language: lang, currency: 'TRY', budgetCur: 'TRY', remind: false, remindHour: 21, subRemind: false, catBudgets: {} } };
     const p = await open({ data: legacy });
-    ok('eski kayıt: panel açılır (gelir yok → harcanan)', (await tid(p, 'balance-card')).startsWith(T('bal.spentTitle')) && (await tid(p, 'balance-card')).includes(mny(SPENT)));
+    ok('eski kayıt: panel açılır (gelir yok → harcanan)', (await tid(p, 'balance-card')).startsWith(T('bal.spentTitle')) && (await tid(p, 'balance-card')).includes(mny0(SPENT)));
     ok('eski kayıt: açılışta üzerine yazılmaz', (await p.evaluate(() => localStorage.getItem('harcama-defteri:v1'))) === JSON.stringify(legacy));
     await id(p, 'qa-income').click(); await wait(p, T('income.newTitle'));
     await id(p, 'income-amount').fill('10');

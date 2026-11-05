@@ -302,7 +302,6 @@ export function recentTransactions(items: Expense[], incomes: Income[], limit = 
 }
 
 /** Saate göre selamlama anahtarı: "morning" 05–11, "afternoon" 12–17, "evening" 18–21, "night" diğer. */
-export const greetingKey = (hour: number) => (hour >= 5 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : hour >= 18 && hour < 22 ? 'evening' : 'night');
 
 /* ---------- Abonelikler ---------- */
 export type SubState =

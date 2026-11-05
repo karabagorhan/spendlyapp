@@ -35,13 +35,13 @@ export function Onboarding({ t: _t, lang, onLang, onDone, accountsEnabled }: { t
   const artSize = Math.max(80, Math.min(art.w, art.h, 380));
   return (
     <View style={{ flex: 1, backgroundColor: OB.bg, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 20 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, minHeight: 44 }}>
-        <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, flexWrap: 'wrap' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, minHeight: 44 }}>
+        <View style={{ flexDirection: 'row', gap: 8, flexShrink: 1, flexWrap: 'wrap' }}>
           {onLang ? LANGS.map((l) => {
             const on = lang === l.code;
             return (
               <Pressable key={l.code} onPress={() => onLang(l.code)} accessibilityRole="button" accessibilityState={{ selected: on }} aria-selected={on}
-                style={{ height: 30, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: on ? OB.fg : OB.line, backgroundColor: on ? OB.fg : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ height: 30, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: on ? OB.fg : OB.line, backgroundColor: on ? OB.fg : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: on ? OB.bg : OB.fg, fontSize: 12.5, fontFamily: FONTS.semi }}>{l.native}</Text>
               </Pressable>
             );
@@ -67,7 +67,7 @@ export function Onboarding({ t: _t, lang, onLang, onDone, accountsEnabled }: { t
             <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingTop: 8 }} onLayout={idx === 0 ? (e) => setArt({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }) : undefined}>
               <OnboardingArt slide={idx} size={artSize} />
             </View>
-            <View style={{ gap: 10, width: '100%', maxWidth: CONTENT_MAX }}>
+            <View style={{ gap: 12, width: '100%', maxWidth: CONTENT_MAX }}>
               <Text accessibilityRole="header" style={{ color: OB.fg, fontSize: narrow ? 28 : 32, lineHeight: narrow ? 34 : 38, fontFamily: FONTS.display, letterSpacing: -0.5 }}>{tr(sl.key + '.title')}</Text>
               <Text style={{ color: OB.muted, fontSize: narrow ? 15 : 16, lineHeight: narrow ? 22 : 24 }}>
                 {tr(sl.key === 'ob.3' && !accountsEnabled ? 'ob.3.bodyLocal' : sl.key + '.body')}
@@ -77,7 +77,7 @@ export function Onboarding({ t: _t, lang, onLang, onDone, accountsEnabled }: { t
         ))}
       </ScrollView>
       <View style={{ paddingHorizontal: 24, width: '100%', maxWidth: CONTENT_MAX + 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20 }}>
-        <View accessible accessibilityLabel={tr('ob.page', { n: i + 1, total: SLIDES.length })} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+        <View accessible accessibilityLabel={tr('ob.page', { n: i + 1, total: SLIDES.length })} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           {SLIDES.map((_, idx) => <View key={idx} style={{ width: idx === i ? 28 : 8, height: 8, borderRadius: 4, backgroundColor: idx === i ? OB.fg : OB.dim }} />)}
         </View>
         <Pressable
@@ -204,7 +204,7 @@ export function SignUp({ t }: { t: Theme }) {
       <TextField t={t} kind="newPassword" label={tr('auth.passwordNew', { n: MIN_PASSWORD })} value={pw} onChangeText={setPw} error={show('pw')} inputRef={refs.pw} onBlur={() => touch('pw')} returnKeyType="next" onSubmitEditing={() => refs.pw2.current?.focus()} testID="su-pw"
         hint={pw ? <StrengthMeter level={passwordStrength(pw, email)} t={t} /> : null} />
       <TextField t={t} kind="newPassword" label={tr('auth.passwordConfirm')} value={pw2} onChangeText={setPw2} error={show('pw2')} inputRef={refs.pw2} onBlur={() => touch('pw2')} returnKeyType="done" onSubmitEditing={submit} testID="su-pw2" />
-      <View style={{ gap: 6 }}>
+      <View style={{ gap: 8 }}>
         <Pressable onPress={() => { setConsent((v) => !v); touch('consent'); }} accessibilityRole="checkbox" aria-checked={consent} accessibilityLabel={tr('auth.consent').replace(/[\[\]]/g, '')} testID="su-consent" style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start', minHeight: 44 }}>
           <Ionicons name={consent ? 'checkbox' : 'square-outline'} size={26} color={consent ? t.accent : errors.consent && (touched.consent || touched.submit) ? t.warn : t.muted} />
           <View style={{ flex: 1, paddingTop: 2 }}><LegalText text={tr('auth.consent')} onOpen={openLegal} t={t} size={14} /></View>

@@ -3,9 +3,9 @@ import { ComponentProps, ReactNode, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { MASK, amountsHidden } from './currency';
-import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
+import { fmtPercent, t as tr } from './i18n';
 import { contrast, mix, rgba } from './palette';
-import { RADIUS, cardBase, cardShadow, trackOf } from './design';
+import { RADIUS, cardBase, cardShadow, selectedFill, selectedLine, trackOf } from './design';
 import { Analysis, Insight, catIndex, catName, compact, pad, subType, subTypeIndex } from './lib';
 import { FONTS, Theme } from './theme';
 
@@ -19,11 +19,11 @@ export function Chip({ label, active, color, icon, onPress, t, disabled }: { lab
       aria-selected={active}
       style={({ pressed }) => [
         s.chip,
-        { backgroundColor: active ? t.accent : t.bg, borderColor: active ? t.accent : t.line, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 },
+        { backgroundColor: active ? selectedFill(t) : t.bg, borderColor: active ? selectedLine(t) : t.line, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 },
       ]}
     >
-      {icon ? <Ionicons name={icon} size={16} color={active ? t.accentFg : color ?? t.fg} /> : color ? <View style={[s.chipDot, { backgroundColor: color }]} /> : null}
-      <Text style={{ color: active ? t.accentFg : t.fg, fontSize: 15 }}>{label}</Text>
+      {icon ? <Ionicons name={icon} size={16} color={color ?? t.fg} /> : color ? <View style={[s.chipDot, { backgroundColor: color }]} /> : null}
+      <Text style={{ color: t.fg, fontSize: 15, fontFamily: active ? FONTS.semi : undefined }}>{label}</Text>
     </Pressable>
   );
 }
@@ -55,12 +55,12 @@ export function PresetCard({ colors, name, label, selected, onPress, t }: {
 }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} aria-selected={selected}
-      style={({ pressed }) => ({ flex: 1, minHeight: 76, borderRadius: 14, borderWidth: selected ? 2 : 1, borderColor: selected ? t.accent : t.line, backgroundColor: selected ? t.accentSoft : t.bg, alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, opacity: pressed ? 0.7 : 1 })}>
+      style={({ pressed }) => ({ flex: 1, minHeight: 76, borderRadius: 12, borderWidth: selected ? 2 : 1, borderColor: selected ? t.accent : t.line, backgroundColor: selected ? selectedFill(t) : t.bg, alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, opacity: pressed ? 0.7 : 1 })}>
       <View style={{ flexDirection: 'row' }}>
         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors[0], borderWidth: 1, borderColor: t.line }} />
         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors[1], borderWidth: 1, borderColor: t.line, marginLeft: -8 }} />
       </View>
-      <Text numberOfLines={1} style={{ color: t.fg, fontSize: 13, fontWeight: selected ? '700' : '500' }}>{name}</Text>
+      <Text numberOfLines={1} style={{ color: t.fg, fontSize: 13, fontFamily: selected ? FONTS.semi : undefined, fontWeight: selected ? undefined : '500' }}>{name}</Text>
     </Pressable>
   );
 }
@@ -81,7 +81,7 @@ export function SoftPill({ tone, label, icon, t, testID }: { tone: Tone; label: 
   return (
     <View style={[s.pill, { backgroundColor: bg }]} testID={testID}>
       {icon ? <Ionicons name={icon} size={12} color={fg} /> : null}
-      <Text style={{ color: fg, fontSize: 12, lineHeight: 16, fontWeight: '700', fontVariant: ['tabular-nums'], flexShrink: 1 }}>{label}</Text>
+      <Text style={{ color: fg, fontSize: 12, lineHeight: 16, fontFamily: FONTS.semi, fontVariant: ['tabular-nums'], flexShrink: 1 }}>{label}</Text>
     </View>
   );
 }
@@ -105,18 +105,18 @@ export function PillButton({ label, icon, onPress, kind = 'primary', size = 'sm'
   );
 }
 
-/** Hap biçimli bölmeli seçici (Harcamalar | Gelirler): yüzey rengi iz, seçili bölüm vurgu dolgulu hap. */
+/** Bölmeli seçici (Harcamalar | Gelirler): 12 köşeli nötr iz, seçili bölüm bir yüzey basamağı yukarıda (vurgu dolgusu yok), birincil metin. */
 export function Segmented<K extends string>({ items, value, onChange, t }: {
   items: { key: K; label: string; testID?: string }[]; value: K; onChange: (k: K) => void; t: Theme;
 }) {
   return (
-    <View style={[s.seg, { backgroundColor: t.surface }, cardShadow(t)]} accessibilityRole="tablist">
+    <View style={[s.seg, { backgroundColor: trackOf(t), borderColor: t.line }]} accessibilityRole="tablist">
       {items.map((x) => {
         const on = x.key === value;
         return (
           <Pressable key={x.key} testID={x.testID} onPress={() => onChange(x.key)} accessibilityRole="tab" aria-selected={on} accessibilityState={{ selected: on }}
-            style={({ pressed }) => [s.segBtn, on && { backgroundColor: t.accent }, !on && pressed && { backgroundColor: t.raised }]}>
-            <Text style={{ color: on ? t.accentFg : t.muted, fontSize: 14, lineHeight: 18, fontFamily: FONTS.semi }} numberOfLines={1}>{x.label}</Text>
+            style={({ pressed }) => [s.segBtn, on && { backgroundColor: selectedFill(t), borderColor: t.line, borderWidth: 1 }, !on && pressed && { backgroundColor: t.raised }]}>
+            <Text style={{ color: on ? t.fg : t.muted, fontSize: 14, lineHeight: 18, fontFamily: on ? FONTS.semi : FONTS.semi }} numberOfLines={1}>{x.label}</Text>
           </Pressable>
         );
       })}
@@ -154,11 +154,11 @@ export function EmptyState({ t, icon, title, hint, action, actionIcon = 'add', o
   return (
     <View style={[cardBase(t), s.empty]} testID={testID}>
       <EmptyArt t={t} icon={icon} />
-      <View style={{ gap: 6, alignItems: 'center', marginTop: 6 }}>
-        <Text style={{ color: t.fg, fontSize: 19, lineHeight: 25, fontFamily: FONTS.bold, textAlign: 'center', letterSpacing: -0.2 }} accessibilityRole="header">{title}</Text>
+      <View style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+        <Text style={{ color: t.fg, fontSize: 19, lineHeight: 25, fontFamily: FONTS.bold, textAlign: 'center' }} accessibilityRole="header">{title}</Text>
         <Text style={{ color: t.muted, fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 300 }}>{hint}</Text>
       </View>
-      {action && onAction ? <View style={{ marginTop: 10 }}><PillButton label={action} icon={actionIcon} onPress={onAction} size="md" t={t} /></View> : null}
+      {action && onAction ? <View style={{ marginTop: 12 }}><PillButton label={action} icon={actionIcon} onPress={onAction} size="md" t={t} /></View> : null}
     </View>
   );
 }
@@ -180,14 +180,14 @@ export function Button({ label, onPress, kind = 'primary', t, style, disabled }:
         style,
       ]}
     >
-      <Text style={{ color: fg, fontWeight: '600', fontSize: 16, letterSpacing: 0.2 }}>{label}</Text>
+      <Text style={{ color: fg, fontFamily: FONTS.semi, fontSize: 16 }}>{label}</Text>
     </Pressable>
   );
 }
 
+/** Alan/bölüm etiketi: cümle düzeni (büyük harf ve harf aralığı yok), 13/500, soluk renk. */
 export function Label({ children, t, color }: { children: string; t: Theme; color?: string }) {
-  // Harf aralığı Latin yazısı içindir; Çince karakterlerde aralık kapatılır
-  return <Text style={[s.label, getLanguage() === 'zh' && { letterSpacing: 0 }, { color: color ?? t.muted }]}>{upper(children)}</Text>;
+  return <Text style={[s.label, { color: color ?? t.muted }]}>{children}</Text>;
 }
 
 /** Seçili ayın günlük harcama çubukları; ortalama ve günlük bütçe kesikli çizgi. */
@@ -373,7 +373,7 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
       </Animated.View>
       <Animated.View
         accessibilityRole="menu"
-        style={[s.menu, { width: MENU_W, backgroundColor: t.surface, borderColor: t.goldLine, paddingTop: top + 14, paddingBottom: bottom + 14,
+        style={[s.menu, { width: MENU_W, backgroundColor: t.surface, borderColor: t.goldLine, paddingTop: top + 16, paddingBottom: bottom + 16,
           transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, -(MENU_W + 24)] }) }] }]}
       >
         {/* Hesap kartı */}
@@ -382,7 +382,7 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
             <Text style={{ fontFamily: FONTS.display, fontSize: 18, color: t.accentFg }}>{tr('app.monogram')}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: FONTS.display, fontSize: 18, lineHeight: 23, color: t.fg, letterSpacing: -0.3 }} numberOfLines={1}>{header.title}</Text>
+            <Text style={{ fontFamily: FONTS.display, fontSize: 18, lineHeight: 24, color: t.fg }} numberOfLines={1}>{header.title}</Text>
             <Text style={{ fontSize: 12.5, lineHeight: 17, color: t.muted }} numberOfLines={2}>{header.sub}</Text>
           </View>
           <Ionicons name="chevron-down" size={18} color={t.muted} />
@@ -410,7 +410,7 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
                     <Text style={{ flex: 1, color: active ? t.accent : t.fg, fontSize: 15, lineHeight: 20, fontFamily: active ? FONTS.bold : FONTS.semi }} numberOfLines={1}>{it.label}</Text>
                     {b && it.badge ? (
                       <View style={[s.badge, { backgroundColor: b.bg, borderColor: b.border }]}>
-                        <Text style={{ color: b.fg, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{it.badge.text}</Text>
+                        <Text style={{ color: b.fg, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{it.badge.text}</Text>
                       </View>
                     ) : null}
                   </Pressable>
@@ -433,7 +433,7 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
             </View>
           ) : null}
 
-          <View style={{ flexGrow: 1, minHeight: 14 }} />
+          <View style={{ flexGrow: 1, minHeight: 16 }} />
           {/* Bütçe kartı */}
           <Pressable onPress={onBudget} style={({ pressed }) => [s.budget, { backgroundColor: t.raised, borderColor: t.line, opacity: pressed ? 0.85 : 1 }]}
             accessibilityLabel={budget ? `${budget.label}: ${budget.amount} / ${budget.total}` : tr('menu.setBudget')}>
@@ -441,10 +441,10 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
               <>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <Text style={[s.secLabel, { color: t.muted, flexShrink: 1 }]} numberOfLines={1}>{budget.label}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: budget.over ? t.warn : t.accent, fontVariant: ['tabular-nums'] }}>{fmtPercent(budget.pct)}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: budget.over ? t.warn : t.accent, fontVariant: ['tabular-nums'] }}>{fmtPercent(budget.pct)}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                  <Amount text={budget.amount} style={{ fontFamily: FONTS.display, fontSize: 22, color: t.fg, letterSpacing: -0.5 }} symbolColor={t.accent} />
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                  <Amount text={budget.amount} style={{ fontFamily: FONTS.display, fontSize: 22, color: t.fg }} symbolColor={t.accent} />
                   <Text style={{ fontSize: 13, color: t.muted, fontVariant: ['tabular-nums'] }}>/ {budget.total}</Text>
                 </View>
                 <View style={{ height: 8, borderRadius: 4, backgroundColor: trackOf(t), overflow: 'hidden' }}>
@@ -452,8 +452,8 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
                 </View>
               </>
             ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <IconBox icon="wallet-outline" color={t.accent} t={t} size={32} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <IconBox icon="wallet-outline" color={t.muted} t={t} size={32} />
                 <Text style={{ flex: 1, fontSize: 14, fontFamily: FONTS.semi, color: t.fg }}>{tr('menu.setBudget')}</Text>
                 <Ionicons name="chevron-forward" size={16} color={t.muted} />
               </View>
@@ -468,8 +468,8 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 15, fontFamily: FONTS.bold, color: t.fg }} numberOfLines={1}>{profile.name}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.good }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.good }} />
               <Text style={{ fontSize: 12, color: t.muted, flexShrink: 1 }} numberOfLines={2}>{status}</Text>
             </View>
           </View>
@@ -498,18 +498,18 @@ export function Bars({ data, selected, onSelect, t, height = 150 }: {
         const tip = on && d.value ? axisText(d.value) : '';
         return (
           <Pressable key={d.key} disabled={!onSelect} onPress={() => onSelect?.(d.key)}
-            style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 6 }}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 8 }}
             accessibilityLabel={amountsHidden() ? `${d.label}: ${tr('amount.hidden')}` : `${d.label}: ${compact(d.value)}`}>
             {tip ? (
               // Baloncuk çubuk yuvasından geniş olabilir: sabit genişlikte ortalanmış kutu, metin tek satırda kalır
               <View style={{ width: 72, alignItems: 'center' }}>
                 <View style={[s.barTip, { backgroundColor: t.fg }]}>
-                  <Text style={{ color: t.bg, fontSize: 11, lineHeight: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{tip}</Text>
+                  <Text style={{ color: t.bg, fontSize: 11, lineHeight: 14, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{tip}</Text>
                 </View>
               </View>
             ) : null}
             <View style={{ width: '100%', maxWidth: 36, height: d.value ? Math.max(8, (d.value / max) * barMax) : 6, borderRadius: 8, backgroundColor: on ? t.accent : d.value ? t.bar : trackOf(t) }} />
-            <Text style={{ fontSize: 12, lineHeight: 16, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '500' }}>{d.label}</Text>
+            <Text style={{ fontSize: 12, lineHeight: 16, color: on ? t.fg : t.muted, fontWeight: on ? '600' : '500' }}>{d.label}</Text>
           </Pressable>
         );
       })}
@@ -519,10 +519,10 @@ export function Bars({ data, selected, onSelect, t, height = 150 }: {
 
 const CAT_ICONS: IconName[] = ['bag-handle-outline', 'restaurant-outline', 'car-outline', 'receipt-outline', 'medkit-outline', 'film-outline', 'shirt-outline', 'ellipsis-horizontal'];
 
-/** Simge kutusu: rengin %16'sı zeminli yuvarlatılmış kare, simge tam renkte (kategori, gelir ve abonelik türü simgeleri). `rotate`: ok simgeleri 45° döner (gelir/gider). */
+/** Simge kutusu: nötr (yazı renginin soluk tonu) yuvarlatılmış kare, simge tam renkte (kategori, gelir ve abonelik türü simgeleri). `rotate`: ok simgeleri 45° döner (gelir/gider). */
 export function IconBox({ icon, color, t, size = 36, rotate }: { icon: IconName; color: string; t: Theme; size?: number; rotate?: boolean }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: Math.round(size * 0.32), backgroundColor: rgba(color, t.name === 'ivory' ? 0.14 : 0.18), alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: size, height: size, borderRadius: Math.round(size * 0.32), backgroundColor: trackOf(t), alignItems: 'center', justifyContent: 'center' }}>
       <Ionicons name={icon} size={Math.round(size * 0.5)} color={color} style={rotate ? { transform: [{ rotate: '45deg' }] } : undefined} />
     </View>
   );
@@ -561,11 +561,11 @@ export function TxnRow({ t, kind, cat, title, subtitle, amount, orig, onPress, f
       style={({ pressed }) => [s.txn, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.line }, pressed && { opacity: 0.75 }]}>
       {income ? <IncomeIcon cat={cat} t={t} size={44} /> : <CatIcon cat={cat} t={t} size={44} />}
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text style={{ color: t.fg, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{title}</Text>
+        <Text style={{ color: t.fg, fontSize: 15, fontFamily: FONTS.semi }} numberOfLines={1}>{title}</Text>
         {subtitle ? <Text style={{ color: t.muted, fontSize: 13 }} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 0, maxWidth: '50%' }}>
-        <Amount text={`${income ? '+' : '−'}${amount}`} style={{ color: income ? t.good : t.fg, fontSize: 15, fontWeight: '700' }} />
+        <Amount text={`${income ? '+' : '−'}${amount}`} style={{ color: income ? t.good : t.fg, fontSize: 15, fontFamily: FONTS.semi }} />
         {orig ? <Text style={{ color: t.muted, fontSize: 12, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{orig}</Text> : null}
       </View>
     </Pressable>
@@ -613,16 +613,19 @@ export function RingsChart({ rings, size, stroke = 8, gap = 4, track, children, 
 
 export const subTypeColor = (type: string | undefined, t: Theme) => t.cats[subTypeIndex(type) % t.cats.length];
 
-/** Otomatik yorumlar listesi: her satırda durumun renginde simge kutusu (uyarı / iyi / bilgi). */
+/** Otomatik yorumlar listesi: nötr simge (ikincil renk) + metin; durum yalnızca küçük renkli noktayla (uyarı / iyi) anlatılır. */
 export function InsightList({ list, t }: { list: Insight[]; t: Theme }) {
   return (
     <View style={{ gap: 12 }}>
       {list.map((x, i) => {
-        const color = x.kind === 'warn' ? t.warn : x.kind === 'good' ? t.good : t.accent;
+        const dot = x.kind === 'warn' ? t.warn : x.kind === 'good' ? t.good : null;
         const icon: IconName = x.kind === 'warn' ? 'alert-circle-outline' : x.kind === 'good' ? 'checkmark-circle-outline' : 'sparkles-outline';
         return (
           <View key={i} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <IconBox icon={icon} color={color} t={t} size={36} />
+            <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={icon} size={20} color={t.muted} />
+              {dot ? <View style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: dot, borderWidth: 1, borderColor: t.surface }} /> : null}
+            </View>
             <Text style={{ flex: 1, color: t.fg, fontSize: 14, lineHeight: 20 }}>{x.text}</Text>
           </View>
         );
@@ -644,28 +647,28 @@ export function Progress({ value, max, t, color, height = 6 }: { value: number; 
 
 const s = StyleSheet.create({
   txn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  menu: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRightWidth: 1, paddingHorizontal: 14, gap: 8, borderTopRightRadius: 28, borderBottomRightRadius: 28 },
+  menu: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRightWidth: 1, paddingHorizontal: 16, gap: 8, borderTopRightRadius: 28, borderBottomRightRadius: 28 },
   account: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: RADIUS.card - 4, borderWidth: 1 },
-  monogram: { width: 42, height: 42, borderRadius: RADIUS.icon, alignItems: 'center', justifyContent: 'center' },
-  secTitle: { fontSize: 12, lineHeight: 16, fontFamily: FONTS.semi, paddingTop: 12, paddingBottom: 4, paddingHorizontal: 12 },
+  monogram: { width: 44, height: 44, borderRadius: RADIUS.icon, alignItems: 'center', justifyContent: 'center' },
+  secTitle: { fontSize: 13, lineHeight: 16, fontFamily: FONTS.semi, paddingTop: 12, paddingBottom: 4, paddingHorizontal: 12 },
   secLabel: { fontSize: 12, fontWeight: '600' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 46, paddingLeft: 7, paddingRight: 14, borderRadius: RADIUS.pill, marginBottom: 2 },
-  menuIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  badge: { minWidth: 22, height: 22, paddingHorizontal: 7, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  pin: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 42, paddingLeft: 8, paddingRight: 14, borderRadius: RADIUS.pill },
-  budget: { padding: 14, borderRadius: RADIUS.card - 4, borderWidth: 1, gap: 10 },
-  profile: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 6, paddingTop: 4 },
-  avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 48, paddingLeft: 8, paddingRight: 16, borderRadius: 12, marginBottom: 2 },
+  menuIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  badge: { minWidth: 24, height: 24, paddingHorizontal: 8, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pin: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 44, paddingLeft: 8, paddingRight: 16, borderRadius: 12 },
+  budget: { padding: 16, borderRadius: RADIUS.card - 4, borderWidth: 1, gap: 12 },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 8, paddingTop: 4 },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   close: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 99, paddingVertical: 8, paddingHorizontal: 14 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 99, paddingVertical: 8, paddingHorizontal: 16 },
   chipDot: { width: 8, height: 8, borderRadius: 4 },
-  pill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingVertical: 3, paddingHorizontal: 9, maxWidth: '100%' },
-  pbtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, height: 36, borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 12 },
-  pbtnMd: { height: 44, paddingHorizontal: 20, gap: 8 },
-  seg: { flexDirection: 'row', borderRadius: RADIUS.pill, padding: 4, gap: 4 },
-  segBtn: { flex: 1, minHeight: 40, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  pill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingVertical: 4, paddingHorizontal: 8, maxWidth: '100%' },
+  pbtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 36, borderRadius: 8, borderWidth: 1, paddingHorizontal: 12 },
+  pbtnMd: { height: 44, borderRadius: 12, paddingHorizontal: 20, gap: 8 },
+  seg: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
+  segBtn: { flex: 1, minHeight: 40, borderRadius: 8, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   empty: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20, gap: 8 },
-  btn: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderWidth: 1 },
-  label: { fontSize: 11, letterSpacing: 1.6, fontWeight: '600' },
-  barTip: { borderRadius: 8, paddingVertical: 3, paddingHorizontal: 7 },
+  btn: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, borderWidth: 1 },
+  label: { fontSize: 13, lineHeight: 18, fontFamily: FONTS.semi },
+  barTip: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8 },
 });
