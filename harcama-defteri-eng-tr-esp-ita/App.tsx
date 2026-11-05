@@ -1,6 +1,7 @@
 import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/500Medium';
 import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
 import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
@@ -24,6 +25,7 @@ import { useRates } from './src/useRates';
 import { AccountSection } from './src/auth/AccountSection';
 import { useAccount } from './src/auth/AccountProvider';
 import { Gate } from './src/auth/Gate';
+import { Intro } from './src/intro';
 import { Amount, Bars, Button, CatIcon, EmptyState, IconBox, IconName, InsightList, Ionicons, MenuSection, Pill, PillButton, Progress, RingsChart, Segmented, SideMenu, SoftPill, SubTypeIcon, Tone, TxnRow, catIconName, DailyChart, fitWidth, subTypeColor } from './src/ui';
 import {
   BalanceCard, BudgetCard, BudgetOverview, CardHead, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, HomeBrand, IncomeIcon, InlineNotice, Pair, QuickActions,
@@ -42,16 +44,27 @@ function useWebOverscroll() {
   }, []);
 }
 
+// Yerel açılış ekranı, açılış animasyonu ilk karesini çizene kadar ekranda kalır (Intro onu görünmez biçimde devralır)
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Açılış animasyonu telefonlarda her açılışta oynar; web'de (testler) yalnızca adreste `?intro` varsa. */
+const introOnStart = () => Platform.OS !== 'web' || (typeof location !== 'undefined' && /[?&]intro\b/.test(location.search));
+
 export default function App() {
   useWebOverscroll();
+  const [intro, setIntro] = useState(introOnStart);
   // Yazı tipi yüklenemezse sistem yazı tipiyle devam edilir
   const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold });
-  if (!fontsLoaded && !fontError) return null;
+  const ready = fontsLoaded || !!fontError;
+  // Animasyon yoksa açılış ekranı uygulama hazır olunca doğrudan kalkar
+  useEffect(() => { if (ready && !intro) SplashScreen.hideAsync().catch(() => {}); }, [ready, intro]);
+  if (!ready) return null;
   return (
     <SafeAreaProvider>
       <Gate>
         <Main />
       </Gate>
+      {intro ? <Intro onDone={() => setIntro(false)} /> : null}
     </SafeAreaProvider>
   );
 }
