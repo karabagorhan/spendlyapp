@@ -19,7 +19,6 @@ const en: Catalog = {
   'common.amountField': 'Amount ({sym})',
   'common.amountPlaceholder': '0.00',
   'sheet.hideKeyboard': 'Hide keyboard',
-  'fab.add': '+  Add expense',
 
   // Screen titles
   'title.ozet': 'Overview',
@@ -144,12 +143,14 @@ const en: Catalog = {
   'insight.freeDays': { one: 'You had {n} day with no spending this month.', other: 'You had {n} days with no spending this month.' },
 
   // Expenses screen
-  'search.placeholder': 'Search note, category or amount',
+  'search.placeholder': 'Search note, category, amount',
   'search.a11y': 'Search expenses',
+  'search.clear': 'Clear search',
   'search.results': { one: '{n} result across all months', other: '{n} results across all months' },
   'list.count': { one: '{n} transaction', other: '{n} transactions' },
   'list.hint': 'Tap an expense to edit or delete it.',
   'filter.day': 'Day',
+  'filter.clear': 'Clear filter',
   'empty.noResults': 'No results',
   'empty.noMatch': 'No matching expenses',
   'empty.noMonth': 'No expenses this month',
@@ -181,6 +182,7 @@ const en: Catalog = {
   'reports.perDayAvg': 'average per day',
   'reports.busiestDay': 'Your biggest spending day: {day} (avg. {amount})',
   'reports.byCategory': 'By category',
+  'reports.overview': 'Spending breakdown',
   'reports.catLine': { one: '{pct}% · {n} transaction', other: '{pct}% · {n} transactions' },
   'reports.limit': 'limit {amount}',
   'reports.noExpenses': 'No expenses this month yet.',
@@ -189,10 +191,11 @@ const en: Catalog = {
   'chart.dayLabel': 'Day {day}',
 
   // Subscriptions
-  'subs.monthly': 'monthly',
-  'subs.yearly': 'yearly',
-  'subs.ofBudget': 'of budget',
   'subs.byType': 'By type (monthly)',
+  'subs.heroTitle': 'Monthly subscriptions',
+  'subs.perYear': 'Per year',
+  'subs.budgetShare': 'Budget share',
+  'subs.emptyTitle': 'No subscriptions yet',
   'subs.pendingCount': { one: '{n} awaiting confirmation', other: '{n} awaiting confirmation' },
   'subs.countShare': { one: '{n} subscription · {pct}%', other: '{n} subscriptions · {pct}%' },
   'subs.perMonthTotal': '{amount} / mo',
@@ -209,6 +212,8 @@ const en: Catalog = {
   'sub.perMonth': 'mo',
   'sub.markPaid': 'Mark as paid',
   'sub.skip': 'Skip this period',
+  'sub.paidShort': 'Paid',
+  'sub.skipShort': 'Skip',
 
   // Subscription form
   'sub.newTitle': 'New subscription',
@@ -237,6 +242,11 @@ const en: Catalog = {
   'budget.ov.empty': 'Set a monthly budget to see this month here.',
   'budget.ov.perDay': 'You can spend {amount} a day',
   'budget.ov.daysLeft': { one: '{n} day left', other: '{n} days left' },
+  'budget.ov.perDayShort': 'Per day',
+  'budget.ov.leftLabel': 'Remaining',
+  'budget.ov.leftCaption': '{pct} of budget',
+  'budget.ov.overLabel': 'Over budget',
+  'budget.ov.overCaption': '{pct} over budget',
   'budget.ov.rowA11y': '{cat}: {spent} of {limit}, {pct}',
   'budget.ov.noLimits': 'No category limits yet. Set one below to track it here.',
 

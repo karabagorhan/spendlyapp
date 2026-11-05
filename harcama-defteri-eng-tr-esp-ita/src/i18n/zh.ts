@@ -20,7 +20,6 @@ const zh: Catalog = {
   'common.amountField': '金额（{sym}）',
   'common.amountPlaceholder': '0.00',
   'sheet.hideKeyboard': '收起键盘',
-  'fab.add': '+  记一笔支出',
 
   // 页面标题
   'title.ozet': '概览',
@@ -147,10 +146,12 @@ const zh: Catalog = {
   // 支出页
   'search.placeholder': '搜索备注、类别或金额',
   'search.a11y': '搜索支出',
+  'search.clear': '清除搜索',
   'search.results': '所有月份共 {n} 条结果',
   'list.count': '{n} 笔',
   'list.hint': '点击支出可修改或删除。',
   'filter.day': '日期',
+  'filter.clear': '清除筛选',
   'empty.noResults': '没有找到结果',
   'empty.noMatch': '没有符合条件的支出',
   'empty.noMonth': '本月没有支出',
@@ -182,6 +183,7 @@ const zh: Catalog = {
   'reports.perDayAvg': '每天平均',
   'reports.busiestDay': '你花得最多的一天：{day}（平均 {amount}）',
   'reports.byCategory': '按类别',
+  'reports.overview': '支出分布',
   'reports.catLine': '{pct}% · {n} 笔',
   'reports.limit': '限额 {amount}',
   'reports.noExpenses': '本月还没有支出。',
@@ -190,10 +192,11 @@ const zh: Catalog = {
   'chart.dayLabel': '{day} 日',
 
   // 订阅
-  'subs.monthly': '每月',
-  'subs.yearly': '每年',
-  'subs.ofBudget': '占预算',
   'subs.byType': '按类型（每月）',
+  'subs.heroTitle': '每月订阅支出',
+  'subs.perYear': '每年合计',
+  'subs.budgetShare': '占预算',
+  'subs.emptyTitle': '还没有订阅',
   'subs.pendingCount': '{n} 项待确认',
   'subs.countShare': '{n} 项订阅 · {pct}%',
   'subs.perMonthTotal': '{amount} / 月',
@@ -210,6 +213,8 @@ const zh: Catalog = {
   'sub.perMonth': '月',
   'sub.markPaid': '标记为已付款',
   'sub.skip': '跳过本期',
+  'sub.paidShort': '已付款',
+  'sub.skipShort': '跳过',
 
   // 订阅表单
   'sub.newTitle': '新增订阅',
@@ -238,6 +243,11 @@ const zh: Catalog = {
   'budget.ov.empty': '设置月度预算后，这里会显示本月情况。',
   'budget.ov.perDay': '每天可花 {amount}',
   'budget.ov.daysLeft': '剩余 {n} 天',
+  'budget.ov.perDayShort': '每日可用',
+  'budget.ov.leftLabel': '剩余',
+  'budget.ov.leftCaption': '预算的 {pct}',
+  'budget.ov.overLabel': '超支',
+  'budget.ov.overCaption': '超出预算 {pct}',
   'budget.ov.rowA11y': '{cat}：{spent} / {limit}，{pct}',
   'budget.ov.noLimits': '还没有类别限额。在下方设置后，这里会显示进度。',
 

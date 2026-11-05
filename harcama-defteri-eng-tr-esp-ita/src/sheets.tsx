@@ -1,10 +1,11 @@
 import { ReactNode, useRef, useState } from 'react';
-import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtShown, fmtStamp, money, symbolOf, toMain } from './currency';
 import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
 import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
 import { ACCENTS, ACCENT_COLORS, PRESETS, TINTS, TINT_COLORS, presetOf } from './palette';
 import { FONTS, Theme } from './theme';
+import { RADIUS, cardBase, cardTitle } from './design';
 import { incomeIcon } from './dashboard';
 import { DatePicker } from './calendar';
 import { Button, CatIcon, Chip, IconName, Label, PresetCard, Swatch, catIconName, subTypeColor } from './ui';
@@ -413,9 +414,11 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
   const budgetRaw = parseAmount(budget);
   const saveBudget = () => { if (budgetRaw <= MAX_AMOUNT) onChange({ ...settings, budget: budgetRaw }); };
   const limitTotal = Object.values(settings.catBudgets).reduce((a, b) => a + b, 0);
+  // İki kart: aylık bütçe tutarı ve kategori limitleri; başlıklar kart başlığı biçiminde (16/700)
   return (
-    <View style={{ gap: 22 }}>
-      <Field label={tr('budget.field', { sym: symbolOf(settings.currency) })} t={t}>
+    <View style={{ gap: 14 }}>
+      <View style={[cardBase(t), { gap: 12 }]}>
+        <Text style={cardTitle(t)} accessibilityRole="header">{tr('budget.field', { sym: symbolOf(settings.currency) })}</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TextInput
             value={budget}
@@ -428,22 +431,22 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
             returnKeyType="done"
             onSubmitEditing={saveBudget}
             maxLength={AMOUNT_MAXLEN}
-            style={[...inputStyle(t), { flex: 1, minWidth: 0 }]}
+            style={[st.panelInput, { flex: 1, minWidth: 0, backgroundColor: t.bg, borderColor: t.line, color: t.fg }]}
             accessibilityLabel={tr('budget.a11y')}
           />
-          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); saveBudget(); }} t={t} style={{ height: 48 }} />
+          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); saveBudget(); }} t={t} style={{ height: 50, borderRadius: 25 }} />
         </View>
         <AmountError value={budgetRaw} t={t} />
-      </Field>
+      </View>
 
-      <View style={{ gap: 0 }}>
-        <Label t={t}>{tr('budget.limitsTitle')}</Label>
-        <Text style={{ color: t.muted, fontSize: 14, lineHeight: 20, paddingVertical: 6 }}>
+      <View style={[cardBase(t), { gap: 4, paddingBottom: 8 }]}>
+        <Text style={cardTitle(t)} accessibilityRole="header">{tr('budget.limitsTitle')}</Text>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 19, paddingBottom: 6 }}>
           {tr('budget.limitsHint')}
           {limitTotal ? ` ${tr('budget.limitsTotal', { amount: money(limitTotal) })}` : ''}
         </Text>
-        {CATS.map((c) => (
-          <CatLimitRow key={c} cat={c} value={settings.catBudgets[c] || 0} t={t}
+        {CATS.map((c, i) => (
+          <CatLimitRow key={c} cat={c} value={settings.catBudgets[c] || 0} first={i === 0} t={t}
             onChange={(v) => {
               const next = { ...settings.catBudgets };
               if (v) next[c] = v; else delete next[c];
@@ -642,7 +645,8 @@ export function RatesBox({ main, rates, refreshing, failed, onRefresh, t }: {
   );
 }
 
-function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; onChange: (v: number) => void; t: Theme }) {
+function CatLimitRow({ cat, value, onChange, first, t }: { cat: string; value: number; onChange: (v: number) => void; first?: boolean; t: Theme }) {
+  const narrow = useWindowDimensions().width < 360; // dar ekranda kutu daralır, kategori adına yer kalır
   const [text, setText] = useState(value ? amountText(value) : '');
   const raw = parseAmount(text);
   const commit = () => {
@@ -650,11 +654,11 @@ function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; 
     if (raw !== value) onChange(raw);
   };
   return (
-    <View>
-    <View style={[st.row, { borderColor: t.line }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-        <CatIcon cat={cat} t={t} size={30} />
-        <Text style={[st.rowTxt, { color: t.fg }]}>{catName(cat)}</Text>
+    <View style={!first && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: t.line }}>
+    <View style={st.limitRow}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+        <CatIcon cat={cat} t={t} size={narrow ? 32 : 36} />
+        <Text style={[st.rowTxt, { color: t.fg, fontSize: narrow ? 14 : 15, fontWeight: '600', minWidth: 0, paddingRight: 0 }]} numberOfLines={1}>{catName(cat)}</Text>
       </View>
       <TextInput
         value={text}
@@ -663,7 +667,7 @@ function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; 
         keyboardType="decimal-pad"
         placeholder={tr('budget.limitNone')}
         placeholderTextColor={t.muted}
-        style={[st.limitInput, { backgroundColor: t.bg, borderColor: t.line, color: t.fg }]}
+        style={[st.limitInput, narrow && { width: 86, paddingHorizontal: 10, fontSize: 14 }, { backgroundColor: t.bg, borderColor: value ? t.goldLine : t.line, color: t.fg }]}
         maxLength={AMOUNT_MAXLEN}
         accessibilityLabel={tr('budget.limitA11y', { cat: catName(cat) })}
       />
@@ -675,7 +679,9 @@ function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; 
 
 const st = StyleSheet.create({
   freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 10, maxWidth: 200 },
-  limitInput: { width: 110, height: 40, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, fontSize: 16, textAlign: 'right' },
+  limitInput: { width: 116, height: 44, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 12, fontSize: 15, textAlign: 'right' },
+  limitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, minHeight: 60, paddingVertical: 8 },
+  panelInput: { height: 50, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 16, fontSize: 17, fontWeight: '600' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, minHeight: 56 },
   topSave: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 18, flexShrink: 1, marginLeft: 12 },
   accessory: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },

@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ComponentProps, ReactNode, useEffect, useRef, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
-import Svg, { Circle, G, Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { MASK, amountsHidden } from './currency';
 import { fmtPercent, getLanguage, t as tr, upper } from './i18n';
-import { contrast, rgba } from './palette';
+import { contrast, mix, rgba } from './palette';
+import { RADIUS, cardBase, cardShadow, trackOf } from './design';
 import { Analysis, Insight, catIndex, catName, compact, pad, subType, subTypeIndex } from './lib';
 import { FONTS, Theme } from './theme';
 
@@ -66,11 +66,99 @@ export function PresetCard({ colors, name, label, selected, onPress, t }: {
 }
 
 export function Pill({ kind, label, t }: { kind: 'up' | 'down' | 'flat'; label: string; t: Theme }) {
-  const bg = kind === 'up' ? t.warnSoft : kind === 'down' ? t.goodSoft : t.bg;
-  const fg = kind === 'up' ? t.warn : kind === 'down' ? t.good : t.muted;
+  return <SoftPill tone={kind === 'up' ? 'warn' : kind === 'down' ? 'good' : 'muted'} label={label} t={t} />;
+}
+
+export type Tone = 'warn' | 'good' | 'neutral' | 'muted' | 'accent';
+
+/**
+ * Yumuşak zeminli durum hapı (DESIGN-2 §9): renkli metin, aynı rengin yumuşak zemini, isteğe bağlı küçük simge.
+ * Abonelik durumu, limit aşımı, değişim oranı gibi kısa etiketler için. Metin kesilmez; dar yerde alt satıra geçer.
+ */
+export function SoftPill({ tone, label, icon, t, testID }: { tone: Tone; label: string; icon?: IconName; t: Theme; testID?: string }) {
+  const fg = tone === 'warn' ? t.warn : tone === 'good' ? t.good : tone === 'accent' ? t.accent : tone === 'neutral' ? t.fg : t.muted;
+  const bg = tone === 'warn' ? t.warnSoft : tone === 'good' ? t.goodSoft : tone === 'accent' ? t.accentSoft : trackOf(t);
   return (
-    <View style={[s.pill, { backgroundColor: bg }]}>
-      <Text style={{ color: fg, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+    <View style={[s.pill, { backgroundColor: bg }]} testID={testID}>
+      {icon ? <Ionicons name={icon} size={12} color={fg} /> : null}
+      <Text style={{ color: fg, fontSize: 12, lineHeight: 16, fontWeight: '700', fontVariant: ['tabular-nums'], flexShrink: 1 }}>{label}</Text>
+    </View>
+  );
+}
+
+/**
+ * Küçük hap düğme: birincil (vurgu dolgu) ya da hayalet (ince çizgi). Satır içi eylemler ve boş durum çağrıları için;
+ * `md` boyutu 44 yüksekliğinde (dokunma hedefi), `sm` 36 (satır içi, `hitSlop` ile genişletilir).
+ */
+export function PillButton({ label, icon, onPress, kind = 'primary', size = 'sm', t, testID, a11y }: {
+  label: string; icon?: IconName; onPress: () => void; kind?: 'primary' | 'ghost'; size?: 'sm' | 'md'; t: Theme; testID?: string; a11y?: string;
+}) {
+  const primary = kind === 'primary';
+  const fg = primary ? t.accentFg : t.fg;
+  const md = size === 'md';
+  return (
+    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={a11y ?? label} hitSlop={md ? undefined : 4}
+      style={({ pressed }) => [s.pbtn, md && s.pbtnMd, primary ? { backgroundColor: t.accent, borderColor: t.accent } : { backgroundColor: 'transparent', borderColor: t.goldLine }, { opacity: pressed ? 0.8 : 1 }]}>
+      {icon ? <Ionicons name={icon} size={md ? 18 : 14} color={primary ? t.accentFg : t.accent} /> : null}
+      <Text style={{ color: fg, fontSize: md ? 15 : 13, lineHeight: md ? 20 : 17, fontFamily: FONTS.semi }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Hap biçimli bölmeli seçici (Harcamalar | Gelirler): yüzey rengi iz, seçili bölüm vurgu dolgulu hap. */
+export function Segmented<K extends string>({ items, value, onChange, t }: {
+  items: { key: K; label: string; testID?: string }[]; value: K; onChange: (k: K) => void; t: Theme;
+}) {
+  return (
+    <View style={[s.seg, { backgroundColor: t.surface }, cardShadow(t)]} accessibilityRole="tablist">
+      {items.map((x) => {
+        const on = x.key === value;
+        return (
+          <Pressable key={x.key} testID={x.testID} onPress={() => onChange(x.key)} accessibilityRole="tab" aria-selected={on} accessibilityState={{ selected: on }}
+            style={({ pressed }) => [s.segBtn, on && { backgroundColor: t.accent }, !on && pressed && { backgroundColor: t.raised }]}>
+            <Text style={{ color: on ? t.accentFg : t.muted, fontSize: 14, lineHeight: 18, fontFamily: FONTS.semi }} numberOfLines={1}>{x.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * Boş durum çizimi (DESIGN-2 geometrik motif): 2×2 ızgarada vurgu renginde çeyrek daire, ikincil renkte yarım daire,
+ * nötr çeyrek daire; sağ alttaki yuvarlak rozetin içinde durumu anlatan simge.
+ */
+export function EmptyArt({ t, icon, size = 112 }: { t: Theme; icon: IconName; size?: number }) {
+  const S = size / 2, W = size;
+  const light = t.name === 'ivory';
+  const neutral = mix(t.fg, t.surface, light ? 0.86 : 0.78);
+  const badge = Math.round(S * 0.92);
+  return (
+    <View style={{ width: W, height: W }} accessible={false}>
+      <Svg width={W} height={W} viewBox={`0 0 ${W} ${W}`}>
+        <Path d={`M0 ${S} A${S / 2} ${S / 2} 0 0 1 ${S} ${S} Z`} fill={t.heroAlt} opacity={light ? 0.9 : 0.75} />
+        <Path d={`M${S} ${S} V0 A${S} ${S} 0 0 1 ${W} ${S} Z`} fill={t.accent} opacity={light ? 0.95 : 0.85} />
+        <Path d={`M${S} ${S} H0 A${S} ${S} 0 0 0 ${S} ${W} Z`} fill={neutral} />
+      </Svg>
+      <View style={{ position: 'absolute', right: (S - badge) / 2, bottom: (S - badge) / 2, width: badge, height: badge, borderRadius: badge / 2, backgroundColor: t.surface, borderWidth: 1, borderColor: t.line, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon} size={Math.round(badge * 0.46)} color={t.accent} />
+      </View>
+    </View>
+  );
+}
+
+/** Boş durum kartı: çizim + başlık + açıklama + isteğe bağlı hap düğme. */
+export function EmptyState({ t, icon, title, hint, action, actionIcon = 'add', onAction, testID }: {
+  t: Theme; icon: IconName; title: string; hint: string; action?: string; actionIcon?: IconName; onAction?: () => void; testID?: string;
+}) {
+  return (
+    <View style={[cardBase(t), s.empty]} testID={testID}>
+      <EmptyArt t={t} icon={icon} />
+      <View style={{ gap: 6, alignItems: 'center', marginTop: 6 }}>
+        <Text style={{ color: t.fg, fontSize: 19, lineHeight: 25, fontFamily: FONTS.bold, textAlign: 'center', letterSpacing: -0.2 }} accessibilityRole="header">{title}</Text>
+        <Text style={{ color: t.muted, fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 300 }}>{hint}</Text>
+      </View>
+      {action && onAction ? <View style={{ marginTop: 10 }}><PillButton label={action} icon={actionIcon} onPress={onAction} size="md" t={t} /></View> : null}
     </View>
   );
 }
@@ -116,7 +204,7 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
   const m = raw / p;
   const max = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
   const y = (v: number) => T + ih - (v / max) * ih;
-  const slot = iw / n, bw = Math.max(2, slot * 0.68);
+  const slot = iw / n, bw = Math.max(2, slot * 0.62);
   const todayD = a.isCur ? new Date().getDate() : 0;
 
   return (
@@ -125,7 +213,7 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
         <>
           <Svg width={w} height={H}>
             {[0, 0.5, 1].map((f) => (
-              <Line key={f} x1={L} x2={w - R} y1={y(max * f)} y2={y(max * f)} stroke={t.line} strokeWidth={1} />
+              <Line key={f} x1={L} x2={w - R} y1={y(max * f)} y2={y(max * f)} stroke={t.line} strokeWidth={1} strokeDasharray={f ? '2 4' : undefined} />
             ))}
             {[0, 0.5, 1].map((f) => (
               <SvgText key={'l' + f} x={L - 6} y={y(max * f) + 3} fontSize={10} fill={t.muted} textAnchor="end">
@@ -137,8 +225,8 @@ export function DailyChart({ a, ym, budget, selected, onSelect, t }: {
               const d = i + 1;
               const h = Math.max(2, (v / max) * ih);
               const day = `${ym}-${pad(d)}`;
-              const fill = selected === day ? t.fg : budgetDay && v > budgetDay ? t.warn : d === todayD ? t.accent : t.bar;
-              return <Rect key={d} x={L + i * slot + (slot - bw) / 2} y={T + ih - h} width={bw} height={h} rx={1.5} fill={fill} />;
+              const fill = selected === day ? t.accent : budgetDay && v > budgetDay ? t.warn : d === todayD ? rgba(t.accent, 0.62) : t.bar;
+              return <Rect key={d} x={L + i * slot + (slot - bw) / 2} y={T + ih - h} width={bw} height={h} rx={Math.min(bw / 2, 4)} fill={fill} />;
             })}
             {vals.map((_, i) => {
               const d = i + 1;
@@ -290,12 +378,12 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
       >
         {/* Hesap kartı */}
         <Pressable onPress={() => onSelect('ozet')} style={({ pressed }) => [s.account, { backgroundColor: t.raised, borderColor: t.line, opacity: pressed ? 0.85 : 1 }]}>
-          <LinearGradient colors={['#e4c98f', '#c9a86a', '#8a6a35']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.monogram}>
-            <Text style={{ fontFamily: FONTS.display, fontSize: 17, color: '#0b0b0d' }}>{tr('app.monogram')}</Text>
-          </LinearGradient>
+          <View style={[s.monogram, { backgroundColor: t.accent }]}>
+            <Text style={{ fontFamily: FONTS.display, fontSize: 18, color: t.accentFg }}>{tr('app.monogram')}</Text>
+          </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: FONTS.display, fontSize: 18, color: t.fg }} numberOfLines={1}>{header.title}</Text>
-            <Text style={{ fontSize: 13, color: t.muted }} numberOfLines={2}>{header.sub}</Text>
+            <Text style={{ fontFamily: FONTS.display, fontSize: 18, lineHeight: 23, color: t.fg, letterSpacing: -0.3 }} numberOfLines={1}>{header.title}</Text>
+            <Text style={{ fontSize: 12.5, lineHeight: 17, color: t.muted }} numberOfLines={2}>{header.sub}</Text>
           </View>
           <Ionicons name="chevron-down" size={18} color={t.muted} />
         </Pressable>
@@ -304,7 +392,7 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
           {sections.map((sec) => (
             <View key={sec.title}>
-              <Text style={[s.secTitle, { color: t.muted }]}>{upper(sec.title)}</Text>
+              <Text style={[s.secTitle, { color: t.muted }]}>{sec.title}</Text>
               {sec.items.map((it) => {
                 const active = it.key === current;
                 const b = it.badge ? badgeStyle(it.badge) : null;
@@ -314,14 +402,12 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
                     onPress={() => onSelect(it.key)}
                     accessibilityRole="menuitem"
                     accessibilityState={{ selected: active }}
-                    style={({ pressed }) => [s.menuItem, {
-                      backgroundColor: active ? t.accentSoft : pressed ? t.raised : 'transparent',
-                      borderColor: active ? t.goldLine : 'transparent',
-                    }]}
+                    style={({ pressed }) => [s.menuItem, { backgroundColor: active ? t.accentSoft : pressed ? t.raised : 'transparent' }]}
                   >
-                    {active ? <View style={[s.menuBar, { backgroundColor: t.gold }]} /> : null}
-                    <Ionicons name={it.icon} size={20} color={active ? t.gold : t.muted} />
-                    <Text style={{ flex: 1, color: active ? t.gold : t.fg, fontSize: 16, fontWeight: active ? '600' : '400' }}>{it.label}</Text>
+                    <View style={[s.menuIcon, { backgroundColor: active ? t.accent : trackOf(t) }]}>
+                      <Ionicons name={it.icon} size={18} color={active ? t.accentFg : t.fg} />
+                    </View>
+                    <Text style={{ flex: 1, color: active ? t.accent : t.fg, fontSize: 15, lineHeight: 20, fontFamily: active ? FONTS.bold : FONTS.semi }} numberOfLines={1}>{it.label}</Text>
                     {b && it.badge ? (
                       <View style={[s.badge, { backgroundColor: b.bg, borderColor: b.border }]}>
                         <Text style={{ color: b.fg, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{it.badge.text}</Text>
@@ -335,13 +421,13 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
 
           {pins.length ? (
             <View>
-              <Text style={[s.secTitle, { color: t.muted }]}>{upper(tr('menu.topCategories'))}</Text>
+              <Text style={[s.secTitle, { color: t.muted }]}>{tr('menu.topCategories')}</Text>
               {pins.map((p) => (
                 <Pressable key={p.cat} onPress={() => onPin(p.cat)} style={({ pressed }) => [s.pin, { backgroundColor: pressed ? t.raised : 'transparent' }]}
                   accessibilityLabel={tr('menu.pinLabel', { cat: catName(p.cat), amount: p.amount })}>
-                  <CatIcon cat={p.cat} t={t} size={26} />
-                  <Text style={{ flex: 1, fontSize: 15, color: t.fg }}>{catName(p.cat)}</Text>
-                  <Text style={{ fontSize: 14, color: t.muted, fontVariant: ['tabular-nums'] }}>{p.amount}</Text>
+                  <CatIcon cat={p.cat} t={t} size={32} />
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: t.fg }} numberOfLines={1}>{catName(p.cat)}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: t.muted, fontVariant: ['tabular-nums'] }}>{p.amount}</Text>
                 </Pressable>
               ))}
             </View>
@@ -354,21 +440,21 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
             {budget ? (
               <>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <Text style={[s.secLabel, { color: t.muted }]}>{upper(budget.label)}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: budget.over ? t.warn : t.gold }}>{fmtPercent(budget.pct)}</Text>
+                  <Text style={[s.secLabel, { color: t.muted, flexShrink: 1 }]} numberOfLines={1}>{budget.label}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: budget.over ? t.warn : t.accent, fontVariant: ['tabular-nums'] }}>{fmtPercent(budget.pct)}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <Amount text={budget.amount} style={{ fontFamily: FONTS.display, fontSize: 24, color: t.fg }} symbolColor={t.gold} />
-                  <Text style={{ fontSize: 14, color: t.muted }}>/ {budget.total}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                  <Amount text={budget.amount} style={{ fontFamily: FONTS.display, fontSize: 22, color: t.fg, letterSpacing: -0.5 }} symbolColor={t.accent} />
+                  <Text style={{ fontSize: 13, color: t.muted, fontVariant: ['tabular-nums'] }}>/ {budget.total}</Text>
                 </View>
-                <View style={{ height: 4, borderRadius: 2, backgroundColor: t.heroTrack, overflow: 'hidden' }}>
-                  <View style={{ width: `${Math.min(100, budget.pct)}%`, height: 4, borderRadius: 2, backgroundColor: budget.over ? t.warn : t.gold }} />
+                <View style={{ height: 8, borderRadius: 4, backgroundColor: trackOf(t), overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.min(100, budget.pct)}%`, height: 8, borderRadius: 4, backgroundColor: budget.over ? t.warn : t.accent }} />
                 </View>
               </>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="wallet-outline" size={20} color={t.gold} />
-                <Text style={{ flex: 1, fontSize: 15, color: t.fg }}>{tr('menu.setBudget')}</Text>
+                <IconBox icon="wallet-outline" color={t.accent} t={t} size={32} />
+                <Text style={{ flex: 1, fontSize: 14, fontFamily: FONTS.semi, color: t.fg }}>{tr('menu.setBudget')}</Text>
                 <Ionicons name="chevron-forward" size={16} color={t.muted} />
               </View>
             )}
@@ -377,11 +463,11 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
 
         {/* Profil */}
         <View style={s.profile}>
-          <View style={[s.avatar, { backgroundColor: t.line, borderColor: t.goldLine }]}>
-            <Text style={{ color: t.gold, fontSize: 14, fontWeight: '600' }}>{profile.initials}</Text>
+          <View style={[s.avatar, { backgroundColor: t.accentSoft }]}>
+            <Text style={{ color: t.accent, fontSize: 14, fontFamily: FONTS.display }}>{profile.initials}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: t.fg }} numberOfLines={1}>{profile.name}</Text>
+            <Text style={{ fontSize: 15, fontFamily: FONTS.bold, color: t.fg }} numberOfLines={1}>{profile.name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.good }} />
               <Text style={{ fontSize: 12, color: t.muted, flexShrink: 1 }} numberOfLines={2}>{status}</Text>
@@ -396,23 +482,34 @@ export function SideMenu({ open, onClose, header, sections, pins, current, onSel
   );
 }
 
-/** Basit dikey çubuk grafik (6 aylık toplamlar, haftanın günleri). */
+/**
+ * Dikey çubuk grafik (6 aylık toplamlar, haftanın günleri): 8 köşeli yuvarlak çubuklar; seçili çubuk vurgu renginde ve
+ * üstünde değer baloncuğu (gizlilik kipinde değer yazılmaz), diğerleri soluk vurgu tonunda, değeri olmayan gün/ay nötr iz.
+ */
 export function Bars({ data, selected, onSelect, t, height = 150 }: {
   data: { key: string; label: string; value: number }[]; selected?: string; onSelect?: (key: string) => void; t: Theme; height?: number;
 }) {
   const max = Math.max(...data.map((d) => d.value), 1);
-  const barMax = height - 46;
+  const barMax = height - 50; // üstte değer baloncuğu, altta ad
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height }}>
       {data.map((d) => {
         const on = d.key === selected;
+        const tip = on && d.value ? axisText(d.value) : '';
         return (
           <Pressable key={d.key} disabled={!onSelect} onPress={() => onSelect?.(d.key)}
-            style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 4 }}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 6 }}
             accessibilityLabel={amountsHidden() ? `${d.label}: ${tr('amount.hidden')}` : `${d.label}: ${compact(d.value)}`}>
-            <Text style={{ fontSize: 11, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.value ? axisText(d.value) : ''}</Text>
-            <View style={{ width: '100%', maxWidth: 34, height: d.value ? Math.max(4, (d.value / max) * barMax) : 3, borderRadius: 7, backgroundColor: on ? t.accent : t.bar }} />
-            <Text style={{ fontSize: 12, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '400' }}>{d.label}</Text>
+            {tip ? (
+              // Baloncuk çubuk yuvasından geniş olabilir: sabit genişlikte ortalanmış kutu, metin tek satırda kalır
+              <View style={{ width: 72, alignItems: 'center' }}>
+                <View style={[s.barTip, { backgroundColor: t.fg }]}>
+                  <Text style={{ color: t.bg, fontSize: 11, lineHeight: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{tip}</Text>
+                </View>
+              </View>
+            ) : null}
+            <View style={{ width: '100%', maxWidth: 36, height: d.value ? Math.max(8, (d.value / max) * barMax) : 6, borderRadius: 8, backgroundColor: on ? t.accent : d.value ? t.bar : trackOf(t) }} />
+            <Text style={{ fontSize: 12, lineHeight: 16, color: on ? t.fg : t.muted, fontWeight: on ? '700' : '500' }}>{d.label}</Text>
           </Pressable>
         );
       })}
@@ -422,11 +519,11 @@ export function Bars({ data, selected, onSelect, t, height = 150 }: {
 
 const CAT_ICONS: IconName[] = ['bag-handle-outline', 'restaurant-outline', 'car-outline', 'receipt-outline', 'medkit-outline', 'film-outline', 'shirt-outline', 'ellipsis-horizontal'];
 
-/** Simge kutusu: rengin %16'sı zeminli yuvarlatılmış kare, simge tam renkte (kategori, gelir ve abonelik türü simgeleri). */
-export function IconBox({ icon, color, t, size = 36 }: { icon: IconName; color: string; t: Theme; size?: number }) {
+/** Simge kutusu: rengin %16'sı zeminli yuvarlatılmış kare, simge tam renkte (kategori, gelir ve abonelik türü simgeleri). `rotate`: ok simgeleri 45° döner (gelir/gider). */
+export function IconBox({ icon, color, t, size = 36, rotate }: { icon: IconName; color: string; t: Theme; size?: number; rotate?: boolean }) {
   return (
     <View style={{ width: size, height: size, borderRadius: Math.round(size * 0.32), backgroundColor: rgba(color, t.name === 'ivory' ? 0.14 : 0.18), alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={icon} size={Math.round(size * 0.5)} color={color} />
+      <Ionicons name={icon} size={Math.round(size * 0.5)} color={color} style={rotate ? { transform: [{ rotate: '45deg' }] } : undefined} />
     </View>
   );
 }
@@ -452,7 +549,7 @@ export function IncomeIcon({ cat, t, size = 36 }: { cat: string; t: Theme; size?
 /**
  * Ortak işlem satırı (DESIGN-2 §6): 44'lük simge kutusu, başlık 15/600, alt yazı 13, sağda tutar 15/700 sabit genişlikli rakamlarla.
  * Gelir `good` renginde "+", gider yazı renginde "−" ile; başka para biriminde girilmiş kayıtta özgün tutar tutarın altında.
- * `amount` biçimlenmiş (gerekirse maskelenmiş) tutardır; erişilebilirlik etiketi çağıran tarafından verilir.
+ * `amount` biçimlenmiş (gerekirse maskelenmiş) tutardır; erişilebilirlik etiketi çağıran tarafından verilir. Alt yazı boşsa çizilmez.
  */
 export function TxnRow({ t, kind, cat, title, subtitle, amount, orig, onPress, first, testID, a11y }: {
   t: Theme; kind: 'expense' | 'income'; cat: string; title: string; subtitle: string; amount: string; orig?: string;
@@ -465,7 +562,7 @@ export function TxnRow({ t, kind, cat, title, subtitle, amount, orig, onPress, f
       {income ? <IncomeIcon cat={cat} t={t} size={44} /> : <CatIcon cat={cat} t={t} size={44} />}
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text style={{ color: t.fg, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{title}</Text>
-        <Text style={{ color: t.muted, fontSize: 13 }} numberOfLines={1}>{subtitle}</Text>
+        {subtitle ? <Text style={{ color: t.muted, fontSize: 13 }} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 0, maxWidth: '50%' }}>
         <Amount text={`${income ? '+' : '−'}${amount}`} style={{ color: income ? t.good : t.fg, fontSize: 15, fontWeight: '700' }} />
@@ -516,20 +613,17 @@ export function RingsChart({ rings, size, stroke = 8, gap = 4, track, children, 
 
 export const subTypeColor = (type: string | undefined, t: Theme) => t.cats[subTypeIndex(type) % t.cats.length];
 
-/** Otomatik yorumlar listesi. */
+/** Otomatik yorumlar listesi: her satırda durumun renginde simge kutusu (uyarı / iyi / bilgi). */
 export function InsightList({ list, t }: { list: Insight[]; t: Theme }) {
   return (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: 12 }}>
       {list.map((x, i) => {
         const color = x.kind === 'warn' ? t.warn : x.kind === 'good' ? t.good : t.accent;
-        const bg = x.kind === 'warn' ? t.warnSoft : x.kind === 'good' ? t.goodSoft : t.accentSoft;
-        const icon: IconName = x.kind === 'warn' ? 'alert-circle' : x.kind === 'good' ? 'checkmark-circle' : 'sparkles';
+        const icon: IconName = x.kind === 'warn' ? 'alert-circle-outline' : x.kind === 'good' ? 'checkmark-circle-outline' : 'sparkles-outline';
         return (
-          <View key={i} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-            <View style={{ width: 28, height: 28, borderRadius: 10, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name={icon} size={16} color={color} />
-            </View>
-            <Text style={{ flex: 1, color: t.fg, fontSize: 15, lineHeight: 21, paddingTop: 3 }}>{x.text}</Text>
+          <View key={i} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+            <IconBox icon={icon} color={color} t={t} size={36} />
+            <Text style={{ flex: 1, color: t.fg, fontSize: 14, lineHeight: 20 }}>{x.text}</Text>
           </View>
         );
       })}
@@ -537,13 +631,12 @@ export function InsightList({ list, t }: { list: Insight[]; t: Theme }) {
   );
 }
 
-/** İnce ilerleme çubuğu (kategori limitleri). */
 /** Çubuk: varsayılan renk %80'e kadar vurgu, sonrası uyarı rengi; `color` verilirse onu kullanır (ör. üç kademeli bütçe çubuğu). */
-export function Progress({ value, max, t, color }: { value: number; max: number; t: Theme; color?: string }) {
+export function Progress({ value, max, t, color, height = 6 }: { value: number; max: number; t: Theme; color?: string; height?: number }) {
   const over = value > max;
   const near = !over && value >= max * 0.8;
   return (
-    <View style={{ height: 6, borderRadius: 99, backgroundColor: t.bg, overflow: 'hidden' }}>
+    <View style={{ height, borderRadius: 99, backgroundColor: trackOf(t), overflow: 'hidden' }}>
       <View style={{ width: `${Math.min(100, (value / max) * 100)}%`, height: '100%', borderRadius: 99, backgroundColor: color ?? (over || near ? t.warn : t.accent) }} />
     </View>
   );
@@ -552,21 +645,27 @@ export function Progress({ value, max, t, color }: { value: number; max: number;
 const s = StyleSheet.create({
   txn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   menu: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRightWidth: 1, paddingHorizontal: 14, gap: 8, borderTopRightRadius: 28, borderBottomRightRadius: 28 },
-  account: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1 },
-  monogram: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  secTitle: { fontSize: 11, letterSpacing: 1.6, fontWeight: '600', paddingTop: 14, paddingBottom: 4, paddingHorizontal: 12 },
-  secLabel: { fontSize: 11, letterSpacing: 1.6, fontWeight: '600' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 13, height: 44, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 2 },
-  menuBar: { position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: 2 },
-  badge: { minWidth: 22, height: 22, paddingHorizontal: 7, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  pin: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 40, paddingHorizontal: 14, borderRadius: 12 },
-  budget: { padding: 12, borderRadius: 18, borderWidth: 1, gap: 8 },
+  account: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: RADIUS.card - 4, borderWidth: 1 },
+  monogram: { width: 42, height: 42, borderRadius: RADIUS.icon, alignItems: 'center', justifyContent: 'center' },
+  secTitle: { fontSize: 12, lineHeight: 16, fontFamily: FONTS.semi, paddingTop: 12, paddingBottom: 4, paddingHorizontal: 12 },
+  secLabel: { fontSize: 12, fontWeight: '600' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 46, paddingLeft: 7, paddingRight: 14, borderRadius: RADIUS.pill, marginBottom: 2 },
+  menuIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  badge: { minWidth: 22, height: 22, paddingHorizontal: 7, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pin: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 42, paddingLeft: 8, paddingRight: 14, borderRadius: RADIUS.pill },
+  budget: { padding: 14, borderRadius: RADIUS.card - 4, borderWidth: 1, gap: 10 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 6, paddingTop: 4 },
-  avatar: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   close: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 99, paddingVertical: 8, paddingHorizontal: 14 },
   chipDot: { width: 8, height: 8, borderRadius: 4 },
-  pill: { alignSelf: 'flex-start', borderRadius: 99, paddingVertical: 2, paddingHorizontal: 8 },
+  pill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingVertical: 3, paddingHorizontal: 9, maxWidth: '100%' },
+  pbtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, height: 36, borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 12 },
+  pbtnMd: { height: 44, paddingHorizontal: 20, gap: 8 },
+  seg: { flexDirection: 'row', borderRadius: RADIUS.pill, padding: 4, gap: 4 },
+  segBtn: { flex: 1, minHeight: 40, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  empty: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20, gap: 8 },
   btn: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderWidth: 1 },
   label: { fontSize: 11, letterSpacing: 1.6, fontWeight: '600' },
+  barTip: { borderRadius: 8, paddingVertical: 3, paddingHorizontal: 7 },
 });

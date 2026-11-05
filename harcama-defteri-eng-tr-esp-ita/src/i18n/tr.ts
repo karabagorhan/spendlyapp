@@ -19,7 +19,6 @@ const tr: Catalog = {
   'common.amountField': 'Tutar ({sym})',
   'common.amountPlaceholder': '0,00',
   'sheet.hideKeyboard': 'Klavyeyi kapat',
-  'fab.add': '+  Harcama ekle',
 
   // Ekran başlıkları
   'title.ozet': 'Özet',
@@ -132,12 +131,14 @@ const tr: Catalog = {
   'insight.freeDays': 'Bu ay {n} gün hiç harcama yapmadın.',
 
   // Harcamalar ekranı
-  'search.placeholder': 'Not, kategori ya da tutar ara',
+  'search.placeholder': 'Not, kategori, tutar ara',
   'search.a11y': 'Harcamalarda ara',
+  'search.clear': 'Aramayı temizle',
   'search.results': 'Tüm aylarda {n} sonuç',
   'list.count': '{n} işlem',
   'list.hint': 'Düzeltmek ya da silmek için harcamanın üzerine dokun.',
   'filter.day': 'Gün',
+  'filter.clear': 'Filtreyi kaldır',
   'empty.noResults': 'Sonuç bulunamadı',
   'empty.noMatch': 'Eşleşen harcama yok',
   'empty.noMonth': 'Bu ay harcama yok',
@@ -169,6 +170,7 @@ const tr: Catalog = {
   'reports.perDayAvg': 'gün başına ortalama',
   'reports.busiestDay': 'En çok harcadığın gün: {day} (ortalama {amount})',
   'reports.byCategory': 'Kategorilere göre',
+  'reports.overview': 'Harcama dağılımı',
   'reports.catLine': '%{pct} · {n} işlem',
   'reports.limit': 'limit {amount}',
   'reports.noExpenses': 'Bu ay henüz harcama yok.',
@@ -177,10 +179,11 @@ const tr: Catalog = {
   'chart.dayLabel': '{day}. gün',
 
   // Abonelikler
-  'subs.monthly': 'aylık',
-  'subs.yearly': 'yıllık',
-  'subs.ofBudget': 'bütçenin',
   'subs.byType': 'Türlere göre (aylık)',
+  'subs.heroTitle': 'Aylık abonelik gideri',
+  'subs.perYear': 'Yıllık toplam',
+  'subs.budgetShare': 'Bütçe payı',
+  'subs.emptyTitle': 'Henüz abonelik yok',
   'subs.pendingCount': '{n} onay bekliyor',
   'subs.countShare': '{n} abonelik · %{pct}',
   'subs.perMonthTotal': '{amount} / ay',
@@ -197,6 +200,8 @@ const tr: Catalog = {
   'sub.perMonth': 'ay',
   'sub.markPaid': 'Ödendi olarak işaretle',
   'sub.skip': 'Bu dönemi atla',
+  'sub.paidShort': 'Ödendi',
+  'sub.skipShort': 'Atla',
 
   // Abonelik formu
   'sub.newTitle': 'Yeni abonelik',
@@ -225,6 +230,11 @@ const tr: Catalog = {
   'budget.ov.empty': 'Aylık bütçeni belirlersen bu ayın durumu burada görünür.',
   'budget.ov.perDay': 'Günde {amount} harcayabilirsin',
   'budget.ov.daysLeft': '{n} gün kaldı',
+  'budget.ov.perDayShort': 'Günlük pay',
+  'budget.ov.leftLabel': 'Kalan',
+  'budget.ov.leftCaption': 'bütçenin {pct}',
+  'budget.ov.overLabel': 'Aşım',
+  'budget.ov.overCaption': 'bütçenin {pct} üstünde',
   'budget.ov.rowA11y': '{cat}: {spent} / {limit}, {pct}',
   'budget.ov.noLimits': 'Henüz kategori limiti yok. Aşağıdan bir kategoriye limit koyarsan ilerlemesi burada görünür.',
 

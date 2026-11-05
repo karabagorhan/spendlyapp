@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
+import { Animated, AppState, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type ScrollViewInstance } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Cur, amountsHidden, fmtMoney, fmtShown, fmtStamp, needsRates, setHideAmounts, setMainCurrency, viewData, fromViewSettings } from './src/currency';
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
@@ -25,12 +25,12 @@ import { useRates } from './src/useRates';
 import { AccountSection } from './src/auth/AccountSection';
 import { useAccount } from './src/auth/AccountProvider';
 import { Gate } from './src/auth/Gate';
-import { Amount, Bars, Button, CatIcon, SubTypeIcon, subTypeColor, DailyChart, InsightList, Ionicons, Label, MenuSection, Pill, Progress, SideMenu } from './src/ui';
+import { Amount, Bars, Button, CatIcon, EmptyState, IconBox, IconName, InsightList, Ionicons, MenuSection, Pill, PillButton, Progress, RingsChart, Segmented, SideMenu, SoftPill, SubTypeIcon, Tone, TxnRow, catIconName, DailyChart, fitWidth, subTypeColor } from './src/ui';
 import {
   BalanceCard, BudgetCard, BudgetOverview, CardHead, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, HomeBrand, IncomeIcon, InlineNotice, Pair, QuickActions,
-  RecentCard, SpendingCard, SubsCard, TabBar, tabBarSpace,
+  RecentCard, SpendingCard, SubsCard, SubsHero, TabBar, tabBarSpace,
 } from './src/dashboard';
-import { SPACE, cardBase, cardShadow } from './src/design';
+import { RADIUS, SPACE, bigAmount, cardBase, cardShadow, trackOf } from './src/design';
 
 /** Web: tarayıcının kenardan "geri git" kaydırması uygulamanın kendi geri hareketiyle çakışmasın. */
 function useWebOverscroll() {
@@ -108,6 +108,7 @@ const SLUG: Record<string, string> = {
 
 function Main() {
   const insets = useSafeAreaInsets();
+  const narrow = useWindowDimensions().width < 360;
   const { data, update, status, reload, recovered, saveFailed } = useAppData();
   const { notice, setNotice } = useAccount();
   const rs = useRates();
@@ -492,21 +493,34 @@ function Main() {
     </Pressable>
   ) : null;
 
-  const expenseRow = (x: Expense, i: number, showDate = false) => (
-    <Pressable
-      key={x.id}
+  // İşlem satırı (ortak TxnRow): başlık not ya da kategori, alt yazı kategori (not varsa) ve abonelik etiketi; başka birimde girilmişse özgün tutar tutarın altında
+  const expenseRow = (x: Expense, i: number) => (
+    <TxnRow key={x.id} t={t} kind="expense" cat={x.cat} first={i === 0}
+      title={x.note || catName(x.cat)}
+      subtitle={[x.note ? catName(x.cat) : '', x.sub ? tr('expense.subscriptionTag') : ''].filter(Boolean).join(' · ')}
+      amount={amountOf(x)} orig={x.orig ? fmtShown(x.orig.amount, x.orig.cur) : undefined}
       onPress={() => setExpSheet({ key: Date.now(), initial: stored.item(x.id) ?? x })}
-      style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountA11y(x) })}
-    >
-      <CatIcon cat={x.cat} t={t} />
-      <View style={{ flex: 1 }}>
-        <Text style={st.itemCat} numberOfLines={1}>{x.note || catName(x.cat)}</Text>
-        <Text style={st.meta} numberOfLines={1}>{[x.note ? catName(x.cat) : '', showDate ? dayLabel(x.date) : '', x.sub ? tr('expense.subscriptionTag') : '', x.orig ? fmtShown(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || catName(x.cat)}</Text>
+      a11y={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountA11y(x) })} />
+  );
+  // Gün kartı: üstte "Bugün · ₺540" düzeninde gün adı (solda) ve gün toplamı (sağda), altında o günün satırları
+  const dayCard = (d: string, total: string | null, rows: ReactNode) => (
+    <View key={d} style={st.dayCard}>
+      <View style={st.dayHead}>
+        <Text style={st.dayLbl} numberOfLines={1}>{dayLabel(d)}</Text>
+        {total !== null ? <Text style={st.dayTot}>{total}</Text> : null}
       </View>
-      <Text style={st.itemAmt}>{amountOf(x)}</Text>
-      <Ionicons name="chevron-forward" size={16} color={t.muted} />
-    </Pressable>
+      {rows}
+    </View>
+  );
+  // Ay özeti kartı: işlem sayısı + toplam (iri tutar), solda gider/gelir simgesi
+  const summaryCard = (kind: 'expense' | 'income', label: string, total: string) => (
+    <View style={st.sumCard} testID={`txn-summary-${kind}`}>
+      <IconBox icon={kind === 'income' ? 'arrow-down' : 'arrow-up'} rotate color={kind === 'income' ? t.good : t.warn} t={t} size={44} />
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={st.sumLbl}>{label}</Text>
+        <Amount text={total} style={st.sumVal} symbolColor={t.accent} />
+      </View>
+    </View>
   );
 
   const curYm = todayIso().slice(0, 7);
@@ -518,31 +532,16 @@ function Main() {
   const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
 
   const txnToggle = (
-    <View style={[st.seg, { backgroundColor: t.surface, borderColor: t.line }]} accessibilityRole="tablist">
-      {(['expenses', 'income'] as const).map((k) => (
-        <Pressable key={k} testID={`txn-tab-${k}`} onPress={() => setTxnTab(k)} accessibilityRole="tab" aria-selected={txnTab === k}
-          style={[st.segBtn, txnTab === k && { backgroundColor: t.accent }]}>
-          <Text style={{ color: txnTab === k ? t.accentFg : t.muted, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{tr('txn.' + k)}</Text>
-        </Pressable>
-      ))}
-    </View>
+    <Segmented t={t} value={txnTab} onChange={setTxnTab}
+      items={[{ key: 'expenses', label: tr('txn.expenses'), testID: 'txn-tab-expenses' }, { key: 'income', label: tr('txn.income'), testID: 'txn-tab-income' }]} />
   );
   const incomeRow = (x: Income, i: number) => (
-    <Pressable
-      key={x.id}
-      testID={`income-row-${i}`}
+    <TxnRow key={x.id} t={t} kind="income" cat={x.cat} first={i === 0} testID={`income-row-${i}`}
+      title={x.note || incomeCatName(x.cat)}
+      subtitle={x.note ? incomeCatName(x.cat) : ''}
+      amount={amountOf(x)} orig={x.orig ? fmtShown(x.orig.amount, x.orig.cur) : undefined}
       onPress={() => setIncSheet({ key: Date.now(), initial: stored.income(x.id) ?? x })}
-      style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: amountA11y(x) })}
-    >
-      <IncomeIcon cat={x.cat} t={t} />
-      <View style={{ flex: 1 }}>
-        <Text style={st.itemCat} numberOfLines={1}>{x.note || incomeCatName(x.cat)}</Text>
-        <Text style={st.meta} numberOfLines={1}>{[x.note ? incomeCatName(x.cat) : '', x.orig ? fmtShown(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || incomeCatName(x.cat)}</Text>
-      </View>
-      <Amount text={`+${amountOf(x)}`} style={[st.itemAmt, { color: t.good }]} />
-      <Ionicons name="chevron-forward" size={16} color={t.muted} />
-    </Pressable>
+      a11y={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: amountA11y(x) })} />
   );
 
   const ctx: Ctx = { t, st, a, ym, items, payItems, subs, monthItems, budget, settings };
@@ -606,33 +605,17 @@ function Main() {
         {txnToggle}
         {monthSwitcher}
         {rateNote}
-        <View style={st.summaryRow}>
-          <Text style={st.meta}>{tr('list.count', { n: monthIncomes.length })}</Text>
-          <Amount text={money(convSum(monthIncomes))} style={st.summaryVal} symbolColor={t.gold} />
-        </View>
+        {monthIncomes.length ? summaryCard('income', tr('list.count', { n: monthIncomes.length }), money(convSum(monthIncomes))) : null}
         {days.length ? (
           <>
-            <Text style={[st.meta, { paddingHorizontal: 4 }]}>{tr('txn.incomeHint')}</Text>
+            <Text style={st.hint}>{tr('txn.incomeHint')}</Text>
             {days.map((d) => {
               const its = groups[d].sort((p, q) => q.ts - p.ts);
-              return (
-                <View key={d} style={{ gap: 6 }}>
-                  <View style={st.dayHead}>
-                    <Label t={t}>{dayLabel(d)}</Label>
-                    {its.some((x) => !x.unconv) ? <Label t={t}>{money(convSum(its))}</Label> : null}
-                  </View>
-                  <View style={st.items}>{its.map((x, i) => incomeRow(x, i))}</View>
-                </View>
-              );
+              return dayCard(d, its.some((x) => !x.unconv) ? money(convSum(its)) : null, its.map((x, i) => incomeRow(x, i)));
             })}
           </>
         ) : (
-          <View style={st.empty} testID="income-empty">
-            <Ionicons name="cash-outline" size={40} color={t.muted} />
-            <Text style={st.emptyTitle}>{tr('txn.incomeEmpty')}</Text>
-            <Text style={[st.meta, { textAlign: 'center' }]}>{tr('txn.incomeEmptyHint')}</Text>
-            <Button label={tr('qa.income')} kind="ghost" onPress={openAddIncome} t={t} style={{ marginTop: 12, minWidth: 180 }} />
-          </View>
+          <EmptyState t={t} testID="income-empty" icon="cash-outline" title={tr('txn.incomeEmpty')} hint={tr('txn.incomeEmptyHint')} action={tr('qa.income')} onAction={openAddIncome} />
         )}
       </>
     );
@@ -653,57 +636,56 @@ function Main() {
         <View style={st.search}>
           <Ionicons name="search" size={18} color={t.muted} />
           <TextInput value={query} onChangeText={setQuery} placeholder={tr('search.placeholder')} placeholderTextColor={t.muted}
-            style={st.searchInput} returnKeyType="search" clearButtonMode="while-editing" accessibilityLabel={tr('search.a11y')} />
+            style={[st.searchInput, narrow && { fontSize: 14 }]} returnKeyType="search" accessibilityLabel={tr('search.a11y')} />
+          {query ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={tr('search.clear')} style={st.searchClear}>
+              <Ionicons name="close" size={14} color={t.surface} />
+            </Pressable>
+          ) : null}
         </View>
         {q ? null : monthSwitcher}
         {rateNote}
-        <View style={st.summaryRow}>
-          <Text style={st.meta}>{q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length })}</Text>
-          <Amount text={money(convSum(shown))} style={st.summaryVal} symbolColor={t.gold} />
-        </View>
+        {/* Boş ayda özet kartı yok (boş durum kartı anlatır); arama ya da filtre sonucu 0 olsa da gösterilir */}
+        {q || listMonth.length ? summaryCard('expense', q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length }), money(convSum(shown))) : null}
         {cats.length > 1 ? (
           <View onStartShouldSetResponderCapture={() => { touchX.current.start = 99999; return false; }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {cats.map((c) => (
-              <Pressable key={c} onPress={() => setFilterCat(filterCat === c ? null : c)}
-                style={[st.catChip, { backgroundColor: filterCat === c ? t.accentSoft : t.surface, borderColor: filterCat === c ? t.gold : t.line }]}>
-                <CatIcon cat={c} t={t} size={22} />
-                <Text style={{ color: filterCat === c ? t.gold : t.fg, fontSize: 14 }}>{catName(c)}</Text>
-              </Pressable>
-            ))}
+            {[null, ...cats].map((c) => {
+              const on = c === filterCat;
+              return (
+                <Pressable key={c ?? '_all'} onPress={() => setFilterCat(c === null || on ? null : c)} accessibilityRole="button" accessibilityState={{ selected: on }} aria-selected={on}
+                  style={({ pressed }) => [st.catChip, on ? { backgroundColor: t.accent, borderColor: t.accent } : { backgroundColor: t.surface, borderColor: t.line }, pressed && { opacity: 0.8 }, !c && { paddingLeft: 14 }]}>
+                  {c ? <IconBox icon={catIconName(c)} color={on ? t.accentFg : t.cats[catIndex(c)]} t={t} size={24} /> : null}
+                  <Text style={{ color: on ? t.accentFg : t.fg, fontSize: 14, lineHeight: 18, fontFamily: FONTS.semi }}>{c ? catName(c) : tr('common.all')}</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
           </View>
         ) : null}
         {filterDay ? (
           <View style={st.filters}>
-            <Label t={t}>{tr('filter.day')}</Label>
-            <Pressable style={st.fchip} onPress={() => setFilterDay(null)}><Text style={st.fchipTxt}>{shortDay(filterDay)} ✕</Text></Pressable>
+            <Text style={st.filterLbl}>{tr('filter.day')}</Text>
+            <Pressable style={st.fchip} onPress={() => setFilterDay(null)} accessibilityRole="button" accessibilityLabel={`${tr('filter.clear')}: ${shortDay(filterDay)}`}>
+              <Text style={st.fchipTxt}>{shortDay(filterDay)}</Text>
+              <Ionicons name="close" size={14} color={t.accentFg} />
+            </Pressable>
           </View>
         ) : null}
         {days.length ? (
           <>
-            <Text style={[st.meta, { paddingHorizontal: 4 }]}>{tr('list.hint')}</Text>
+            <Text style={st.hint}>{tr('list.hint')}</Text>
             {days.map((d) => {
               const its = groups[d].sort((p, q) => q.ts - p.ts);
-              return (
-                <View key={d} style={{ gap: 6 }}>
-                  <View style={st.dayHead}>
-                    <Label t={t}>{dayLabel(d)}</Label>
-                    {its.some((x) => !x.unconv) ? <Label t={t}>{money(convSum(its))}</Label> : null}
-                  </View>
-                  <View style={st.items}>{its.map((x, i) => expenseRow(x, i))}</View>
-                </View>
-              );
+              return dayCard(d, its.some((x) => !x.unconv) ? money(convSum(its)) : null, its.map((x, i) => expenseRow(x, i)));
             })}
           </>
+        ) : q ? (
+          <EmptyState t={t} icon="search" title={tr('empty.noResults')} hint={tr('empty.tryOther')} action={tr('search.clear')} actionIcon="close" onAction={() => setQuery('')} />
+        ) : listMonth.length ? (
+          <EmptyState t={t} icon="funnel-outline" title={tr('empty.noMatch')} hint={tr('empty.removeFilter')} action={tr('filter.clear')} actionIcon="close" onAction={() => { setFilterCat(null); setFilterDay(null); }} />
         ) : (
-          <View style={st.empty}>
-            <Ionicons name={q ? 'search' : 'wallet-outline'} size={40} color={t.muted} />
-            <Text style={st.emptyTitle}>{q ? tr('empty.noResults') : listMonth.length ? tr('empty.noMatch') : tr('empty.noMonth')}</Text>
-            <Text style={[st.meta, { textAlign: 'center' }]}>
-              {q ? tr('empty.tryOther') : listMonth.length ? tr('empty.removeFilter') : tr('empty.useButton')}
-            </Text>
-          </View>
+          <EmptyState t={t} icon="wallet-outline" title={tr('empty.noMonth')} hint={tr('empty.useButton')} action={tr('qa.expense')} onAction={openAdd} />
         )}
       </>
     );
@@ -739,65 +721,56 @@ function Main() {
       <>
         {rateNote}
         {subs.length ? (
-          <View style={st.subSum}>
-            <View><Amount text={money(monthly)} style={st.subSumVal} symbolColor={t.gold} /><Text style={st.tileSub}>{tr('subs.monthly')}</Text></View>
-            <View><Amount text={money0(monthly * 12)} style={st.subSumVal} symbolColor={t.gold} /><Text style={st.tileSub}>{tr('subs.yearly')}</Text></View>
-            {budget ? <View><Text style={st.subSumVal}>{fmtPercent(Math.round((monthly / budget) * 100))}</Text><Text style={st.tileSub}>{tr('subs.ofBudget')}</Text></View> : null}
-          </View>
+          <SubsHero t={t} monthly={money(monthly)} yearly={money0(monthly * 12)} share={budget ? fmtPercent(Math.round((monthly / budget) * 100)) : null} pending={pendingCount} />
         ) : null}
         {groups.length > 1 && monthly > 0 ? (
-          <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('subs.byType')}</Label>
-              {pendingCount ? <Pill kind="up" label={tr('subs.pendingCount', { n: pendingCount })} t={t} /> : null}
-            </View>
+          <View style={st.card} testID="subs-types">
+            <CardHead t={t} title={tr('subs.byType')} />
             <View style={st.stack}>
-              {groups.map((g) => <View key={g.tp.key} style={{ flex: g.total, backgroundColor: subTypeColor(g.tp.key, t) }} />)}
+              {groups.filter((g) => g.total > 0).map((g) => <View key={g.tp.key} style={{ flex: g.total, borderRadius: 99, backgroundColor: subTypeColor(g.tp.key, t) }} />)}
             </View>
-            {groups.map((g, i) => (
-              <View key={g.tp.key} style={[st.catRow, i > 0 && st.topLine]}>
-                <SubTypeIcon type={g.tp.key} t={t} size={30} />
-                <View style={{ flex: 1 }}>
-                  <Text style={st.itemCat}>{subLabel(g.tp.key)}</Text>
-                  <Text style={st.meta}>{tr('subs.countShare', { n: g.list.length, pct: Math.round((g.total / monthly) * 100) })}</Text>
+            <View style={{ marginBottom: -8 }}>
+              {groups.map((g, i) => (
+                <View key={g.tp.key} style={[st.catRow, i > 0 && st.topLine]}>
+                  <SubTypeIcon type={g.tp.key} t={t} size={40} />
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <View style={st.nameLine}>
+                      <Text style={[st.itemCat, { flex: 1, minWidth: 0 }]}>{subLabel(g.tp.key)}</Text>
+                      <Amount text={money(g.total)} style={st.itemAmt} />
+                    </View>
+                    <Text style={st.meta}>{tr('subs.countShare', { n: g.list.length, pct: Math.round((g.total / monthly) * 100) })}</Text>
+                  </View>
                 </View>
-                <Text style={st.itemAmt}>{money(g.total)}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
         ) : null}
         {groups.length ? (
           groups.map((g) => (
-            <View key={g.tp.key} style={{ gap: 6 }}>
+            <View key={g.tp.key} style={st.dayCard}>
               <View style={st.dayHead}>
-                <Label t={t}>{subLabel(g.tp.key)}</Label>
-                {g.list.some((r) => !r.s.unconv) ? <Label t={t}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Label> : null}
+                <Text style={st.dayLbl} numberOfLines={1}>{subLabel(g.tp.key)}</Text>
+                {g.list.some((r) => !r.s.unconv) ? <Text style={st.dayTot}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Text> : null}
               </View>
-              <View style={[st.card, { paddingVertical: 6 }]}>
-                {g.list.map(({ s }, i) => (
-                  <SubRow key={s.id} s={s} ctx={ctx} first={i === 0} onEdit={() => setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s })} onPay={() => paySub(s)} onSkip={() => skipSub(s)} />
-                ))}
-              </View>
+              {g.list.map(({ s }, i) => (
+                <SubRow key={s.id} s={s} ctx={ctx} first={i === 0} onEdit={() => setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s })} onPay={() => paySub(s)} onSkip={() => skipSub(s)} />
+              ))}
             </View>
           ))
         ) : (
-          <View style={st.card}>
-            <Text style={st.meta}>{tr('subs.empty')}</Text>
-          </View>
+          <EmptyState t={t} icon="repeat-outline" title={tr('subs.emptyTitle')} hint={tr('subs.empty')} action={tr('sub.newTitle')} onAction={() => setSubSheet({ key: Date.now(), initial: null })} />
         )}
-        <Button label={tr('subs.add')} kind="ghost" onPress={() => setSubSheet({ key: Date.now(), initial: null })} t={t} />
+        {groups.length ? <Button label={tr('subs.add')} kind="ghost" onPress={() => setSubSheet({ key: Date.now(), initial: null })} t={t} /> : null}
       </>
     );
   } else if (screen === 'butce') {
     body = (
-      <View style={{ gap: 14 }}>
+      <View style={{ gap: SPACE.gap }}>
       {rateNote}
       {/* Üstte bu ayın ilerlemesi (görünüm verisi: ana para biriminde, çevrilemeyenler yok); altta form */}
       <BudgetOverview t={t} p={budgetProgress(items, settings, todayIso().slice(0, 7))} periodLabel={monthLabel(todayIso().slice(0, 7))} />
-      <Label t={t}>{tr('budget.editTitle')}</Label>
-      <View style={st.card}>
-        <BudgetPanel key={budgetFocusKey} focusBudget={budgetFocusKey > 0} settings={settings} onChange={changeSettings} t={t} />
-      </View>
+      <Text style={st.section} accessibilityRole="header">{tr('budget.editTitle')}</Text>
+      <BudgetPanel key={budgetFocusKey} focusBudget={budgetFocusKey > 0} settings={settings} onChange={changeSettings} t={t} />
       </View>
     );
   } else {
@@ -969,8 +942,8 @@ function Tiles({ ctx }: { ctx: Ctx }) {
     <View style={st.tiles}>
       {tiles.map((x) => (
         <View key={x.label} style={st.tile}>
-          <Label t={t}>{x.label}</Label>
-          <Amount text={x.value} style={st.tileVal} symbolColor={t.gold} />
+          <Text style={st.tileLbl}>{x.label}</Text>
+          <Amount text={x.value} style={st.tileVal} symbolColor={t.accent} />
           {x.sub}
         </View>
       ))}
@@ -978,34 +951,44 @@ function Tiles({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/**
+ * Abonelik satırı: tür simgesi, ad, ödeme takvimi ve sağda tutar; altında durum hapı (bekliyor: uyarı, yaklaşan: nötr,
+ * ödendi: iyi, atlandı: soluk). Ödeme bekliyorsa tek satırda iki küçük hap düğme: "Ödendi" (vurgu) ve "Atla" (hayalet).
+ */
 function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; first: boolean; onEdit: () => void; onPay: () => void; onSkip: () => void }) {
   const { t, st, payItems } = ctx;
   const x = subStatus(s, payItems);
+  const chip: { tone: Tone; icon: IconName; label: string } =
+    x.state === 'pending' ? { tone: 'warn', icon: 'time-outline', label: tr('sub.pendingOn', { date: shortDay(iso(x.due)) }) }
+      : x.state === 'upcoming' ? { tone: 'neutral', icon: 'calendar-clear-outline', label: tr('sub.inDays', { n: x.days }) }
+      : x.state === 'paid' ? { tone: 'good', icon: 'checkmark-circle-outline', label: tr('sub.paidNext', { date: shortDay(iso(x.next)) }) }
+      : { tone: 'muted', icon: 'play-skip-forward-outline', label: tr('sub.skippedNext', { date: shortDay(iso(x.next)) }) };
   return (
     <View style={[st.subWrap, !first && st.topLine]}>
-      <Pressable onPress={onEdit} style={st.subRow} accessibilityLabel={tr('sub.rowA11y', { name: s.name })}>
-        <SubTypeIcon type={s.type} t={t} />
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={st.itemCat}>{s.name}</Text>
-          <View style={st.metaRow}>
-            <Text style={st.meta}>{s.freq === 'yearly' ? tr('sub.yearlyOn', { day: s.day, month: monthName(s.month - 1) }) : tr('sub.everyMonth', { day: s.day })}</Text>
-            {x.state === 'pending' ? <Pill kind="up" label={tr('sub.pendingOn', { date: shortDay(iso(x.due)) })} t={t} /> : null}
-            {x.state === 'upcoming' ? <Pill kind="flat" label={tr('sub.inDays', { n: x.days })} t={t} /> : null}
-            {x.state === 'paid' || x.state === 'skipped' ? (
-              <Pill kind={x.state === 'paid' ? 'down' : 'flat'} label={tr(x.state === 'paid' ? 'sub.paidNext' : 'sub.skippedNext', { date: shortDay(iso(x.next)) })} t={t} />
-            ) : null}
+      <Pressable onPress={onEdit} style={({ pressed }) => [st.subRow, pressed && { opacity: 0.75 }]} accessibilityRole="button" accessibilityLabel={tr('sub.rowA11y', { name: s.name })}>
+        <SubTypeIcon type={s.type} t={t} size={44} />
+        {/* Tutar ad satırında; takvim satırı tutarın altına da uzanır (dar ekranda ve uzun dillerde gereksiz kırılmasın) */}
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <View style={st.nameLine}>
+            <Text style={[st.itemCat, { flex: 1, minWidth: 0 }]} numberOfLines={2}>{s.name}</Text>
+            <Text style={{ textAlign: 'right', flexShrink: 0 }}>
+              <Amount text={s.unconv ? fmtShown(s.amount, s.cur ?? 'TRY') : money(s.amount)} style={st.itemAmt} />
+              <Text style={st.meta}>/{tr(s.freq === 'yearly' ? 'sub.perYear' : 'sub.perMonth')}</Text>
+            </Text>
+          </View>
+          <View style={st.nameLine}>
+            <Text style={[st.meta, { flex: 1, minWidth: 0 }]}>{s.freq === 'yearly' ? tr('sub.yearlyOn', { day: s.day, month: monthName(s.month - 1) }) : tr('sub.everyMonth', { day: s.day })}</Text>
+            {s.orig ? <Text style={[st.meta, { fontSize: 12, fontVariant: ['tabular-nums'] }]}>{fmtShown(s.orig.amount, s.orig.cur)}</Text> : null}
           </View>
         </View>
-        <Text style={st.itemAmt}>
-          {s.unconv ? fmtShown(s.amount, s.cur ?? 'TRY') : money(s.amount)}
-          <Text style={st.meta}>/{tr(s.freq === 'yearly' ? 'sub.perYear' : 'sub.perMonth')}</Text>
-          {s.orig ? <Text style={st.meta}>{'\n'}{fmtShown(s.orig.amount, s.orig.cur)}</Text> : null}
-        </Text>
       </Pressable>
+      <View style={st.subFoot}>
+        <SoftPill tone={chip.tone} icon={chip.icon} label={chip.label} t={t} />
+      </View>
       {x.state === 'pending' ? (
-        <View style={[st.subAct, { paddingLeft: 46 }]}>
-          <Button label={tr('sub.markPaid')} onPress={onPay} t={t} style={st.smallBtn} />
-          <Button label={tr('sub.skip')} kind="ghost" onPress={onSkip} t={t} style={st.smallBtn} />
+        <View style={st.subFoot}>
+          <PillButton label={tr('sub.paidShort')} a11y={tr('sub.markPaid')} icon="checkmark" onPress={onPay} t={t} testID={`sub-pay-${s.id}`} />
+          <PillButton label={tr('sub.skipShort')} a11y={tr('sub.skip')} icon="play-skip-forward-outline" kind="ghost" onPress={onSkip} t={t} testID={`sub-skip-${s.id}`} />
         </View>
       ) : null}
     </View>
@@ -1017,6 +1000,8 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
   onMonth: (ym: string) => void; onExport: () => void; monthSwitcher: ReactNode; rateNote: ReactNode;
 }) {
   const { t, st, a, ym, items, monthItems, budget, settings } = ctx;
+  const { width } = useWindowDimensions();
+  const [ringW, setRingW] = useState(0);
   const { cur, prev } = categoryCompare(items, ym);
   const week = weekdayAverages(items, ym);
   const busiest = week.reduce((m, d) => (d.value > m.value ? d : m), week[0]);
@@ -1038,36 +1023,78 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
   const catRows = Object.keys(by).sort((p, q) => by[q] - by[p]);
   const top = [...monthItems].sort((p, q) => q.amount - p.amount).slice(0, 5);
 
+  // Eşmerkezli yaylar: en çok 4 kategori halka olur; kalanlar açıklamada "Diğerleri" satırında toplanır
+  const ringTop = catRows.slice(0, 4);
+  const restTotal = catRows.slice(4).reduce((m, c) => m + by[c], 0);
+  const legend = [
+    ...ringTop.map((c) => ({ key: c, label: catName(c), value: by[c], color: t.cats[catIndex(c)] })),
+    ...(restTotal ? [{ key: '_o', label: tr('dash.others'), value: restTotal, color: t.muted }] : []),
+  ];
+  // Geniş ekranda grafik solda, açıklama sağda; dar ekranda alt alta
+  const side = width >= 360;
+  const ringSize = side ? Math.min(156, Math.max(132, Math.round((ringW || 280) * 0.5))) : Math.min(184, ringW || 184);
+  const ringStroke = ringSize >= 170 ? 10 : 9;
+  const ringGap = 3;
+  const hole = 2 * (ringSize / 2 - ringStroke - (ringTop.length - 1) * (ringStroke + ringGap));
+  const totalText = money0(a.total);
+
   return (
     <>
       {monthSwitcher}
       {rateNote}
+      <View style={st.card} testID="reports-rings">
+        <CardHead t={t} title={tr('reports.overview')} sub={monthLabel(ym)} />
+        {catRows.length ? (
+          <View style={[{ gap: 18, alignItems: 'center' }, side && { flexDirection: 'row' }]} onLayout={(e) => setRingW(e.nativeEvent.layout.width)}>
+            <RingsChart rings={ringTop.map((c) => ({ key: c, share: a.total ? by[c] / a.total : 0, color: t.cats[catIndex(c)] }))} size={ringSize} stroke={ringStroke} gap={ringGap}
+              track={trackOf(t)} a11y={tr('dash.donutA11y')}>
+              <Text style={{ color: t.muted, fontSize: 11, lineHeight: 14 }} numberOfLines={1}>{tr('dash.totalSpent')}</Text>
+              <Amount fit text={totalText} style={{ color: t.fg, fontSize: fitWidth(totalText, 18, hole - 14, -0.3), fontFamily: FONTS.display, letterSpacing: -0.3 }} symbolColor={t.accent} />
+            </RingsChart>
+            <View style={[{ gap: 12, alignSelf: 'stretch', justifyContent: 'center' }, side ? { flex: 1, minWidth: 0 } : { paddingHorizontal: 4 }]}>
+              {legend.map((r) => (
+                <View key={r.key} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: r.color, marginTop: 4 }} />
+                  <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                    <Text style={{ color: t.fg, fontSize: 13, lineHeight: 18, fontWeight: '600' }}>{r.label}</Text>
+                    <Text style={{ color: t.muted, fontSize: 12, lineHeight: 16, fontVariant: ['tabular-nums'] }}>
+                      {money0(r.value)} · {fmtPercent(Math.round((r.value / a.total) * 100))}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <View style={st.cardEmpty}>
+            <IconBox icon="pie-chart-outline" color={t.accent} t={t} size={48} />
+            <Text style={[st.meta, { textAlign: 'center' }]}>{tr('reports.noExpenses')}</Text>
+          </View>
+        )}
+      </View>
+
       {notes.length ? (
         <View style={st.card}>
-          <Label t={t}>{tr('section.highlights')}</Label>
+          <CardHead t={t} title={tr('section.highlights')} />
           <InsightList list={notes} t={t} />
         </View>
       ) : null}
+
       <View style={st.card}>
-        <View style={st.cardHead}>
-          <Label t={t}>{tr('reports.last6')}</Label>
-          {avg6 ? <Text style={st.meta}>{tr('tile.average', { amount: money0(avg6) })}</Text> : null}
-        </View>
+        <CardHead t={t} title={tr('reports.last6')} sub={avg6 ? tr('tile.average', { amount: money0(avg6) }) : undefined} />
         <Bars data={months} selected={ym} onSelect={onMonth} t={t} />
       </View>
 
       <View style={st.card}>
-        <View style={st.cardHead}>
-          <Label t={t}>{tr('reports.daily')}</Label>
-          <View style={st.legend}>
-            <View style={st.legendItem}><View style={[st.dash, { borderColor: t.muted }]} /><Text style={st.legendTxt}>{tr('reports.legendAvg')}</Text></View>
-            {budget ? <View style={st.legendItem}><View style={[st.dash, { borderColor: t.warn }]} /><Text style={st.legendTxt}>{tr('reports.legendBudget')}</Text></View> : null}
-          </View>
+        <CardHead t={t} title={tr('reports.daily')} />
+        <View style={st.legend}>
+          <View style={st.legendItem}><View style={[st.dash, { borderColor: t.muted }]} /><Text style={st.legendTxt}>{tr('reports.legendAvg')}</Text></View>
+          {budget ? <View style={st.legendItem}><View style={[st.dash, { borderColor: t.warn }]} /><Text style={st.legendTxt}>{tr('reports.legendBudget')}</Text></View> : null}
         </View>
         <DailyChart a={a} ym={ym} budget={budget} selected={filterDay} onSelect={onDay} t={t} />
         {filterDay ? (
-          <Pressable onPress={onShowDay} style={st.metaRow}>
-            <Text style={st.meta}>{tr('reports.dayTotal', { day: dayLabel(filterDay), amount: money(a.perDay[filterDay] || 0) })}</Text>
+          <Pressable onPress={onShowDay} style={[st.metaRow, { justifyContent: 'space-between' }]} accessibilityRole="button">
+            <Text style={[st.meta, { flexShrink: 1 }]}>{tr('reports.dayTotal', { day: dayLabel(filterDay), amount: money(a.perDay[filterDay] || 0) })}</Text>
             <Text style={st.link}>{tr('reports.showExpenses')}</Text>
           </Pressable>
         ) : (
@@ -1077,32 +1104,26 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
 
       {monthItems.length ? (
         <View style={st.card}>
-          <View style={st.cardHead}>
-            <Label t={t}>{tr('reports.weekday')}</Label>
-            <Text style={st.meta}>{tr('reports.perDayAvg')}</Text>
-          </View>
-          <Bars data={week} selected={busiest.value ? busiest.key : undefined} t={t} height={130} />
+          <CardHead t={t} title={tr('reports.weekday')} sub={tr('reports.perDayAvg')} />
+          <Bars data={week} selected={busiest.value ? busiest.key : undefined} t={t} height={136} />
           {busiest.value ? <Text style={st.meta}>{tr('reports.busiestDay', { day: busiest.label, amount: money0(busiest.value) })}</Text> : null}
         </View>
       ) : null}
 
-      <View style={st.card}>
-        <View style={st.cardHead}>
-          <Label t={t}>{tr('reports.byCategory')}</Label>
-          {monthItems.length ? <Label t={t}>{tr('list.count', { n: monthItems.length })}</Label> : null}
-        </View>
+      <View style={[st.card, { gap: 6 }]}>
+        <CardHead t={t} title={tr('reports.byCategory')} sub={monthItems.length ? tr('list.count', { n: monthItems.length }) : undefined} />
         {catRows.length ? (
-          <>
-            <View style={st.stack}>
-              {catRows.map((c) => <View key={c} style={{ flex: by[c], backgroundColor: t.cats[catIndex(c)] }} />)}
-            </View>
+          <View>
             {catRows.map((c, i) => (
-              <Pressable key={c} onPress={() => onCat(c)} style={[st.catRow, i > 0 && st.topLine]}>
-                <CatIcon cat={c} t={t} />
-                <View style={{ flex: 1, gap: 4 }}>
-                  <View style={st.metaRow}>
-                    <Text style={st.itemCat}>{catName(c)}</Text>
-                    <CatChange cur={cur[c] || 0} prev={prev[c] || 0} t={t} />
+              <Pressable key={c} onPress={() => onCat(c)} accessibilityRole="button" style={({ pressed }) => [st.catRow, i > 0 && st.topLine, pressed && { opacity: 0.75 }]}>
+                <CatIcon cat={c} t={t} size={44} />
+                <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                  <View style={st.nameLine}>
+                    <View style={[st.metaRow, { flex: 1, minWidth: 0 }]}>
+                      <Text style={st.itemCat}>{catName(c)}</Text>
+                      <CatChange cur={cur[c] || 0} prev={prev[c] || 0} t={t} />
+                    </View>
+                    <Amount text={money(by[c])} style={st.itemAmt} />
                   </View>
                   <Text style={st.meta}>
                     {tr('reports.catLine', { pct: Math.round((by[c] / a.total) * 100), n: cnt[c] })}
@@ -1110,30 +1131,24 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
                   </Text>
                   {settings.catBudgets[c] ? <Progress value={by[c]} max={settings.catBudgets[c]} t={t} /> : null}
                 </View>
-                <Text style={st.itemAmt}>{money(by[c])}</Text>
-                <Ionicons name="chevron-forward" size={16} color={t.muted} />
               </Pressable>
             ))}
-          </>
+          </View>
         ) : (
           <Text style={st.meta}>{tr('reports.noExpenses')}</Text>
         )}
       </View>
 
       {top.length ? (
-        <View style={st.card}>
-          <Label t={t}>{tr('reports.top')}</Label>
-          {top.map((x, i) => (
-            <View key={x.id} style={[st.catRow, i > 0 && st.topLine]}>
-              <Text style={st.rank}>{i + 1}</Text>
-              <CatIcon cat={x.cat} t={t} size={30} />
-              <View style={{ flex: 1 }}>
-                <Text style={st.itemCat}>{x.note || catName(x.cat)}</Text>
-                <Text style={st.meta}>{catName(x.cat)} · {shortDay(x.date)}</Text>
-              </View>
-              <Text style={st.itemAmt}>{money(x.amount)}</Text>
-            </View>
-          ))}
+        <View style={[st.card, { gap: 6 }]}>
+          <CardHead t={t} title={tr('reports.top')} />
+          <View>
+            {top.map((x, i) => (
+              <TxnRow key={x.id} t={t} kind="expense" cat={x.cat} first={i === 0} title={x.note || catName(x.cat)}
+                subtitle={x.note ? `${catName(x.cat)} · ${shortDay(x.date)}` : shortDay(x.date)} amount={money(x.amount)}
+                a11y={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountsHidden() ? tr('amount.hidden') : money(x.amount) })} />
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -1159,42 +1174,26 @@ function makeStyles(t: Theme) {
     scroll: { paddingHorizontal: SPACE.edge, paddingTop: 8 },
     wrap: { width: '100%', maxWidth: DASH_MAX, alignSelf: 'center', gap: 16 },
     dashBody: { gap: SPACE.gap },
-    seg: { flexDirection: 'row', borderWidth: 1, borderRadius: 99, padding: 4, gap: 4 },
-    segBtn: { flex: 1, minHeight: 40, borderRadius: 99, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
     h1: { fontSize: 28, lineHeight: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.6 },
     link: { color: t.gold, fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
     months: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     mBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
     monthNow: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.accentSoft },
     mLabel: { fontSize: 17, fontFamily: FONTS.bold, color: t.fg, letterSpacing: -0.2 },
-    hero: { borderRadius: 26, padding: 22, gap: 16, borderWidth: 1, borderColor: 'rgba(201,168,106,0.45)', overflow: 'hidden' },
-    heroTop: { flexDirection: 'row', justifyContent: 'space-between' },
-    heroBrand: { color: t.heroLabel, fontSize: 10, letterSpacing: 2.4, fontWeight: '600' },
-    heroLabel: { color: t.heroMuted, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase' },
-    heroRule: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(201,168,106,0.4)' },
-    heroBudget: { borderWidth: 1, borderColor: 'rgba(201,168,106,0.5)', borderRadius: 99, paddingVertical: 6, paddingHorizontal: 12 },
-    heroBudgetTxt: { color: t.heroLabel, fontSize: 13, fontWeight: '600' },
-    heroBig: { color: t.heroFg, fontSize: 48, fontFamily: FONTS.display, marginTop: 6, letterSpacing: -0.5 },
-    heroMid: { color: t.heroFg, fontSize: 26, fontFamily: FONTS.bold, marginTop: 2 },
-    heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8 },
-    heroSmall: { color: t.heroMuted, fontSize: 13, fontVariant: ['tabular-nums'] },
-    track: { height: 4, borderRadius: 99, backgroundColor: t.heroTrack, overflow: 'hidden' },
-    fill: { height: '100%', borderRadius: 99 },
     tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     tile: { flexGrow: 1, flexBasis: '45%', ...cardBase(t), padding: 16, gap: 6 },
     tileVal: { fontSize: 22, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
     tileSub: { fontSize: 13, color: t.muted },
+    tileLbl: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.muted },
     card: { ...cardBase(t), gap: 14 },
-    cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: 4 },
-    summaryVal: { fontSize: 28, fontFamily: FONTS.display, color: t.fg },
-    catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 12 },
-    subSum: { flexDirection: 'row', gap: 24, paddingHorizontal: 4 },
-    subSumVal: { fontSize: 26, fontFamily: FONTS.display, color: t.fg },
-    subWrap: { gap: 10, paddingVertical: 10 },
+    sumCard: { ...cardBase(t), flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+    sumLbl: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted },
+    sumVal: { ...bigAmount, fontSize: 24, lineHeight: 31, color: t.fg, letterSpacing: -0.6 },
+    catChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.pill, minHeight: 38, paddingVertical: 6, paddingLeft: 7, paddingRight: 14 },
+    subWrap: { gap: 10, paddingVertical: 12 },
     subRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    subAct: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingLeft: 20 },
-    smallBtn: { height: 38, borderRadius: 12, paddingHorizontal: 12 },
+    nameLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    subFoot: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingLeft: 56 },
     backHint: { position: 'absolute', left: 0, top: '45%', width: 40, height: 40, borderRadius: 20, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
     rateNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
     metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
@@ -1203,23 +1202,25 @@ function makeStyles(t: Theme) {
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     legendTxt: { fontSize: 12, color: t.muted },
     dash: { width: 14, height: 0, borderTopWidth: 2, borderStyle: 'dashed' },
-    stack: { flexDirection: 'row', height: 14, borderRadius: 99, overflow: 'hidden', gap: 2 },
-    catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 2 },
-    dot: { width: 10, height: 10, borderRadius: 3 },
+    stack: { flexDirection: 'row', height: 12, borderRadius: RADIUS.pill, overflow: 'hidden', gap: 3 },
+    catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+    cardEmpty: { alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14 },
     filters: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-    fchip: { backgroundColor: t.accent, borderRadius: 99, paddingVertical: 6, paddingHorizontal: 12 },
-    fchipTxt: { color: t.accentFg, fontSize: 14, fontWeight: '600' },
-    dayHead: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
-    items: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.line, borderRadius: 20, overflow: 'hidden' },
-    item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 },
-    itemCat: { fontSize: 16, fontWeight: '500', color: t.fg },
-    itemAmt: { textAlign: 'right', fontSize: 16, fontWeight: '500', color: t.fg, fontVariant: ['tabular-nums'] },
-    meta: { fontSize: 13, color: t.muted },
-    empty: { alignItems: 'center', paddingVertical: 28, gap: 4 },
-    emptyTitle: { fontSize: 22, fontFamily: FONTS.bold, color: t.fg, marginTop: 6 },
+    filterLbl: { fontSize: 13, fontWeight: '600', color: t.muted },
+    fchip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.accent, borderRadius: RADIUS.pill, paddingVertical: 6, paddingLeft: 12, paddingRight: 10 },
+    fchipTxt: { color: t.accentFg, fontSize: 14, fontFamily: FONTS.semi },
+    dayCard: { ...cardBase(t), paddingTop: 14, paddingBottom: 4 },
+    dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 },
+    dayLbl: { flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted },
+    dayTot: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted, fontVariant: ['tabular-nums'], textAlign: 'right' },
+    itemCat: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: t.fg },
+    itemAmt: { textAlign: 'right', fontSize: 15, fontWeight: '700', color: t.fg, fontVariant: ['tabular-nums'] },
+    meta: { fontSize: 13, lineHeight: 18, color: t.muted },
+    hint: { fontSize: 12.5, lineHeight: 17, color: t.muted, paddingHorizontal: 4 },
+    section: { fontSize: 18, lineHeight: 24, fontFamily: FONTS.bold, color: t.fg, letterSpacing: -0.2, paddingHorizontal: 4, marginTop: 6 },
     toast: { position: 'absolute', alignSelf: 'center', maxWidth: '92%', backgroundColor: t.raised, borderWidth: 1, borderColor: t.goldLine, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
-    search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 23, borderWidth: 1, borderColor: t.line, backgroundColor: t.surface, paddingHorizontal: 12 },
-    searchInput: { flex: 1, fontSize: 16, color: t.fg, height: '100%' },
-    rank: { width: 16, fontSize: 15, color: t.muted, fontFamily: FONTS.bold, textAlign: 'center' },
+    search: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, borderRadius: RADIUS.inner, backgroundColor: t.surface, paddingHorizontal: 14, ...cardShadow(t) },
+    searchInput: { flex: 1, minWidth: 0, fontSize: 15, color: t.fg, height: '100%' },
+    searchClear: { width: 22, height: 22, borderRadius: 11, backgroundColor: t.muted, alignItems: 'center', justifyContent: 'center' },
   });
 }

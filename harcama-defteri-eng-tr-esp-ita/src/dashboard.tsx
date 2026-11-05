@@ -9,7 +9,7 @@ import { Analysis, Balance, BudgetProgress, Expense, Sub, Txn, catIndex, catName
 import { mix, rgba } from './palette';
 import { FONTS, Theme } from './theme';
 import { RADIUS, SPACE, bigAmount, cardBase, cardShadow, cardTitle, trackOf } from './design';
-import { Amount, Button, CatIcon, IconName, IncomeIcon, Ionicons, Progress, RingsChart, SubTypeIcon, TxnRow, fitFont, fitWidth, incomeIcon } from './ui';
+import { Amount, Button, CatIcon, IconBox, IconName, IncomeIcon, Ionicons, Progress, RingsChart, SoftPill, SubTypeIcon, TxnRow, fitFont, fitWidth, incomeIcon } from './ui';
 
 export { IncomeIcon, incomeIcon };
 
@@ -434,66 +434,163 @@ export function BudgetCard({ t, spent, budget, onBudget, periodLabel }: { t: The
 }
 
 /* ---------- Bütçe ekranı: bu ayın ilerlemesi ve kategori limitleri ---------- */
+/** Kart içi küçük gösterge kutusu: simge + etiket, iri tutar, isteğe bağlı alt yazı. */
+function MiniStat({ t, icon, color, label, value, caption, a11y }: { t: Theme; icon: IconName; color: string; label: string; value: string; caption?: string; a11y?: string }) {
+  const [w, setW] = useState(0);
+  return (
+    <View style={[s.mini, { backgroundColor: t.bg }]} onLayout={(e) => setW(e.nativeEvent.layout.width)} accessible={!!a11y} accessibilityLabel={a11y}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <IconBox icon={icon} color={color} t={t} size={28} />
+        <Text style={{ color: t.muted, fontSize: 12, lineHeight: 16, fontWeight: '600', flexShrink: 1 }}>{label}</Text>
+      </View>
+      <Amount fit text={value} style={{ color: t.fg, fontSize: fitWidth(value, 19, w - 24), fontFamily: FONTS.display, letterSpacing: -0.4 }} symbolColor={t.accent} />
+      {caption ? <Text style={{ color: t.muted, fontSize: 12, lineHeight: 16 }}>{caption}</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * Kategori limiti kutucuğu (DESIGN-2 §7, Financy "Savings"): simge kutusu ve oran, ad, "₺2.500 / ₺3.000", kategorinin renginde
+ * kalın yuvarlak çubuk. %80'den itibaren çubuk uyarı tonuna döner, limit aşılınca aşım renginde ve küçük "aşıldı" hapıyla.
+ */
+function LimitTile({ t, r }: { t: Theme; r: BudgetProgress['limits'][number] }) {
+  const over = r.ratio > 1;
+  const near = !over && r.ratio >= 0.8;
+  const pct = fmtPercent(Math.round(r.ratio * 100));
+  const bar = over ? t.warn : near ? t.cats[1] : t.cats[catIndex(r.cat)];
+  return (
+    <View style={[cardBase(t), s.tile]} testID={`limit-${r.cat}`} accessible
+      accessibilityLabel={tr('budget.ov.rowA11y', { cat: catName(r.cat), spent: money0A11y(r.spent), limit: money0A11y(r.limit), pct })}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+        <CatIcon cat={r.cat} t={t} size={40} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 2 }}>
+          {near ? <Ionicons name="alert-circle" size={14} color={t.cats[1]} /> : null}
+          <Text style={{ color: over ? t.warn : t.fg, fontSize: 15, lineHeight: 20, fontFamily: FONTS.display, fontVariant: ['tabular-nums'] }}>{pct}</Text>
+        </View>
+      </View>
+      <View style={{ gap: 3 }}>
+        <Text style={{ color: t.fg, fontSize: 14, lineHeight: 19, fontFamily: FONTS.bold }}>{catName(r.cat)}</Text>
+        <Text style={{ color: t.muted, fontSize: 12, lineHeight: 17, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ color: t.fg, fontWeight: '700' }}>{money0(r.spent)}</Text>{` / ${money0(r.limit)}`}
+        </Text>
+      </View>
+      <View style={{ gap: 8 }}>
+        <Progress value={r.spent} max={r.limit} color={bar} height={8} t={t} />
+        {over ? <SoftPill tone="warn" icon="alert-circle-outline" label={tr('dash.budgetOver')} t={t} /> : null}
+      </View>
+    </View>
+  );
+}
+
 export function BudgetOverview({ t, p, periodLabel }: { t: Theme; p: BudgetProgress; periodLabel: string }) {
   const over = p.budget > 0 && p.remaining < 0;
+  const [cw, setCw] = useState(0);
+  const spentText = money0(p.spent);
+  // Kutucuklar ikişer ikişer dizilir; tek kalan kutucuğun yanı boş kalır (son kutucuk tüm satırı kaplamasın)
+  const pairs: BudgetProgress['limits'][] = [];
+  p.limits.forEach((r, i) => (i % 2 ? pairs[pairs.length - 1].push(r) : pairs.push([r])));
   return (
-    <View style={{ gap: 14 }}>
+    <View style={{ gap: SPACE.gap }}>
       <Card t={t} testID="budget-overview">
-        <CardHead t={t} title={tr('card.budget')} sub={periodLabel} />
+        <View style={[s.head, { alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1, minWidth: 0 }}><CardHead t={t} title={tr('card.budget')} sub={periodLabel} /></View>
+          {p.budget > 0 ? <SoftPill tone={over ? 'warn' : p.ratio >= 0.8 ? 'neutral' : 'accent'} label={fmtPercent(Math.round(p.ratio * 100))} t={t} testID="budget-ov-pct" /> : null}
+        </View>
         {p.budget > 0 ? (
-          <View style={{ gap: 12, marginTop: 10 }}>
+          <View style={{ gap: 14, marginTop: 12 }} onLayout={(e) => setCw(e.nativeEvent.layout.width)}>
             <View style={{ gap: 2 }}>
-              <Amount fit text={money0(p.spent)} style={{ color: t.fg, fontSize: fitFont(money0(p.spent), 24, 10), fontWeight: '800' }} symbolColor={t.accent} />
-              <Text style={{ color: t.muted, fontSize: 12 }} numberOfLines={1}>{tr('dash.budgetOf', { total: money0(p.budget) })}</Text>
+              <Amount fit text={spentText} style={[bigAmount, { color: t.fg, fontSize: fitWidth(spentText, 34, cw, -1), lineHeight: 42 }]} symbolColor={t.accent} />
+              <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18 }}>{tr('dash.budgetOf', { total: money0(p.budget) })}</Text>
             </View>
-            <Progress value={p.spent} max={p.budget} color={budgetColor(p.ratio, t)} t={t} />
-            <View style={[s.leftRow, { backgroundColor: over ? t.warnSoft : t.goodSoft }]}>
-              <Ionicons name={over ? 'alert-circle-outline' : 'wallet-outline'} size={16} color={over ? t.warn : t.good} />
-              <View style={{ flex: 1 }}>
-                <Amount fit text={money0(Math.abs(p.remaining))} style={{ color: t.fg, fontSize: fitFont(money0(Math.abs(p.remaining)), 13, 8), fontWeight: '700' }} symbolColor={t.accent} />
-                <Text style={{ color: t.muted, fontSize: 10 }} numberOfLines={1}>{tr(over ? 'dash.budgetOver' : 'dash.budgetLeft')}</Text>
-              </View>
+            <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.min(100, Math.round(p.ratio * 100)) }}>
+              <Progress value={p.spent} max={p.budget} color={budgetColor(p.ratio, t)} height={10} t={t} />
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <Text style={{ color: t.fg, fontSize: 13, flexShrink: 1 }}>
-                {p.perDay !== null ? tr('budget.ov.perDay', { amount: money0(p.perDay) }) : ''}
-              </Text>
-              <Text style={{ color: t.muted, fontSize: 12 }}>{tr('budget.ov.daysLeft', { n: p.daysLeft })}</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <MiniStat t={t} icon={over ? 'alert-circle-outline' : 'wallet-outline'} color={over ? t.warn : t.good} label={tr(over ? 'budget.ov.overLabel' : 'budget.ov.leftLabel')} value={money0(Math.abs(p.remaining))}
+                caption={over ? tr('budget.ov.overCaption', { pct: fmtPercent(Math.round(p.ratio * 100) - 100) }) : tr('budget.ov.leftCaption', { pct: fmtPercentPoss(100 - Math.round(p.ratio * 100)) })} />
+              <MiniStat t={t} icon="calendar-outline" color={t.accent} label={tr('budget.ov.perDayShort')} value={p.perDay !== null ? money0(p.perDay) : '—'}
+                caption={tr('budget.ov.daysLeft', { n: p.daysLeft })} a11y={p.perDay !== null ? `${tr('budget.ov.perDay', { amount: money0A11y(p.perDay) })}, ${tr('budget.ov.daysLeft', { n: p.daysLeft })}` : undefined} />
             </View>
           </View>
         ) : (
           <View style={s.cardEmpty}>
-            <Ionicons name="wallet-outline" size={26} color={t.muted} />
-            <Text style={{ color: t.muted, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>{tr('budget.ov.empty')}</Text>
+            <IconBox icon="wallet-outline" color={t.accent} t={t} size={48} />
+            <Text style={{ color: t.muted, fontSize: 13, textAlign: 'center', lineHeight: 18, maxWidth: 300 }}>{tr('budget.ov.empty')}</Text>
           </View>
         )}
       </Card>
 
-      <Card t={t} testID="budget-limits">
-        <CardHead t={t} title={tr('budget.limitsTitle')} sub={periodLabel} />
-        {p.limits.length ? (
-          <View style={{ gap: 14, marginTop: 12 }}>
-            {p.limits.map((r) => {
-              const color = budgetColor(r.ratio, t);
-              return (
-                <View key={r.cat} style={{ gap: 6 }} accessible accessibilityLabel={tr('budget.ov.rowA11y', { cat: catName(r.cat), spent: money0A11y(r.spent), limit: money0A11y(r.limit), pct: fmtPercent(Math.round(r.ratio * 100)) })}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <CatIcon cat={r.cat} t={t} size={32} />
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ color: t.fg, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{catName(r.cat)}</Text>
-                      <Text style={{ color: t.muted, fontSize: 12 }} numberOfLines={1}>{`${money0(r.spent)} / ${money0(r.limit)}`}</Text>
-                    </View>
-                    <Text style={{ color, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{fmtPercent(Math.round(r.ratio * 100))}</Text>
-                  </View>
-                  <Progress value={r.spent} max={r.limit} color={color} t={t} />
-                </View>
-              );
-            })}
-          </View>
+      <View testID="budget-limits" style={{ gap: 12 }}>
+        <View style={{ paddingHorizontal: 4, gap: 2 }}>
+          <Text style={[cardTitle(t), { fontSize: 17, lineHeight: 22 }]} accessibilityRole="header">{tr('budget.limitsTitle')}</Text>
+          <Text style={{ color: t.muted, fontSize: 12, lineHeight: 16 }}>{periodLabel}</Text>
+        </View>
+        {pairs.length ? (
+          pairs.map((row) => (
+            <View key={row[0].cat} style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch' }}>
+              {row.map((r) => <LimitTile key={r.cat} t={t} r={r} />)}
+              {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
+            </View>
+          ))
         ) : (
-          <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18, marginTop: 10 }}>{tr('budget.ov.noLimits')}</Text>
+          <Card t={t}>
+            <Text style={{ color: t.muted, fontSize: 13, lineHeight: 19 }}>{tr('budget.ov.noLimits')}</Text>
+          </Card>
         )}
-      </Card>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Abonelikler ekranı: özet kartı ---------- */
+/**
+ * Abonelik özeti, bakiye kartıyla aynı koyu kart dilinde: aylık toplam iri tutar, onay bekleyen sayısı çipi,
+ * altta yıllık toplam | bütçe payı (bütçe yoksa yalnızca yıllık).
+ */
+export function SubsHero({ t, monthly, yearly, share, pending }: { t: Theme; monthly: string; yearly: string; share: string | null; pending: number }) {
+  const { width } = useWindowDimensions();
+  const [cw, setCw] = useState(Math.min(width, DASH_MAX) - 2 * SPACE.edge);
+  const PAD = 20;
+  const CELL = cw < 300 ? 40 : 48;
+  const size = fitWidth(monthly, 36, cw - 2 * PAD - (CELL - PAD + 10), -1);
+  const light = t.name === 'ivory';
+  const colW = share !== null ? (cw - 2 * PAD - 2 * 14 - 1 - 2 * 12) / 2 : cw - 2 * PAD - 2 * 14;
+  return (
+    <LinearGradient colors={t.heroGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} testID="subs-hero" onLayout={(e) => setCw(e.nativeEvent.layout.width)}
+      style={[s.hero, { borderColor: glass(0.07) }, light && { boxShadow: '0px 12px 28px rgba(11,18,32,0.18)' }]}>
+      <HeroMotif t={t} cell={CELL} />
+      <Text style={{ color: t.heroMuted, fontSize: 13, lineHeight: 18, fontWeight: '600', paddingRight: 2 * CELL - PAD + 8 }}>{tr('subs.heroTitle')}</Text>
+      <View style={{ gap: 10, marginTop: -6 }}>
+        <Amount fit text={monthly} style={[bigAmount, { color: t.heroFg, fontSize: size, lineHeight: Math.round(size * 1.25), paddingRight: CELL - PAD + 10 }]} symbolColor={t.heroLabel} />
+        {pending ? (
+          <View style={[s.delta, { alignSelf: 'flex-start', backgroundColor: rgba(HERO_AMBER, 0.16) }]}>
+            <Ionicons name="time-outline" size={13} color={HERO_AMBER} />
+            <Text style={{ color: HERO_AMBER, fontSize: 12, fontWeight: '700' }}>{tr('subs.pendingCount', { n: pending })}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={[s.split, { backgroundColor: glass(0.06), borderColor: glass(0.08) }]}>
+        <HeroStat t={t} icon="calendar-outline" label={tr('subs.perYear')} value={yearly} width={colW} />
+        {share !== null ? (
+          <>
+            <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: glass(0.12) }} />
+            <HeroStat t={t} icon="pie-chart-outline" label={tr('subs.budgetShare')} value={share} width={colW} />
+          </>
+        ) : null}
+      </View>
+    </LinearGradient>
+  );
+}
+
+function HeroStat({ t, icon, label, value, width }: { t: Theme; icon: IconName; label: string; value: string; width: number }) {
+  // Etiket iki satıra kırılırsa tutarlar yine aynı hizada (alta yaslı) kalır
+  return (
+    <View style={{ flex: 1, minWidth: 0, gap: 6, alignSelf: 'stretch', justifyContent: 'space-between' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+        <View style={[s.flowChip, { backgroundColor: glass(0.1) }]}><Ionicons name={icon} size={13} color={t.heroLabel} /></View>
+        <Text style={{ color: t.heroMuted, fontSize: 12, fontWeight: '600', flexShrink: 1 }}>{label}</Text>
+      </View>
+      <Amount fit text={value} style={{ color: t.heroFg, fontSize: fitWidth(value, 17, width), fontFamily: FONTS.bold, letterSpacing: -0.3 }} symbolColor={t.heroLabel} />
     </View>
   );
 }
@@ -756,6 +853,8 @@ const s = StyleSheet.create({
   tip: { alignSelf: 'flex-start', borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
   barCell: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   donutCenter: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  mini: { flex: 1, minWidth: 0, borderRadius: RADIUS.inner, padding: 12, gap: 6 },
+  tile: { flex: 1, minWidth: 0, padding: 14, gap: 12, borderRadius: 20 },
   leftRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingVertical: 7, paddingHorizontal: 10, alignSelf: 'stretch' },
   tabWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   tabBar: { flexDirection: 'row', alignItems: 'center', height: TAB_BAR_H, borderRadius: TAB_BAR_H / 2, borderWidth: 1, paddingHorizontal: 4 },

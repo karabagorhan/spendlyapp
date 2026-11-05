@@ -20,7 +20,6 @@ const it: Catalog = {
   'common.amountField': 'Importo ({sym})',
   'common.amountPlaceholder': '0,00',
   'sheet.hideKeyboard': 'Nascondi tastiera',
-  'fab.add': '+  Aggiungi spesa',
 
   // Titoli delle schermate
   'title.ozet': 'Riepilogo',
@@ -145,12 +144,14 @@ const it: Catalog = {
   'insight.freeDays': { one: 'Questo mese hai passato {n} giorno senza spendere.', other: 'Questo mese hai passato {n} giorni senza spendere.' },
 
   // Schermata spese
-  'search.placeholder': 'Cerca nota, categoria o importo',
+  'search.placeholder': 'Cerca nota, categoria, importo',
   'search.a11y': 'Cerca nelle spese',
+  'search.clear': 'Cancella ricerca',
   'search.results': { one: '{n} risultato in tutti i mesi', other: '{n} risultati in tutti i mesi' },
   'list.count': { one: '{n} operazione', other: '{n} operazioni' },
   'list.hint': 'Tocca una spesa per correggerla o eliminarla.',
   'filter.day': 'Giorno',
+  'filter.clear': 'Rimuovi filtro',
   'empty.noResults': 'Nessun risultato',
   'empty.noMatch': 'Nessuna spesa corrisponde',
   'empty.noMonth': 'Nessuna spesa questo mese',
@@ -182,6 +183,7 @@ const it: Catalog = {
   'reports.perDayAvg': 'media per giorno',
   'reports.busiestDay': 'Il tuo giorno di maggiore spesa: {day} (media {amount})',
   'reports.byCategory': 'Per categoria',
+  'reports.overview': 'Ripartizione spese',
   'reports.catLine': { one: '{pct}% · {n} operazione', other: '{pct}% · {n} operazioni' },
   'reports.limit': 'limite {amount}',
   'reports.noExpenses': 'Ancora nessuna spesa questo mese.',
@@ -190,10 +192,11 @@ const it: Catalog = {
   'chart.dayLabel': 'Giorno {day}',
 
   // Abbonamenti
-  'subs.monthly': 'al mese',
-  'subs.yearly': 'all’anno',
-  'subs.ofBudget': 'del budget',
   'subs.byType': 'Per tipo (mensile)',
+  'subs.heroTitle': 'Abbonamenti al mese',
+  'subs.perYear': 'All’anno',
+  'subs.budgetShare': 'Del budget',
+  'subs.emptyTitle': 'Nessun abbonamento',
   'subs.pendingCount': { one: '{n} da confermare', other: '{n} da confermare' },
   'subs.countShare': { one: '{n} abbonamento · {pct}%', other: '{n} abbonamenti · {pct}%' },
   'subs.perMonthTotal': '{amount} / mese',
@@ -210,6 +213,8 @@ const it: Catalog = {
   'sub.perMonth': 'mese',
   'sub.markPaid': 'Segna come pagato',
   'sub.skip': 'Salta questo periodo',
+  'sub.paidShort': 'Pagato',
+  'sub.skipShort': 'Salta',
 
   // Modulo abbonamento
   'sub.newTitle': 'Nuovo abbonamento',
@@ -238,6 +243,11 @@ const it: Catalog = {
   'budget.ov.empty': 'Imposta un budget mensile per vedere il mese qui.',
   'budget.ov.perDay': 'Puoi spendere {amount} al giorno',
   'budget.ov.daysLeft': { one: 'manca {n} giorno', other: 'mancano {n} giorni' },
+  'budget.ov.perDayShort': 'Al giorno',
+  'budget.ov.leftLabel': 'Rimanente',
+  'budget.ov.leftCaption': '{pct} del budget',
+  'budget.ov.overLabel': 'Sforamento',
+  'budget.ov.overCaption': '{pct} oltre il budget',
   'budget.ov.rowA11y': '{cat}: {spent} di {limit}, {pct}',
   'budget.ov.noLimits': 'Nessun limite per categoria. Impostane uno qui sotto.',
 
