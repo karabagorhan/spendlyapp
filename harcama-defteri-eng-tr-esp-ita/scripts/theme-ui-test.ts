@@ -1,8 +1,9 @@
 /**
  * Renk kartelası arayüz testi (tarayıcıda, iPhone boyutunda): `npx tsx scripts/theme-ui-test.ts <dil> [--shots dizin]`
  *   Önce web paketi alınmalı: npx expo export --platform web --output-dir /tmp/web-out   (dizin: WEB_DIR)
- * Kontroller: her mod (Noir/Fildişi/Telefona göre) × 4 zemin tonu × 8 vurgu rengi için ekranda gerçekten uygulanan renkler
- * (zemin ve seçili çip rengi), seçili kartelanın işaretlenmesi, kalıcılık, dil değişince renklerin korunması.
+ * Kontroller: her mod (Noir/Fildişi/Telefona göre) × tüm zemin tonları × tüm vurgu renkleri için ekranda gerçekten uygulanan renkler
+ * (zemin ve vurgu rengi), 6 hazır tema (Wada kombinasyonları; kartta "Wada No." notu), seçili kartelanın işaretlenmesi, kalıcılık,
+ * dil değişince renklerin korunması.
  */
 import { chromium } from 'playwright-core';
 import { createServer } from 'http';
@@ -131,12 +132,18 @@ const data = (extra: Record<string, unknown> = {}) => ({
       ok(`[${label}] hazır tema ${p.id}: vurgu uygulanıyor`, (await accentNow(NATIVE[lang])) === rgbOf(makeTheme(mode, p.tint, p.accent).accent));
       ok(`[${label}] hazır tema ${p.id}: kart seçili`, (await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.' + p.id))).getAttribute('aria-selected')) === 'true');
       for (const q of PRESETS.filter((x) => x !== p)) ok(`[${label}] hazır tema ${p.id}: ${q.id} seçili değil`, (await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.' + q.id))).getAttribute('aria-selected')) === 'false');
+      ok(`[${label}] hazır tema ${p.id}: Wada notu görünüyor`, await page.getByText(cat('preset.wada').replace('{n}', String(p.wada)), { exact: true }).first().isVisible());
       ok(`[${label}] hazır tema ${p.id}: tek tek seçiciler de seçili`, (await swatch(cat('accent.' + p.accent)).getAttribute('aria-selected')) === 'true' && (await swatch(cat('tint.' + p.tint)).getAttribute('aria-selected')) === 'true');
       if (shots) { mkdirSync(shots, { recursive: true }); await page.screenshot({ path: join(shots, `${lang}-hazir-${mode}-${p.id}.png`) }); }
     }
-    // Hazır temadan sonra tek tek seçim hazır temanın işaretini kaldırır; sonraki kontroller son vurgu/tonla devam eder
+    // Hazır temadan sonra tek tek seçim hazır temanın işaretini kaldırır (yalnızca vurgu değişince hiçbir hazır tema seçili kalmaz);
+    // sonraki kontroller son vurgu/tonla devam eder (bu çift de bir hazır temaysa yalnızca o işaretlenir)
+    const presetSel = async (id: string) => (await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.' + id))).getAttribute('aria-selected')) === 'true';
+    await swatch(cat('accent.gold')).click(); await page.waitForTimeout(350);
+    const anySel = (await Promise.all(PRESETS.map((p) => presetSel(p.id)))).some(Boolean);
+    ok(`[${label}] ayrı seçim hazır tema işaretini kaldırır`, !anySel);
     await swatch(cat('accent.' + LA)).click(); await swatch(cat('tint.' + LT)).click(); await page.waitForTimeout(350);
-    ok(`[${label}] ayrı seçim hazır tema işaretini kaldırır`, (await swatch(cat('settings.presetA11y').replace('{name}', cat('preset.plum'))).getAttribute('aria-selected')) === 'false');
+    for (const p of PRESETS) ok(`[${label}] ${LA}/${LT} seçiliyken hazır tema ${p.id} işareti doğru`, (await presetSel(p.id)) === (p.accent === LA && p.tint === LT));
     // Her ekran seçili renklerle açılıyor (çökme/boş ekran yok)
     for (const n of [0, 2, 3, 4, 5]) {
       await menuBtn().click(); await page.waitForTimeout(400);

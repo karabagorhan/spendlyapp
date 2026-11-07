@@ -47,20 +47,24 @@ export function Swatch({ fill, inner, line, selected, label, onPress, t }: {
 }
 
 /**
- * Hazır tema kartı: iki renkli örnek (birincil + ikincil) ve ad; seçiliyken vurgu rengiyle çerçevelenir.
- * Dokunmak vurgu + zemin tonunu birlikte ayarlar, açık/koyu moda dokunmaz.
+ * Hazır tema kartı: Wada kombinasyonunun 2–4 rengi (kitaptaki gibi yan yana bitişik şeritler), ad ve küçük "Wada No. 123" notu;
+ * seçiliyken vurgu rengiyle çerçevelenir. Dokunmak vurgu + zemin tonunu birlikte ayarlar, açık/koyu moda dokunmaz.
+ * Izgarada iki sütun (320 px'te de ad ve not kesilmeden sığar); kart genişliği üst bileşenden gelir.
  */
-export function PresetCard({ colors, name, label, selected, onPress, t }: {
-  colors: [string, string]; name: string; label: string; selected: boolean; onPress: () => void; t: Theme;
+export function PresetCard({ colors, name, caption, label, selected, onPress, t }: {
+  colors: string[]; name: string; caption: string; label: string; selected: boolean; onPress: () => void; t: Theme;
 }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} aria-selected={selected}
-      style={({ pressed }) => ({ flex: 1, minHeight: 76, borderRadius: 12, borderWidth: selected ? 2 : 1, borderColor: selected ? t.accent : t.line, backgroundColor: selected ? selectedFill(t) : t.bg, alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, opacity: pressed ? 0.7 : 1 })}>
-      <View style={{ flexDirection: 'row' }}>
-        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors[0], borderWidth: 1, borderColor: t.line }} />
-        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors[1], borderWidth: 1, borderColor: t.line, marginLeft: -8 }} />
+      style={({ pressed }) => ({ flexGrow: 1, flexBasis: '40%', minWidth: 120, borderRadius: 12, borderWidth: selected ? 2 : 1, borderColor: selected ? t.accent : t.line, backgroundColor: selected ? selectedFill(t) : t.bg, padding: selected ? 7 : 8, gap: 8, opacity: pressed ? 0.7 : 1 })}>
+      {/* Kombinasyon örneği: kitaptaki levhalar gibi eşit genişlikte bitişik renk blokları */}
+      <View style={{ flexDirection: 'row', height: 34, borderRadius: 6, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: t.line }}>
+        {colors.map((c, i) => <View key={i} style={{ flex: 1, backgroundColor: c }} />)}
       </View>
-      <Text numberOfLines={1} style={{ color: t.fg, fontSize: 13, fontFamily: selected ? FONTS.semi : undefined, fontWeight: selected ? undefined : '500' }}>{name}</Text>
+      <View style={{ gap: 1, paddingHorizontal: 2 }}>
+        <Text numberOfLines={1} style={{ color: t.fg, fontSize: 13, lineHeight: 17, fontFamily: selected ? FONTS.semi : undefined, fontWeight: selected ? undefined : '500' }}>{name}</Text>
+        <Text numberOfLines={1} style={{ color: t.muted, fontSize: 11, lineHeight: 14, fontVariant: ['tabular-nums'] }}>{caption}</Text>
+      </View>
     </Pressable>
   );
 }

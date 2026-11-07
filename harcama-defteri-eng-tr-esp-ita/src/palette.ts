@@ -4,14 +4,16 @@
 // "Noir" — oniks siyahı zemin, vurgu rengi (varsayılan şampanya altını), fildişi yazı;
 // "Fildişi" — sıcak kırık beyaz zemin, koyu vurgu, oniks yazı.
 // Vurgu yalnızca vurgu için kullanılır (seçili öğe, ana düğme, ince çerçeveler, özet kartı); her yere yayılmaz.
-// Kategori renkleri soluk mücevher tonlarıdır: zümrüt, kehribar, safir, arduvaz, yakut, ametist, gül, vizon.
+// Kategori renkleri ve hazır temalar Sanzo Wada'nın "A Dictionary of Color Combinations" kitabındaki renklerdendir
+// (docs/DESIGN-2.md "Renk kombinasyonları"): her hazır tema kitaptaki bir kombinasyondur, numarası `wada` alanında.
 
 export type Mode = 'noir' | 'ivory';
-export type Accent = 'gold' | 'emerald' | 'sapphire' | 'amethyst' | 'rose' | 'copper' | 'coral' | 'ruby' | 'teal' | 'silver' | 'coralteal' | 'cobaltlime' | 'plumpeach';
-export type Tint = 'classic' | 'blue' | 'green' | 'plum' | 'midnight' | 'deepsea' | 'cobaltnight';
+export type Accent = 'gold' | 'emerald' | 'sapphire' | 'amethyst' | 'rose' | 'copper' | 'coral' | 'ruby' | 'teal' | 'silver'
+  | 'coralteal' | 'cobaltlime' | 'plumpeach' | 'indigoochre' | 'sagerust' | 'slaterose';
+export type Tint = 'classic' | 'blue' | 'green' | 'plum' | 'midnight' | 'deepsea' | 'cobaltnight' | 'indigo' | 'sage' | 'slate';
 
-export const ACCENTS: Accent[] = ['gold', 'emerald', 'sapphire', 'amethyst', 'rose', 'copper', 'coral', 'ruby', 'teal', 'silver', 'coralteal', 'cobaltlime', 'plumpeach'];
-export const TINTS: Tint[] = ['classic', 'blue', 'green', 'plum', 'midnight', 'deepsea', 'cobaltnight'];
+export const ACCENTS: Accent[] = ['gold', 'emerald', 'sapphire', 'amethyst', 'rose', 'copper', 'coral', 'ruby', 'teal', 'silver', 'coralteal', 'cobaltlime', 'plumpeach', 'indigoochre', 'sagerust', 'slaterose'];
+export const TINTS: Tint[] = ['classic', 'blue', 'green', 'plum', 'midnight', 'deepsea', 'cobaltnight', 'indigo', 'sage', 'slate'];
 export const isAccent = (v: unknown): v is Accent => typeof v === 'string' && ACCENTS.includes(v as Accent);
 export const isTint = (v: unknown): v is Tint => typeof v === 'string' && TINTS.includes(v as Tint);
 
@@ -46,20 +48,27 @@ export const ACCENT_COLORS: Record<Accent, Record<Mode, string>> = {
   ruby:     { noir: '#fb7480', ivory: '#b3162d' },
   teal:     { noir: '#4cc0cc', ivory: '#1a6b75' },
   silver:   { noir: '#c0c4cd', ivory: '#555c69' },
-  // İki renkli çiftler: her modda zemine karşı kontrastı geçen renk (koyuda açık olan, açıkta koyu olan) vurgu olur
-  coralteal:  { noir: '#ff6b5a', ivory: '#0d6e66' },
-  cobaltlime: { noir: '#c8ff3d', ivory: '#1f4fe6' },
-  plumpeach:  { noir: '#ffb39a', ivory: '#542a52' },
+  // Wada kombinasyonları: her modda zemine karşı kontrastı geçen renk (koyuda açık olan, açıkta koyu olan) vurgu olur.
+  // Kitaptaki renkler aynen kullanılır; yalnızca kontrast için gerekirse açıklık (L*) ayarlanır (ΔE notu yanında).
+  coralteal:   { noir: '#f48067', ivory: '#006f67' }, // No. 193: Grenadine Pink · Light Porcelain Green #00908a (L* −12)
+  cobaltlime:  { noir: '#f8ed43', ivory: '#0065ae' }, // No. 333: Lemon Yellow · Blue #006eb8 (L* −3)
+  plumpeach:   { noir: '#d8a37b', ivory: '#501345' }, // No. 238: Ochraceous Salmon · Cotinga Purple
+  indigoochre: { noir: '#e2b540', ivory: '#1c4286' }, // No. 126: Yellow Ocher · Deep Lyons Blue
+  sagerust:    { noir: '#da6558', ivory: '#ab3d34' }, // No. 137: Etruscan Red #c55347 (koyuda L* +7, açıkta L* −8)
+  slaterose:   { noir: '#f8b6ba', ivory: '#34454c' }, // No. 27: Corinthian Pink · Slate Color
 };
 
 /**
- * İkinci renk: çiftin vurgu olmayan rengi (turkuaz / kobalt / erik). Yalnızca özet kartının gradyanında kullanılır;
- * k = siyaha karışım oranları (kart üstü, orta, alt). Etiket ve dolgu yine vurgu renginde kalır.
+ * Kombinasyonun öbür renkleri, yalnızca özet kartında: `color` kartın zemin rengi (gradyan; k = siyaha karışım oranları: üst, orta, alt),
+ * `alt` geometrik motifin ikinci rengi, `label` (verilirse) kart üstündeki etiket/dolgu rengi; verilmezse vurgu renginin koyu moddaki tonu.
  */
-export const SECONDARY: Partial<Record<Accent, { color: string; k: [number, number, number] }>> = {
-  coralteal:  { color: '#14b8a6', k: [0.78, 0.86, 0.92] },
-  cobaltlime: { color: '#2457ff', k: [0.6, 0.76, 0.88] },
-  plumpeach:  { color: '#542a52', k: [0.2, 0.5, 0.7] },
+export const SECONDARY: Partial<Record<Accent, { color: string; k: [number, number, number]; alt: string; label?: string }>> = {
+  coralteal:   { color: '#00908a', k: [0.6, 0.74, 0.86], alt: '#fbe6a0' },          // Light Porcelain Green; Naples Yellow
+  cobaltlime:  { color: '#006eb8', k: [0.38, 0.62, 0.8], alt: '#96d1aa' },          // Blue; Cobalt Green
+  plumpeach:   { color: '#501345', k: [0, 0.42, 0.7], alt: '#a1a39a' },             // Cotinga Purple; Warm Gray
+  indigoochre: { color: '#1c4286', k: [0.12, 0.48, 0.74], alt: '#ebd3a2' },         // Deep Lyons Blue; Ivory Buff
+  sagerust:    { color: '#648f7b', k: [0.52, 0.7, 0.84], alt: '#c55347', label: '#fdc57e' }, // Pistachio Green; Etruscan Red; Cinnamon Buff
+  slaterose:   { color: '#34454c', k: [0.06, 0.44, 0.72], alt: '#34454c' },         // Slate Color (motifte açılır: ton üstüne ton)
 };
 
 /* ---------- Zemin tonları ---------- */
@@ -81,27 +90,48 @@ export const TINT_COLORS: Record<Tint, Record<Mode, Surfaces>> = {
     noir:  { bg: '#100b12', surface: '#171119', raised: '#1e1722', line: '#2c2231' },
     ivory: { bg: '#f6eff3', surface: '#fffbfd', raised: '#faf3f7', line: '#e8d9e1' },
   },
-  // 6 basamaklı ölçeklerden: Midnight Plum (#17121D #302538 #51405F …) ve Deep Teal (#071C27 #123747 #245568 …)
-  midnight: {
-    noir:  { bg: '#17121d', surface: '#241c2c', raised: '#302538', line: '#51405f' },
-    ivory: { bg: '#f4eef6', surface: '#fdfbfe', raised: '#f7f1f9', line: '#e8ddeb' },
+  // Hazır temaların zeminleri (Wada): tonu kombinasyonun bir renginden (koyuda zemin rengi, açıkta açık ya da zemin rengi) alınır,
+  // açıklık ve doygunluk ise role göre sabittir (koyu: L* 3.6 / 7.4 / 11 / 16.5, C* ≈ 3–8; açık: L* 95 / 99 / 97 / 88, C* ≈ 2–8).
+  // Böylece zemin renkli görünmez, yalnızca kombinasyonun sıcaklığını/soğukluğunu taşır.
+  midnight: { // No. 238: Cotinga Purple / Ochraceous Salmon
+    noir:  { bg: '#110b10', surface: '#1a1519', raised: '#221c20', line: '#2f262d' },
+    ivory: { bg: '#f9f0ea', surface: '#fffcfa', raised: '#fef6f1', line: '#ebdcd2' },
   },
-  deepsea: {
-    noir:  { bg: '#071c27', surface: '#0d2a37', raised: '#123747', line: '#245568' },
-    ivory: { bg: '#eef5f5', surface: '#fbfefe', raised: '#f3f9f8', line: '#dce9e8' },
+  deepsea: { // No. 193: Light Porcelain Green
+    noir:  { bg: '#040f0e', surface: '#0f1817', raised: '#151f1f', line: '#1d2c2a' },
+    ivory: { bg: '#e9f4f3', surface: '#f9fefd', raised: '#f0faf9', line: '#cfe2e0' },
   },
-  cobaltnight: {
-    noir:  { bg: '#070c1c', surface: '#0d1428', raised: '#131c36', line: '#1f2c52' },
-    ivory: { bg: '#eaf0fe', surface: '#fafcff', raised: '#f1f5ff', line: '#d3ddf5' },
+  cobaltnight: { // No. 333: Blue
+    noir:  { bg: '#080d15', surface: '#12171f', raised: '#181e28', line: '#212937' },
+    ivory: { bg: '#eef2fa', surface: '#fbfdff', raised: '#f4f8ff', line: '#d8dfed' },
+  },
+  indigo: { // No. 126: Deep Lyons Blue / Ivory Buff
+    noir:  { bg: '#0c0c14', surface: '#15161d', raised: '#1c1d26', line: '#262834' },
+    ivory: { bg: '#f8f0e4', surface: '#fffdf8', raised: '#fdf7ec', line: '#e8ddc9' },
+  },
+  sage: { // No. 137: Pistachio Green
+    noir:  { bg: '#060f0b', surface: '#111814', raised: '#171f1b', line: '#202b26' },
+    ivory: { bg: '#ebf4ef', surface: '#fafefc', raised: '#f2f9f5', line: '#d3e2da' },
+  },
+  slate: { // No. 27: Slate Color
+    noir:  { bg: '#050e12', surface: '#10181b', raised: '#161f23', line: '#1e2b30' },
+    ivory: { bg: '#ebf3f7', surface: '#fafeff', raised: '#f2f9fc', line: '#d2e1e7' },
   },
 };
 
-/** Hazır temalar: vurgu + zemin tonu birlikte; açık/koyu mod seçimine dokunmaz. colors = örnekteki iki renk (birincil, ikincil). */
-export type PresetId = 'coral' | 'cobalt' | 'plum';
-export const PRESETS: { id: PresetId; accent: Accent; tint: Tint; colors: [string, string] }[] = [
-  { id: 'coral', accent: 'coralteal', tint: 'deepsea', colors: ['#ff6b5a', '#14b8a6'] },
-  { id: 'cobalt', accent: 'cobaltlime', tint: 'cobaltnight', colors: ['#2457ff', '#c8ff3d'] },
-  { id: 'plum', accent: 'plumpeach', tint: 'midnight', colors: ['#542a52', '#ffb39a'] },
+/**
+ * Hazır temalar: vurgu + zemin tonu birlikte; açık/koyu mod seçimine dokunmaz. Her biri Wada'nın kitabındaki bir kombinasyondur:
+ * `wada` = kombinasyon numarası, `colors` = kombinasyonun kitaptaki renkleri (değiştirilmemiş; kartta örnek olarak gösterilir).
+ * Sıra: zemin (özet kartı) rengi, vurgu, motif rengi, varsa dördüncü renk.
+ */
+export type PresetId = 'coral' | 'cobalt' | 'plum' | 'indigo' | 'sage' | 'slate';
+export const PRESETS: { id: PresetId; accent: Accent; tint: Tint; wada: number; colors: string[] }[] = [
+  { id: 'coral', accent: 'coralteal', tint: 'deepsea', wada: 193, colors: ['#00908a', '#f48067', '#fbe6a0'] },
+  { id: 'cobalt', accent: 'cobaltlime', tint: 'cobaltnight', wada: 333, colors: ['#006eb8', '#f8ed43', '#96d1aa', '#ae5224'] },
+  { id: 'plum', accent: 'plumpeach', tint: 'midnight', wada: 238, colors: ['#501345', '#d8a37b', '#a1a39a'] },
+  { id: 'indigo', accent: 'indigoochre', tint: 'indigo', wada: 126, colors: ['#1c4286', '#e2b540', '#ebd3a2'] },
+  { id: 'sage', accent: 'sagerust', tint: 'sage', wada: 137, colors: ['#648f7b', '#c55347', '#fdc57e'] },
+  { id: 'slate', accent: 'slaterose', tint: 'slate', wada: 27, colors: ['#34454c', '#f8b6ba'] },
 ];
 /** Geçerli vurgu + ton bir hazır temayla birebir eşleşiyorsa onu verir. */
 export const presetOf = (accent: Accent, tint: Tint): PresetId | null => PRESETS.find((p) => p.accent === accent && p.tint === tint)?.id ?? null;
@@ -127,8 +157,9 @@ const noir = {
   heroMuted: 'rgba(244,238,226,0.62)',
   heroTrack: 'rgba(201,168,106,0.18)',
   heroFill: '#c9a86a',
-  // Özet kartı geometrik motifinin ikinci rengi ve kart üstündeki gelir/gider renkleri (kart her iki modda da koyu)
-  heroAlt: '#6f8fc9',
+  // Özet kartı geometrik motifinin ikinci rengi ve kart üstündeki gelir/gider renkleri (kart her iki modda da koyu).
+  // Şampanya (Isabella Color'a çok yakın) + Dark Medici Blue: Wada No. 241
+  heroAlt: '#547076',
   heroGood: '#9cc4a6',
   heroWarn: '#e0866b',
   warn: '#e0866b',
@@ -136,7 +167,10 @@ const noir = {
   good: '#9cc4a6',
   goodSoft: '#1a2a20',
   scrim: 'rgba(0,0,0,0.65)',
-  cats: ['#5aa58b', '#d1a256', '#6f8fc9', '#8f98a6', '#c76b78', '#9a7cc4', '#c98fa2', '#a1978a'],
+  // Kategori renkleri (Wada; sıra: Market, Yeme-İçme, Ulaşım, Fatura, Sağlık, Eğlence, Giyim, Diğer):
+  // Green, Raw Sienna, Olympic Blue, Artemesia Green (No. 293, 324), Etruscan Red, Aconite Violet, Laelia Pink, Ecru (No. 275, 327, 280).
+  // Yeme-İçme (Raw Sienna) aynı zamanda bütçede "dikkat" (%80+) rengidir.
+  cats: ['#489b6e', '#bb7125', '#5a82b3', '#709390', '#c55347', '#a36aa5', '#ca92a8', '#c2ae93'],
   statusBar: 'light' as 'dark' | 'light',
 };
 
@@ -160,7 +194,7 @@ const ivory: typeof noir = {
   heroMuted: 'rgba(244,238,226,0.62)',
   heroTrack: 'rgba(212,180,122,0.2)',
   heroFill: '#d4b47a',
-  heroAlt: '#6f8fc9',
+  heroAlt: '#547076',
   heroGood: '#9cc4a6',
   heroWarn: '#e0866b',
   warn: '#b2502f',
@@ -168,7 +202,9 @@ const ivory: typeof noir = {
   good: '#3d7a57',
   goodSoft: '#dfeee4',
   scrim: 'rgba(20,18,14,0.45)',
-  cats: ['#2f7d63', '#b07f2a', '#3f62a3', '#66707e', '#a7424f', '#75559f', '#a85f78', '#7d7367'],
+  // Açık zeminde ≥ 3:1 olsun diye açık tonların yerine aynı aileden koyu Wada renkleri: Diamine Green, Dark Medici Blue,
+  // Veronia Purple (No. 13, Raw Sienna ile), Dark Citrine (No. 274, Olympic Blue ile)
+  cats: ['#1a7444', '#bb7125', '#5a82b3', '#547076', '#c55347', '#a36aa5', '#8c4c62', '#8b835b'],
   statusBar: 'dark',
 };
 
@@ -190,6 +226,7 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
   const heroA = ACCENT_COLORS[accent].noir;
   const dark = mode === 'noir';
   const sec = SECONDARY[accent];
+  const heroL = sec?.label ?? heroA;
   return {
     ...base,
     ...surf,
@@ -201,10 +238,10 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
     goldLine: rgba(a, 0.35),
     heroGrad: sec ? sec.k.map((k) => mix(sec.color, '#000000', k)) as [string, string, string]
       : accent === 'gold' ? base.heroGrad : [mix(heroA, '#000000', 0.8), mix(heroA, '#000000', 0.89), mix(heroA, '#000000', 0.94)],
-    heroLabel: accent === 'gold' ? base.heroLabel : heroA,
-    heroFill: accent === 'gold' ? base.heroFill : heroA,
-    heroTrack: accent === 'gold' ? base.heroTrack : rgba(heroA, 0.18),
-    heroAlt: heroAltFor(accent, sec?.color),
+    heroLabel: accent === 'gold' ? base.heroLabel : heroL,
+    heroFill: accent === 'gold' ? base.heroFill : heroL,
+    heroTrack: accent === 'gold' ? base.heroTrack : rgba(heroL, 0.18),
+    heroAlt: heroAltFor(accent, sec?.alt),
     // Kırmızı/turuncu vurgularda uyarı rengi vurguyla karışmasın (aşılan bütçe ile normal çubuk ayırt edilsin): kehribar kullanılır
     ...(WARM_ACCENTS.includes(accent) ? warnFor(accent === 'copper' ? 'red' : 'amber', dark, surf.bg) : {}),
   };
@@ -217,10 +254,13 @@ function warnFor(kind: 'amber' | 'red', dark: boolean, bg: string) {
 }
 
 /** Uyarı rengiyle (turuncu-kırmızı) karışabilecek sıcak vurgular. */
-export const WARM_ACCENTS: Accent[] = ['copper', 'coral', 'ruby', 'rose', 'coralteal'];
+export const WARM_ACCENTS: Accent[] = ['copper', 'coral', 'ruby', 'rose', 'coralteal', 'sagerust', 'slaterose'];
 
-/** Motifin ikinci rengi: hazır temada çiftin öbür rengi, yoksa vurguyla uyumlu bir kategori tonu; koyu karta karşı seçilebilir olsun diye gerekirse açılır. */
+/**
+ * Motifin ikinci rengi: hazır temada kombinasyonun motif rengi; yoksa soğuk vurgularda Isabella Color (Wada No. 12, Green Blue ile),
+ * ötekilerde Dark Medici Blue (No. 241, varsayılanla aynı). Koyu karta karşı seçilebilir olsun diye gerekirse açılır.
+ */
 function heroAltFor(accent: Accent, secondary?: string): string {
-  const c = secondary ?? (['emerald', 'sapphire', 'teal', 'amethyst'].includes(accent) ? '#d1a256' : '#6f8fc9');
+  const c = secondary ?? (['emerald', 'sapphire', 'teal', 'amethyst'].includes(accent) ? '#c5a56e' : '#547076');
   return contrast(c, '#000000') < 3 ? mix(c, '#ffffff', 0.35) : c;
 }

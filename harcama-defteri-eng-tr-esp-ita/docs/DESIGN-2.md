@@ -51,3 +51,79 @@ Veri modeli, para birimi/kur mantığı, 5 dil, gizlilik kipi, kilit, erişilebi
 WCAG kontrast testleri (tüm vurgu × zemin × kip), mevcut gezinme hareketleri.
 
 Cila geçişi: unslop yöntemi, Damir Sokolovsky (@heydamir), CC BY 4.0, https://github.com/heydamir/unslop
+
+## Renk kombinasyonları (Sanzo Wada)
+
+Hazır temalar, kategori renkleri ve varsayılan temanın motif rengi Sanzo Wada'nın *A Dictionary of Color Combinations*
+(Haishoku Soukan, 1933–34; Seigensha yeniden basımı: 159 renk, 348 kombinasyon) kitabından alındı. Kombinasyon tablosu
+(numara → 2–4 renk) verideki her rengin `combinations` listesinden kuruldu; veri `scripts/data/wada-colors.json`
+(test bunu okur, uygulamaya paketlenmez).
+
+### Wada'nın kombinasyonları neden işliyor (veriden çözümleme)
+
+- **Değer (açıklık) karşıtlığı:** bir kombinasyonda en açık ile en koyu renk arasındaki L* farkının ortancası ≈ 39;
+  kombinasyonların ≈ %48'inde koyu bir "çapa" (L* < 35), ≈ %46'sında çok açık bir renk (L* > 80) var. Okunurluk ve düzen tondan önce açıklıktan gelir.
+- **Kısık, topraksı doygunluk:** 159 rengin kroma ortancası ≈ 36; yalnızca 22'si C* > 60. Kombinasyonların ≈ yarısında
+  **tam bir** canlı renk (C* > 50) var: geri kalanlar onu taşıyan kısık renklerdir (aşı boyası, sienna, kurşuni, gri yeşil, bej).
+- **Sıcak–soğuk gerilimi:** kombinasyonların ≈ yarısı belirgin bir sıcak (kırmızı-turuncu-sarı) ile belirgin bir soğuk
+  (mavi-yeşil-mor) rengi yan yana koyar; aynı aileden renklerle kurulanlarda bile açıklık farkı büyüktür.
+- **2–4 renk, her birinin rolü var:** zemin/çapa (geniş, koyu ya da kırık beyaz), ana renk, küçük canlı bir not, gerekirse nötr
+  bir ara renk (Warm Gray, Neutral Gray, Ecru). Monibo'da bu roller: kart zemini (özet kartı gradyanı + koyu yüzeylerin tonu),
+  vurgu (ana düğme, seçili öğe), motif rengi (özet kartındaki geometrik parça), açık zeminin tonu.
+
+Uygulama kuralları (unslop ile birlikte): kitaptaki renk **aynen** kullanılır; yalnızca WCAG kontrastı için açıklık (L*)
+ayarlanır ve not edilir. Yüzeyler renkli görünmez: zeminin **tonu** kombinasyondan gelir, açıklığı ve doygunluğu role göre
+sabittir (koyu: L* 3.6 / 7.4 / 11 / 16.5, C* ≈ 3–10; açık: L* 95 / 99 / 97 / 88, C* ≈ 1–9). Zengin renk "anlarda" kalır:
+özet kartı ve motifi, kategori halkaları, bütçe çubukları.
+
+### Hazır temalar
+
+Kartta kombinasyonun 2–4 rengi kitaptaki levhalar gibi bitişik bloklar halinde ve "Wada No. …" notuyla gösterilir.
+Anahtarlar (vurgu/ton) önceki sürümlerle aynıdır; eski kayıtlar olduğu gibi yüklenir.
+
+| Tema (anahtar) | Wada | Renkler | Roller |
+|---|---|---|---|
+| Coral (`coralteal` + `deepsea`) | **No. 193** | Light Porcelain Green `#00908a`, Grenadine Pink `#f48067`, Naples Yellow `#fbe6a0` | kart + koyu zemin tonu: Light Porcelain Green · vurgu koyu: Grenadine Pink · vurgu açık: Light Porcelain Green → `#006f67` · motif: Naples Yellow |
+| Kobalt (`cobaltlime` + `cobaltnight`) | **No. 333** | Blue `#006eb8`, Lemon Yellow `#f8ed43`, Cobalt Green `#96d1aa`, Burnt Sienna `#ae5224` | kart + zemin tonu: Blue · vurgu koyu: Lemon Yellow · vurgu açık: Blue → `#0065ae` · motif: Cobalt Green · Burnt Sienna yalnızca örnekte (sıcak karşı not) |
+| Erik (`plumpeach` + `midnight`) | **No. 238** | Cotinga Purple `#501345`, Ochraceous Salmon `#d8a37b`, Warm Gray `#a1a39a` | kart + koyu zemin: Cotinga Purple · açık zemin tonu: Ochraceous Salmon · vurgu koyu: Ochraceous Salmon · vurgu açık: Cotinga Purple · motif: Warm Gray |
+| Çivit (`indigoochre` + `indigo`) — yeni | **No. 126** | Deep Lyons Blue `#1c4286`, Yellow Ocher `#e2b540`, Ivory Buff `#ebd3a2` | kart + koyu zemin: Deep Lyons Blue · açık zemin tonu: Ivory Buff · vurgu koyu: Yellow Ocher · vurgu açık: Deep Lyons Blue · motif: Ivory Buff |
+| Adaçayı (`sagerust` + `sage`) — yeni | **No. 137** | Pistachio Green `#648f7b`, Etruscan Red `#c55347`, Cinnamon Buff `#fdc57e` | kart + zemin tonu: Pistachio Green · vurgu: Etruscan Red (koyu `#da6558`, açık `#ab3d34`) · motif: Etruscan Red · kart etiketi/dolgusu: Cinnamon Buff |
+| Arduvaz (`slaterose` + `slate`) — yeni | **No. 27** | Slate Color `#34454c`, Corinthian Pink `#f8b6ba` | kart + zemin tonu: Slate Color · vurgu koyu: Corinthian Pink · vurgu açık: Slate Color · motif: Slate Color (koyu kartta otomatik açılır: ton üstüne ton) |
+
+Kontrast için yapılan açıklık ayarları (CIE76 ΔE, D65; `npx tsx scripts/theme-test.ts --wada`):
+
+| No. | Renk | Kitapta | Kullanılan | ΔE | Neden |
+|---|---|---|---|---|---|
+| 193 | Light Porcelain Green (açık modda vurgu) | `#00908a` | `#006f67` | 13.2 (L* −12) | beyaz yazı ve yumuşak zemin üstünde ≥ 4.5:1; sRGB sınırında kroma biraz düşer |
+| 333 | Blue (açık modda vurgu) | `#006eb8` | `#0065ae` | 3.7 (L* −3) | vurgu/yumuşak zemin ≥ 4.5:1 |
+| 137 | Etruscan Red (koyu modda vurgu) | `#c55347` | `#da6558` | 6.9 (L* +7) | koyu yüzeylerde ≥ 4.5:1 |
+| 137 | Etruscan Red (açık modda vurgu) | `#c55347` | `#ab3d34` | 8.5 (L* −8) | açık zeminlerde ≥ 4.5:1 |
+
+Öteki tüm rol renkleri kitaptaki değerlerdir. Özet kartının gradyanı kart renginin siyaha karışımıdır (`SECONDARY.k`);
+koyu kartta 3:1'in altında kalan motif rengi %35 beyazla açılır (yalnızca Arduvaz'da devreye girer).
+Kırmızı/pembe vurgulu Coral, Adaçayı ve Arduvaz'da uyarı rengi kehribara geçer (aşılan bütçe vurgudan ayrışsın).
+
+### Kategori renkleri (`cats`)
+
+Sıra: Market, Yeme-İçme, Ulaşım, Fatura, Sağlık, Eğlence, Giyim, Diğer. Yeme-İçme rengi bütçede "dikkat" (%80+) rengidir.
+
+| | Market | Yeme-İçme | Ulaşım | Fatura | Sağlık | Eğlence | Giyim | Diğer |
+|---|---|---|---|---|---|---|---|---|
+| Noir | Green `#489b6e` | Raw Sienna `#bb7125` | Olympic Blue `#5a82b3` | Artemesia Green `#709390` | Etruscan Red `#c55347` | Aconite Violet `#a36aa5` | Laelia Pink `#ca92a8` | Ecru `#c2ae93` |
+| Fildişi | Diamine Green `#1a7444` | Raw Sienna | Olympic Blue | Dark Medici Blue `#547076` | Etruscan Red | Aconite Violet | Veronia Purple `#8c4c62` | Dark Citrine `#8b835b` |
+
+Kaynak kombinasyonlar: **No. 293** (Raw Sienna, Artemesia Green, Green), **No. 324** (Olympic Blue, Aconite Violet),
+**No. 275** (Etruscan Red, Ecru), **No. 327** (Raw Sienna, Ecru), **No. 280** (Laelia Pink, kısık gül), açık mod koyu karşılıkları **No. 13**
+(Raw Sienna + Veronia Purple), **No. 274** (Olympic Blue + Dark Citrine), **No. 249** (Ecru + Dark Medici Blue).
+Raw Sienna ve Ecru setin bağlayıcı renkleridir; set kısık, topraksı, tek tek canlı notlar (Raw Sienna, Etruscan Red) taşır.
+Hepsi kitaptaki değerlerdir (ayar yok). Test: her renk Wada verisinde; çift çift ΔE ≥ 20; her modda tüm zemin tonlarının
+zemin/yüzey/yükseltilmiş rengine ≥ 3:1; C* ≤ 60 (neon değil). Excel dışa aktarımı etkilenmez.
+
+### Varsayılan (Klasik + Şampanya)
+
+Şampanya altını `#c9a86a`, Wada'nın Isabella Color'ına (`#c5a56e`, ΔE ≈ 3.8) denk düşer; siyah zemin ve "M" simgesi aynen kaldı.
+Tek değişiklik: özet kartı motifinin ikinci rengi `#6f8fc9` → **Dark Medici Blue `#547076`**; böylece varsayılan
+**No. 241** (Isabella Color, Dark Medici Blue, Pale Lemon Yellow ≈ kart yazısı, Red Orange ≈ uyarı) kombinasyonudur.
+Hazır tema dışındaki vurgularda motif rengi: soğuk vurgularda Isabella Color (No. 12), ötekilerde Dark Medici Blue.
+
+Sanzo Wada, A Dictionary of Color Combinations (Seigensha); veri: mattdesl/dictionary-of-colour-combinations (MIT)

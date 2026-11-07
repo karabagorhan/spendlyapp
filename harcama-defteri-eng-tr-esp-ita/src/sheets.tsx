@@ -558,9 +558,9 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
       </Field>
       <RatesBox main={settings.currency} rates={rates} refreshing={refreshing} failed={failed} onRefresh={onRefresh} t={t} />
       <Field label={tr('settings.presets')} t={t}>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {PRESETS.map((p) => (
-            <PresetCard key={p.id} colors={p.colors} name={tr('preset.' + p.id)} label={tr('settings.presetA11y', { name: tr('preset.' + p.id) })}
+            <PresetCard key={p.id} colors={p.colors} name={tr('preset.' + p.id)} caption={tr('preset.wada', { n: p.wada })} label={tr('settings.presetA11y', { name: tr('preset.' + p.id) })}
               selected={presetOf(settings.accent, settings.tint) === p.id} onPress={() => onChange({ ...settings, accent: p.accent, tint: p.tint })} t={t} />
           ))}
         </View>
