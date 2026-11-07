@@ -52,6 +52,14 @@ export const LANGS: LangInfo[] = [
 export const CATALOGS: Record<Lang, Catalog> = { tr, en, es, it, zh };
 export const isLang = (v: unknown): v is Lang => typeof v === 'string' && LANGS.some((l) => l.code === v);
 
+/** Cihazın diline en yakın desteklenen dil; tanınmazsa İngilizce. Yalnızca ilk kurulumda varsayılan olarak kullanılır. */
+export function deviceLanguage(): Lang {
+  let loc = '';
+  try { loc = Intl.DateTimeFormat().resolvedOptions().locale || ''; } catch {}
+  const code = loc.toLowerCase().split(/[-_]/)[0];
+  return isLang(code) ? code : 'en';
+}
+
 let current: Lang = 'tr';
 export function setLanguage(l: Lang) {
   current = l;
@@ -109,6 +117,19 @@ export function fmtTime(d: Date) {
 export const decimalText = (n: number) => String(n).replace('.', langInfo().decimal);
 /** Yüzde metni seçili dilin sırasıyla: Türkçe "%165", İngilizce "165%" (katalogdaki `fmt.percent`). */
 export const fmtPercent = (n: number | string) => t('fmt.percent', { n });
+
+/** Türkçede sayıya gelen iyelik eki (okunuşun son sözcüğüne göre): 30 → "u" (otuzu), 65 → "i" (altmış beşi), 60 → "ı", 2 → "si". */
+const trPossSuffix = (n: number) => {
+  const ones = ['ı', 'i', 'si', 'ü', 'ü', 'i', 'sı', 'si', 'i', 'u'];
+  const tens = ['', 'u', 'si', 'u', 'ı', 'si', 'ı', 'i', 'i', 'ı'];
+  n = Math.abs(Math.round(n));
+  if (n === 0) return 'ı';
+  if (n % 10) return ones[n % 10];
+  if (n % 100) return tens[(n % 100) / 10];
+  return n % 1000 ? 'ü' : 'i';
+};
+/** "Bütçenin %65'i" gibi iyelik bağlamında yüzde: Türkçede kesme işaretli ek eklenir, diğer dillerde düz yüzde. */
+export const fmtPercentPoss = (n: number) => (current === 'tr' ? `${fmtPercent(n)}'${trPossSuffix(n)}` : fmtPercent(n));
 
 /**
  * Kullanıcının yazdığı tutarı sayıya çevirir; geçersiz ya da sıfırsa 0.

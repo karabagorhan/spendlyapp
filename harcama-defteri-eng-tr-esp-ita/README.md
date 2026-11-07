@@ -1,8 +1,26 @@
-# Harcama Defteri · TR / EN / ES / IT / 中文
+# Monibo · TR / EN / ES / IT / 中文
 
 `harcama-app` klasöründeki uygulamanın **bağımsız** çok dilli, çok para birimli sürümü. Kaynak proje değiştirilmedi;
 tüm geliştirmeler yalnızca bu klasörde yapıldı. Önceki uygulamanın bütün işlevleri (harcama, bütçe ve kategori limitleri,
 raporlar, abonelikler, Excel/yedek, bildirimler, Noir ve Fildişi temalar) ve tasarımı korunmuştur.
+
+## Monibo paneli
+
+Ana ekran referans tasarıma göre yenilendi (koyu/açık tema, tüm vurgu renkleri ve zemin tonlarıyla çalışır):
+
+- **Başlık:** marka, saate göre selamlama (adın varsa adınla), ana para birimi seçici, profil/menü düğmesi.
+- **Bakiye kartı:** **Net durum** (gelir − gider), geçen ayın aynı dönemine göre değişim, aylık gelir ve gider; göz simgesiyle tutarlar gizlenir (kalıcı).
+  Hiç gelir kaydı yoksa net tutar **uydurulmaz**: kart "Harcanan"ı gösterir ve gelir eklemeyi önerir.
+- **Hızlı eylemler:** Harcama ekle · Gelir ekle · Raporlar · Bütçe.
+- **Kartlar:** Harcama özeti (günlük çubuklar, dokununca gün tutarı), Kategoriler (halka grafik), Aylık bütçe (ilerleme halkası), Abonelikler, Son işlemler (gelir + harcama).
+- **Gelir kaydı (yeni):** Harcamalardan ayrı `incomes` listesinde tutulur; eski veri ve yedekler olduğu gibi çalışır (gelir listesi boş gelir). Para birimi dönüşümü, yedek/geri yükleme ve Excel (ayrı "Gelirler" sayfası) gelirleri de kapsar. İşlemler sekmesinde **Harcamalar | Gelirler** anahtarı vardır.
+- **Alt sekme çubuğu:** Ana sayfa · İşlemler · Bütçe · Raporlar · Ayarlar. Yan menü, kaydırma hareketleri ve tüm eski ekranlar yerinde.
+- **Durumlar:** yüklenme iskeleti; veri açılamazsa hata ekranı (**gerçek veriye yazılmaz**, "Tekrar dene"); bozuk kayıt özgün kopyası saklanarak kurtarılır ve kalıcı uyarıyla bildirilir; kayıt yazılamazsa uyarı; kur alınamazsa doğru metinli uyarı; her kartın boş durumu; başarı bildirimleri (geri alma dahil).
+- **Duyarlı:** 320 px telefondan 1280 px web'e; geniş ekranda içerik ≤ 920 px ortalı. Çok dar ekranda ikili kartlar alt alta dizilir. Uzun tutarlar küçülerek tek satırda kalır.
+- **Görünen ad her yerde Monibo:** uygulama adı, bildirimler, dosya adları (`monibo-…`), yedek iletileri. Paket/EAS kimlikleri (slug, bundle id, `harcama://` şeması) **değişmedi**, mevcut kurulumlar ve kestirme bağlantılar çalışmaya devam eder.
+- Yeni kurulumların varsayılan görünümü referansa yakındır (telefona göre açık/koyu, safir vurgu, mavi ton); **mevcut kullanıcıların ayarlarına dokunulmaz**.
+
+Ayrıntı ve test sonuçları: [`docs/DASHBOARD.md`](docs/DASHBOARD.md).
 
 ## Yenilikler
 
@@ -50,6 +68,9 @@ Expo Go'da açmak için (iPhone'da Safari'ye ya da Notlar'a yapıştırıp dokun
 Diğer açılış bağlantıları: `…&channel-name=ekle` (yeni harcama formu), `…&channel-name=ayarlar` (Ayarlar), `…&channel-name=butce` (bütçe alanı).
 
 Yeniden yayınlamak: `npx eas-cli@latest update --branch main --environment production --message "..."`.
+Mağaza derlemeleri (`eas build --profile production`) ise `production` kanalına bağlıdır (`eas.json`).
+
+Supabase değişkenleri (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) repoda tutulmaz; EAS ortamlarında (`eas env:create`) tanımlanır.
 
 ```bash
 npm install
@@ -59,19 +80,50 @@ npx expo start            # Expo Go
 Kestirme bağlantıları (`harcama://ekle?tutar=125,50&kategori=market`) aynen çalışır; tutar her zaman Türkçe kurallarla okunur ve ana para
 biriminde girilir. Aynı cihazda iki uygulama kuruluysa `harcama://` şeması ikisinde de tanımlıdır.
 
+## Hesap, tanıtım ve yasal uyumluluk (Modül 1)
+
+Uygulama yerel-öncelikli kalır; **hesap isteğe bağlıdır** ("Hesap açmadan devam et"). Ayrıntılı mimari, Supabase/Apple/Google kurulumu ve güvenlik modeli: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Test sonuçları, bulunan kusurlar ve **doğrulanamayanlar**: [`docs/QA-MODULE-1.md`](docs/QA-MODULE-1.md).
+
+- İlk açılışta 3 sayfalık tanıtım (dil seçici, "Atla"); ardından Apple / Google / e-posta ile giriş ya da misafir olarak devam.
+- E-posta ile kayıtta doğrulama zorunlu; parola sıfırlama; Ayarlar → Hesap'tan çıkış ve **Hesabı sil** (yeniden kimlik doğrulama, Apple erişim izni iptali).
+- Supabase değişkenleri yoksa (`.env.example`) hesap özellikleri kapalıdır ve uygulama eskisi gibi çalışır.
+- Gizlilik Politikası ve Kullanım Koşulları uygulama içinde (TASLAK; yayından önce `src/legal/config.ts` doldurulmalı ve hukukçuya okutulmalı).
+
+```bash
+npm test                 # tip + çeviri + çekirdek + kur + tema + hesap mantığı + Edge Function mantığı
+npm run test:sql         # gerçek PostgreSQL'de migration ve RLS testleri (initdb/psql gerekir)
+npm run check:release    # yayın engelleri (yasal bilgiler, sahte servis, anahtar sızıntısı)
+```
+
+## Marka: Monibo
+
+Görünen ad **Monibo** (önceki adı Spendly; App Store'da benzer adlı uygulamalar nedeniyle değiştirildi). Paket/EAS kimlikleri
+(slug, bundle id, `harcama://` şeması) değişmedi; mevcut kurulumlar, kestirmeler ve eski yedekler çalışmaya devam eder.
+
+`assets/` simgeleri konsept C'dir (safir-mor gradyan, beyaz kese, yükselen çubuklar; kaynak: `../audit/marka/`):
+`icon.png` 1024 saydamsız, Android ön/arka/tek renk katmanları, açılış ekranı ve favicon.
+**Yayından önce:** "Monibo" adı için TÜRKPATENT, EUIPO (TMview), USPTO ve WIPO'da 9, 36 ve 42. sınıflarda resmi marka
+araştırması yapılmalı; ön taramada benzer adlı "MonBo" (finans) ve "Moniboi" (oyun) uygulamaları görüldü.
+
 ## Testler
 
 ```bash
-npm test                  # tip kontrolü + çeviri denetimi + çekirdek, para birimi ve renk (kontrast) testleri
+npm test                  # tip + çeviri + çekirdek + kur + tema + panel/gelir + hesap + Edge Function mantığı
+npm run test:sql          # gerçek PostgreSQL'de migration ve RLS testleri (initdb/psql gerekir; isteğe bağlı)
+npm run check:release     # yayın engelleri (yasal bilgiler, sahte servis, anahtar sızıntısı)
+
+# Tarayıcı testleri (iPhone boyutunda; önce web paketi alınır)
 npx expo export --platform web --output-dir /tmp/web-out
-node scripts/ui-test.js <tr|en|es|it|zh>            # tüm ekranlar, taşma/kesilme, dil geçişi
-node scripts/currency-ui-test.js <tr|en|es|it|zh>   # kur, ana para birimi, veri bütünlüğü, çevrimdışı
-npx tsx scripts/theme-ui-test.ts <tr|en|es|it|zh>   # renk kartelaları: mod × ton × vurgu, kalıcılık
-node scripts/gesture-ui-test.js <tr|en|es|it|zh>    # kaydırma hareketleri (gerçek dokunma olaylarıyla)
+WEB_DIR=/tmp/web-out npx tsx scripts/dashboard-ui-test.ts <tr|en|es|it|zh>   # Spendly paneli: hesaplar, gelir, para birimi, durumlar, duyarlılık
+WEB_DIR=/tmp/web-out node scripts/ui-test.js <tr|en|es|it|zh>            # tüm ekranlar, taşma/kesilme, dil geçişi
+WEB_DIR=/tmp/web-out node scripts/currency-ui-test.js <tr|en|es|it|zh>   # kur, ana para birimi, veri bütünlüğü, çevrimdışı
+WEB_DIR=/tmp/web-out npx tsx scripts/theme-ui-test.ts <tr|en|es|it|zh>   # renk kartelaları: mod × ton × vurgu, kalıcılık
+WEB_DIR=/tmp/web-out node scripts/gesture-ui-test.js <tr|en|es|it|zh>    # kaydırma hareketleri (gerçek dokunma olaylarıyla)
+# Hesap arayüzü testi ayrı bir (sahte hesap servisli) derleme ister: bkz. scripts/auth-ui-test.ts başlığı
 ```
 
 Testlerdeki kur değerleri yalnızca test verisidir; canlı API çağrısı testlerde taklit edilir.
 
 Kod yapısı: `App.tsx` ana ekran; `src/currency.ts` para birimi/kur/dönüşüm; `src/useRates.ts` kur çekme ve önbellek;
 `src/i18n/` katalogları (`tr`, `en`, `es`, `it`, `zh`); `src/palette.ts` renkler ve kartelalar; `src/lib.ts` hesaplar; `src/store.ts` kayıt ve eski veri uyumu; `src/sheets.tsx` formlar;
-`src/ui.tsx` grafik ve düğmeler; `src/files.ts` Excel/yedek; `src/notify.ts` bildirimler.
+`src/ui.tsx` grafik ve düğmeler; `src/dashboard.tsx` panel bileşenleri; `src/excel.ts` Excel üretimi; `src/files.ts` paylaşım/yedek; `src/notify.ts` bildirimler.

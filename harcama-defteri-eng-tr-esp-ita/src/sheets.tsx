@@ -1,16 +1,20 @@
 import { ReactNode, useRef, useState } from 'react';
-import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtStamp, money, symbolOf, toMain } from './currency';
-import { LANGS, Lang, fmtTime, t as tr } from './i18n';
-import { CATS, Expense, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, guessSubType, monthName, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
-import { ACCENTS, ACCENT_COLORS, TINTS, TINT_COLORS } from './palette';
+import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtShown, fmtStamp, money, symbolOf, toMain } from './currency';
+import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
+import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
+import { ACCENTS, ACCENT_COLORS, PRESETS, TINTS, TINT_COLORS, presetOf, rgba } from './palette';
 import { FONTS, Theme } from './theme';
-import { Button, CatIcon, Chip, IconName, Label, Swatch, catIconName, subTypeColor } from './ui';
+import { RADIUS, cardBase, cardTitle } from './design';
+import { incomeIcon } from './dashboard';
+import { DatePicker } from './calendar';
+import { Button, CatIcon, Chip, IconBox, IconName, Ionicons, Label, PresetCard, Swatch, catIconName, subTypeColor } from './ui';
+import { bigAmount, selectedFill, selectedLine } from './design';
 
-type SheetAction = { label: string; onPress: () => void; disabled?: boolean };
+type SheetAction = { label: string; headerLabel?: string; onPress: () => void; disabled?: boolean };
 
 /**
- * Alt sayfa: üstte Vazgeç / Kaydet, klavye açılınca içerik yukarı kayar,
+ * Alt sayfa: üstte Vazgeç / başlık / Kaydet hapı, klavye açılınca içerik yukarı kayar,
  * klavyenin hemen üstünde tam genişlikte bir Kaydet çubuğu durur (iOS).
  */
 function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
@@ -36,20 +40,20 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
   ).current;
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.surface }} {...edge.panHandlers}>
-        <View style={st.topRow}>
-          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">
-            <Text style={{ color: t.muted, fontSize: 17 }}>{tr('common.cancel')}</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.bg }} {...edge.panHandlers}>
+        <View style={sh.head}>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" style={sh.headSide}>
+            <Text style={{ color: t.muted, fontSize: 16, fontFamily: FONTS.semi }}>{tr('common.cancel')}</Text>
           </Pressable>
+          <Text accessibilityRole="header" style={[sh.headTitle, { color: t.fg }]}>{title}</Text>
           {action ? (
-            <Pressable onPress={action.onPress} disabled={action.disabled} hitSlop={12} accessibilityRole="button"
-              style={[st.topSave, { backgroundColor: action.disabled ? 'transparent' : t.accent, borderColor: action.disabled ? t.line : t.accent }]}>
-              <Text style={{ color: action.disabled ? t.muted : t.accentFg, fontSize: 16, fontWeight: '700' }}>{action.label}</Text>
+            <Pressable onPress={action.onPress} disabled={action.disabled} hitSlop={12} accessibilityRole="button" accessibilityLabel={action.label}
+              style={[sh.headSave, { backgroundColor: action.disabled ? t.surface : t.accent, borderColor: action.disabled ? t.line : t.accent }]}>
+              <Text numberOfLines={1} style={{ color: action.disabled ? t.muted : t.accentFg, fontSize: 15, fontFamily: FONTS.bold }}>{action.headerLabel ?? action.label}</Text>
             </Pressable>
-          ) : null}
+          ) : <View style={sh.headSide} />}
         </View>
-        <Text style={[st.title, { color: t.fg }]}>{title}</Text>
-        <ScrollView contentContainerStyle={st.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+        <ScrollView contentContainerStyle={sh.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
           {children}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -61,7 +65,7 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
             </Pressable>
             <Pressable onPress={action.onPress} disabled={action.disabled} accessibilityRole="button"
               style={[st.accessorySave, { backgroundColor: t.accent, opacity: action.disabled ? 0.4 : 1 }]}>
-              <Text style={{ color: t.accentFg, fontSize: 16, fontWeight: '700' }}>{action.label}</Text>
+              <Text style={{ color: t.accentFg, fontSize: 16, fontWeight: '600' }}>{action.label}</Text>
             </Pressable>
           </View>
         </InputAccessoryView>
@@ -72,19 +76,59 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
 
 function Field({ label, children, t }: { label: string; children: ReactNode; t: Theme }) {
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: 8 }}>
       <Label t={t}>{label}</Label>
       {children}
     </View>
   );
 }
 
+/** Form bileşenlerinin stilleri (Monibo 2.0: 16'lık köşe, yüzey rengi, hap düğmeler). */
+const sh = StyleSheet.create({
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 20, paddingTop: 16, minHeight: 60 },
+  headSide: { minHeight: 44, minWidth: 44, justifyContent: 'center', flexShrink: 0 },
+  headTitle: { flex: 1, textAlign: 'center', fontSize: 17, lineHeight: 22, fontFamily: FONTS.bold },
+  headSave: { borderWidth: 1, borderRadius: 12, height: 40, paddingHorizontal: 16, justifyContent: 'center', flexShrink: 0 },
+  body: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 48, gap: 24 },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pillsC: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  pill: { height: 36, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  field: { height: 52, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, fontSize: 16 },
+  stepper: { height: 52, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, maxWidth: 200 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  btn: { height: 52, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+});
+
+const fieldStyle = (t: Theme) => [sh.field, { backgroundColor: t.surface, borderColor: t.line, color: t.fg }, Platform.OS === 'web' ? ({ outlineColor: t.accent } as object) : null];
+
+/** Küçük hap: para birimi, tarih kısayolu, sıklık, ay seçimi. */
+function Pill({ label, active, onPress, t, disabled, color, icon }: { label: string; active: boolean; onPress: () => void; t: Theme; disabled?: boolean; color?: string; icon?: IconName }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityState={{ selected: active, disabled }} aria-selected={active}
+      style={({ pressed }) => [sh.pill, { backgroundColor: active ? selectedFill(t) : t.surface, borderColor: active ? selectedLine(t) : t.line, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}>
+      {icon ? <Ionicons name={icon} size={16} color={color ?? t.fg} /> : null}
+      <Text style={{ color: t.fg, fontSize: 14, fontFamily: active ? FONTS.bold : FONTS.semi }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Sayfanın ana eylemi: 52 yüksekliğinde, 12 köşeli düğme. */
+function PrimaryButton({ label, onPress, disabled, t }: { label: string; onPress: () => void; disabled?: boolean; t: Theme }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }}
+      style={({ pressed }) => [sh.btn, { flex: 1, backgroundColor: t.accent, borderColor: t.accent, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 }]}>
+      <Text numberOfLines={1} style={{ color: t.accentFg, fontSize: 16, fontFamily: FONTS.bold }}>{label}</Text>
+    </Pressable>
+  );
+}
+
 /** Para birimi seçimi: kayıt hangi birimde girilecek. Kur yokken yalnızca ana birim seçilebilir. */
 function CurrencyChips({ value, onChange, main, rates, t }: { value: Cur; onChange: (c: Cur) => void; main: Cur; rates: Rates | null; t: Theme }) {
   return (
-    <View style={st.chips}>
+    <View style={sh.pillsC}>
       {CURRENCIES.map((c) => (
-        <Chip key={c.code} label={`${c.symbol} ${c.code}`} active={value === c.code} disabled={!rates && c.code !== main} onPress={() => onChange(c.code)} t={t} />
+        <Pill key={c.code} label={`${c.symbol} ${c.code}`} active={value === c.code} disabled={!rates && c.code !== main} onPress={() => onChange(c.code)} t={t} />
       ))}
     </View>
   );
@@ -93,48 +137,139 @@ function CurrencyChips({ value, onChange, main, rates, t }: { value: Cur; onChan
 /** Girilen tutarın ana para birimindeki karşılığı ("≈ ₺1.234,56 · 1 € = ₺50,12"). */
 function ConvertHint({ amount, cur, main, rates, t }: { amount: number; cur: Cur; main: Cur; rates: Rates | null; t: Theme }) {
   if (cur === main) return null;
-  if (!rates) return <Text style={{ color: t.warn, fontSize: 13 }}>{tr('rates.noneHint')}</Text>;
+  if (!rates) return <Text style={{ color: t.warn, fontSize: 13, textAlign: 'center' }}>{tr('rates.noneHint')}</Text>;
   const rate = convert(1, cur, main, rates);
   return (
-    <Text style={{ color: t.muted, fontSize: 13 }}>
+    <Text style={{ color: t.muted, fontSize: 13, textAlign: 'center' }}>
       {amount ? `≈ ${fmtMoney(toMain(amount, cur, main, rates) ?? 0, main)} · ` : ''}{`1 ${cur} = ${fmtMoney(rate, main, 4)}`}
     </Text>
   );
+}
+
+/** Tutar alanı en çok bu kadar karakter alır (MAX_AMOUNT, binlik ayraçları ve ondalıklarla birlikte sığar). */
+const AMOUNT_MAXLEN = 18;
+
+/** Tutar çok büyükse alanın altında görünen satır içi hata. */
+function AmountError({ value, t }: { value: number; t: Theme }) {
+  if (value <= MAX_AMOUNT) return null;
+  return <Text style={{ color: t.warn, fontSize: 13 }} testID="amount-too-large" accessibilityRole="alert">{tr('amount.tooLarge', { max: fmtNumber(MAX_AMOUNT, 0) })}</Text>;
 }
 
 function inputStyle(t: Theme, big = false) {
   return [st.input, big && st.big, { backgroundColor: t.bg, borderColor: t.line, color: t.fg }];
 }
 
-function CatChips({ value, onChange, t }: { value: string; onChange: (c: string) => void; t: Theme }) {
+/** Ortada iri tutar girişi (44, Plus Jakarta Sans 800) + para birimi simgesi; altında hata, para birimi hapları ve kur ipucu. */
+function AmountHero({ value, onChange, raw, cur, onCur, main, rates, t, label, a11y, testID, autoFocus, accessoryId }: {
+  value: string; onChange: (s: string) => void; raw: number; cur: Cur; onCur: (c: Cur) => void; main: Cur; rates: Rates | null; t: Theme;
+  label: string; a11y?: string; testID?: string; autoFocus?: boolean; accessoryId: string;
+}) {
+  const { width } = useWindowDimensions();
+  const fs = value.length > 13 ? 30 : value.length > 10 ? 36 : 44;
+  const symW = symbolOf(cur).length * fs * 0.7 + 6;
+  const w = Math.min(width - 40 - symW - 8, Math.max(value.length, 4) * fs * 0.56 + 12);
   return (
-    <View style={st.chips}>
-      {CATS.map((c) => (
-        <Chip key={c} label={catName(c)} active={value === c} color={t.cats[catIndex(c)]} icon={catIconName(c)} onPress={() => onChange(c)} t={t} />
-      ))}
+    <View style={{ alignItems: 'center', gap: 12 }}>
+      <Label t={t}>{label}</Label>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+        <Text style={{ color: t.accent, fontSize: fs * 0.8, lineHeight: fs * 1.25, fontFamily: FONTS.display }} aria-hidden>{symbolOf(cur)}</Text>
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          keyboardType="decimal-pad"
+          placeholder={tr('common.amountPlaceholder')}
+          placeholderTextColor={rgba(t.fg, 0.28)}
+          autoFocus={autoFocus}
+          inputAccessoryViewID={accessoryId}
+          maxLength={AMOUNT_MAXLEN}
+          accessibilityLabel={a11y ?? label}
+          testID={testID}
+          style={[{ width: w, height: fs * 1.4, fontSize: fs, color: t.fg, textAlign: 'center', padding: 0, borderWidth: 0 }, bigAmount, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+        />
+      </View>
+      <AmountError value={raw} t={t} />
+      <CurrencyChips value={cur} onChange={onCur} main={main} rates={rates} t={t} />
+      <ConvertHint amount={raw > MAX_AMOUNT ? 0 : raw} cur={cur} main={main} rates={rates} t={t} />
     </View>
   );
 }
 
-/** Silme iki dokunuşla: yanlışlıkla silinmesin. */
+/** Uzun tek sözcüklerde ("Supermercado", "Abbigliamento") dar kutucukta taşmasın diye ortaya görünmez tire koyar; yalnızca sığmadığında bölünür. */
+const softWrap = (s: string) => s.split(' ').map((w) => (w.length >= 11 ? w.slice(0, Math.ceil(w.length / 2)) + '\u00AD' + w.slice(Math.ceil(w.length / 2)) : w)).join(' ');
+
+type Tile = { key: string; label: string; icon: IconName; color: string };
+
+/** 4 sütunlu ikon ızgarası: 56'lık nötr kutuda kategori renginde ikon + altında ad; seçili = vurgu halkası + kalın ad. */
+function TileGrid({ items, value, onChange, t }: { items: Tile[]; value: string; onChange: (k: string) => void; t: Theme }) {
+  const { width } = useWindowDimensions();
+  const narrow = width < 360;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16, marginHorizontal: -2 }}>
+      {items.map((it) => {
+        const on = value === it.key;
+        return (
+          <Pressable key={it.key} onPress={() => onChange(it.key)} accessibilityRole="button" accessibilityLabel={it.label} accessibilityState={{ selected: on }} aria-selected={on}
+            style={({ pressed }) => ({ width: '25%', alignItems: 'center', gap: 8, paddingHorizontal: 2, opacity: pressed ? 0.7 : 1 })}>
+            <View style={{ width: 64, height: 64, borderRadius: 20, borderWidth: 2, borderColor: on ? t.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+              <IconBox icon={it.icon} color={it.color} t={t} size={56} />
+            </View>
+            <Text style={{ fontSize: narrow ? 11 : 12, lineHeight: 15, textAlign: 'center', color: on ? t.fg : t.muted, fontFamily: on ? FONTS.bold : FONTS.semi }}>{softWrap(it.label)}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function CatChips({ value, onChange, t }: { value: string; onChange: (c: string) => void; t: Theme }) {
+  return <TileGrid items={CATS.map((c) => ({ key: c, label: catName(c), icon: catIconName(c), color: t.cats[catIndex(c)] }))} value={value} onChange={onChange} t={t} />;
+}
+
+/** Tarih: kısayol hapları + ‹ gün › çubuğu + açılır takvim. */
+function DateField({ date, setDate, cal, setCal, t }: { date: string; setDate: (d: string) => void; cal: boolean; setCal: (v: boolean) => void; t: Theme }) {
+  const isToday = date >= todayIso();
+  return (
+    <Field label={tr('expense.date')} t={t}>
+      <View style={sh.pills}>
+        <Pill label={tr('date.today')} active={date === todayIso()} onPress={() => setDate(todayIso())} t={t} />
+        <Pill label={tr('date.yesterday')} active={date === addDays(todayIso(), -1)} onPress={() => setDate(addDays(todayIso(), -1))} t={t} />
+        <Pill label={tr('date.twoDaysAgo')} active={date === addDays(todayIso(), -2)} onPress={() => setDate(addDays(todayIso(), -2))} t={t} />
+      </View>
+      <View style={[sh.stepper, { backgroundColor: t.surface, borderColor: t.line }]}>
+        <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={8} style={st.stepBtn} accessibilityLabel={tr('date.prevDay')}>
+          <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
+        </Pressable>
+        <Pressable onPress={() => setCal(!cal)} style={st.dateBtn} accessibilityRole="button" accessibilityLabel={`${tr('date.pick')}: ${dayLabel(date)}`} accessibilityState={{ expanded: cal }}>
+          <Text style={{ color: t.fg, fontSize: 16, fontFamily: FONTS.semi }}>{dayLabel(date)}</Text>
+          <Text style={{ color: t.muted, fontSize: 12 }}>{cal ? '▲' : '▼'}</Text>
+        </Pressable>
+        <Pressable onPress={() => !isToday && setDate(addDays(date, 1))} hitSlop={8} style={[st.stepBtn, { opacity: isToday ? 0.3 : 1 }]} accessibilityLabel={tr('date.nextDay')}>
+          <Text style={[st.stepTxt, { color: t.fg }]}>›</Text>
+        </Pressable>
+      </View>
+      {cal ? <DatePicker value={date} onChange={(d) => { setDate(d); setCal(false); }} t={t} /> : null}
+    </Field>
+  );
+}
+
+/** Silme iki dokunuşla: yanlışlıkla silinmesin. Kırmızı çerçeveli hap; onay beklerken dolu kırmızı. */
 function DeleteButton({ onDelete, t }: { onDelete: () => void; t: Theme }) {
   const [armed, setArmed] = useState(false);
   return (
-    <Button
-      label={armed ? tr('common.confirmDelete') : tr('common.delete')}
-      kind={armed ? 'danger' : 'ghost'}
-      onPress={() => (armed ? onDelete() : setArmed(true))}
-      t={t}
-    />
+    <Pressable onPress={() => (armed ? onDelete() : setArmed(true))} accessibilityRole="button"
+      style={({ pressed }) => [sh.btn, { backgroundColor: armed ? t.warn : 'transparent', borderColor: t.warn, opacity: pressed ? 0.8 : 1 }]}>
+      <Text numberOfLines={1} style={{ color: armed ? t.surface : t.warn, fontSize: 16, fontFamily: FONTS.bold }}>{armed ? tr('common.confirmDelete') : tr('common.delete')}</Text>
+    </Pressable>
   );
 }
 
 /* ---------- Harcama ekle / düzenle ---------- */
-export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, rates, onSave, onDelete, onClose, t }: {
+export function ExpenseSheet({ visible, initial, prefill, frequent = [], lastCat, main, rates, onSave, onDelete, onClose, t }: {
   visible: boolean;
   initial: Expense | null;
   prefill?: { amount?: number; cat?: string };
   frequent?: { cat: string; note: string; amount: number }[];
+  lastCat?: string; // en son eklenen harcamanın kategorisi: yeni kayıtta varsayılan
   main: Cur;
   rates: Rates | null;
   onSave: (e: Expense) => void;
@@ -143,13 +278,14 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
   t: Theme;
 }) {
   const [amount, setAmount] = useState(initial ? amountText(initial.amount) : prefill?.amount ? amountText(prefill.amount) : '');
-  const [cat, setCat] = useState(initial?.cat ?? prefill?.cat ?? CATS[0]);
+  const [cat, setCat] = useState(initial?.cat ?? prefill?.cat ?? (lastCat && CATS.includes(lastCat) ? lastCat : CATS[0]));
   const [note, setNote] = useState(initial?.note ?? '');
   const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [cal, setCal] = useState(false); // takvim açık mı
   // Kayıt girildiği para biriminde gösterilir ve saklanır; yeni kayıt ana para biriminde başlar
   const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
-  const value = parseAmount(amount);
-  const isToday = date >= todayIso();
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw; // çok büyük tutar geçersiz sayılır; alanın altında satır içi hata gösterilir
 
   const save = () => {
     if (!value) return;
@@ -160,10 +296,13 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
     }
     onSave(e);
   };
+  const saveLabel = value ? tr('expense.saveAmount', { amount: fmtMoney(value, cur) }) : tr('common.save');
 
   return (
     <Sheet visible={visible} title={initial ? tr('expense.editTitle') : tr('expense.newTitle')} onClose={onClose} t={t}
-      accessoryId="expense-save" action={{ label: value ? tr('expense.saveAmount', { amount: fmtMoney(value, cur) }) : tr('common.save'), onPress: save, disabled: !value }}>
+      accessoryId="expense-save" action={{ label: saveLabel, headerLabel: tr('common.save'), onPress: save, disabled: !value }}>
+      <AmountHero value={amount} onChange={setAmount} raw={raw} cur={cur} onCur={setCur} main={main} rates={rates} t={t}
+        label={tr('common.amountField', { sym: symbolOf(cur) })} a11y={tr('expense.amountA11y')} autoFocus={!initial} accessoryId="expense-save" />
       {!initial && frequent.length ? (
         <Field label={tr('expense.frequent')} t={t}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="always">
@@ -171,59 +310,69 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], main, r
               <Pressable
                 key={f.cat + f.note}
                 onPress={() => { setCat(f.cat); setNote(f.note); setAmount(amountText(f.amount)); setCur(main); }}
-                style={({ pressed }) => [st.freq, { backgroundColor: t.bg, borderColor: t.line, opacity: pressed ? 0.7 : 1 }]}
+                style={({ pressed }) => [sh.freq, { backgroundColor: t.surface, borderColor: t.line, opacity: pressed ? 0.7 : 1 }]}
               >
                 <CatIcon cat={f.cat} t={t} size={28} />
                 <View>
-                  <Text style={{ color: t.fg, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{f.note}</Text>
-                  <Text style={{ color: t.muted, fontSize: 12 }}>{fmtMoney(f.amount, main)}</Text>
+                  <Text style={{ color: t.fg, fontSize: 14, fontFamily: FONTS.semi }} numberOfLines={1}>{f.note}</Text>
+                  <Text style={{ color: t.muted, fontSize: 12 }}>{fmtShown(f.amount, main)}</Text>
                 </View>
               </Pressable>
             ))}
           </ScrollView>
         </Field>
       ) : null}
-      <Field label={tr('common.amountField', { sym: symbolOf(cur) })} t={t}>
-        <TextInput
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="decimal-pad"
-          placeholder={tr('common.amountPlaceholder')}
-          placeholderTextColor={t.muted}
-          autoFocus={!initial}
-          inputAccessoryViewID="expense-save"
-          style={inputStyle(t, true)}
-          accessibilityLabel={tr('expense.amountA11y')}
-        />
-        <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
-        <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
-      </Field>
       <Field label={tr('common.category')} t={t}>
         <CatChips value={cat} onChange={setCat} t={t} />
       </Field>
       <Field label={tr('expense.note')} t={t}>
-        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t)}
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={fieldStyle(t)} maxLength={80}
           inputAccessoryViewID="expense-save" returnKeyType="done" onSubmitEditing={save} />
       </Field>
-      <Field label={tr('expense.date')} t={t}>
-        <View style={st.chips}>
-          <Chip label={tr('date.today')} active={date === todayIso()} onPress={() => setDate(todayIso())} t={t} />
-          <Chip label={tr('date.yesterday')} active={date === addDays(todayIso(), -1)} onPress={() => setDate(addDays(todayIso(), -1))} t={t} />
-          <Chip label={tr('date.twoDaysAgo')} active={date === addDays(todayIso(), -2)} onPress={() => setDate(addDays(todayIso(), -2))} t={t} />
-        </View>
-        <View style={[st.stepper, { backgroundColor: t.bg, borderColor: t.line }]}>
-          <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={8} style={st.stepBtn} accessibilityLabel={tr('date.prevDay')}>
-            <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
-          </Pressable>
-          <Text style={{ color: t.fg, fontSize: 16, fontWeight: '500' }}>{dayLabel(date)}</Text>
-          <Pressable onPress={() => !isToday && setDate(addDays(date, 1))} hitSlop={8} style={[st.stepBtn, { opacity: isToday ? 0.3 : 1 }]} accessibilityLabel={tr('date.nextDay')}>
-            <Text style={[st.stepTxt, { color: t.fg }]}>›</Text>
-          </Pressable>
-        </View>
-      </Field>
-      <View style={st.actions}>
+      <DateField date={date} setDate={setDate} cal={cal} setCal={setCal} t={t} />
+      <View style={sh.actions}>
         {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
-        <Button label={tr('common.save')} onPress={save} disabled={!value} t={t} style={{ flex: 1 }} />
+        <PrimaryButton label={saveLabel} onPress={save} disabled={!value} t={t} />
+      </View>
+    </Sheet>
+  );
+}
+
+/* ---------- Gelir ekle / düzenle ---------- */
+export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, onClose, t }: {
+  visible: boolean; initial: Income | null; main: Cur; rates: Rates | null; onSave: (x: Income) => void; onDelete: (id: string) => void; onClose: () => void; t: Theme;
+}) {
+  const [amount, setAmount] = useState(initial ? amountText(initial.amount) : '');
+  const [cat, setCat] = useState(initial?.cat ?? INCOME_CATS[0]);
+  const [note, setNote] = useState(initial?.note ?? '');
+  const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [cal, setCal] = useState(false); // takvim açık mı
+  const [cur, setCur] = useState<Cur>(initial?.cur ?? (initial ? 'TRY' : main));
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw;
+
+  const save = () => {
+    if (!value) return;
+    onSave({ id: initial?.id ?? uid(), amount: value, cat, note: note.trim().slice(0, 80), date, ts: initial?.ts ?? Date.now(), cur });
+  };
+  const saveLabel = value ? tr('income.saveAmount', { amount: fmtMoney(value, cur) }) : tr('common.save');
+
+  return (
+    <Sheet visible={visible} title={initial ? tr('income.editTitle') : tr('income.newTitle')} onClose={onClose} t={t}
+      accessoryId="income-save" action={{ label: saveLabel, headerLabel: tr('common.save'), onPress: save, disabled: !value }}>
+      <AmountHero value={amount} onChange={setAmount} raw={raw} cur={cur} onCur={setCur} main={main} rates={rates} t={t}
+        label={tr('common.amountField', { sym: symbolOf(cur) })} a11y={tr('income.amountA11y')} testID="income-amount" autoFocus={!initial} accessoryId="income-save" />
+      <Field label={tr('common.category')} t={t}>
+        <TileGrid items={INCOME_CATS.map((c) => ({ key: c, label: incomeCatName(c), icon: incomeIcon(c), color: t.cats[incomeCatIndex(c)] }))} value={cat} onChange={setCat} t={t} />
+      </Field>
+      <Field label={tr('expense.note')} t={t}>
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('income.notePlaceholder')} placeholderTextColor={t.muted} style={fieldStyle(t)} maxLength={80}
+          inputAccessoryViewID="income-save" returnKeyType="done" onSubmitEditing={save} />
+      </Field>
+      <DateField date={date} setDate={setDate} cal={cal} setCal={setCal} t={t} />
+      <View style={sh.actions}>
+        {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
+        <PrimaryButton label={saveLabel} onPress={save} disabled={!value} t={t} />
       </View>
     </Sheet>
   );
@@ -244,7 +393,8 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
   // Kullanıcı türü/kategoriyi kendisi seçtiyse addan tahmin edilen değer onun yerine geçmez
   const [typeTouched, setTypeTouched] = useState(!!initial);
   const [catTouched, setCatTouched] = useState(!!initial);
-  const value = parseAmount(amount);
+  const raw = parseAmount(amount);
+  const value = raw > MAX_AMOUNT ? 0 : raw;
   const d = parseInt(day, 10);
   const valid = !!name.trim() && !!value && d >= 1 && d <= 31;
 
@@ -268,35 +418,28 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
   return (
     <Sheet visible={visible} title={initial ? tr('sub.editTitle') : tr('sub.newTitle')} onClose={onClose} t={t}
       accessoryId="sub-save" action={{ label: tr('common.save'), onPress: save, disabled: !valid }}>
+      <AmountHero value={amount} onChange={setAmount} raw={raw} cur={cur} onCur={setCur} main={main} rates={rates} t={t}
+        label={tr('common.amountField', { sym: symbolOf(cur) })} accessoryId="sub-save" />
       <Field label={tr('sub.name')} t={t}>
-        <TextInput value={name} onChangeText={onName} placeholder={tr('sub.namePlaceholder')} placeholderTextColor={t.muted} autoFocus={!initial} style={inputStyle(t)} inputAccessoryViewID="sub-save" />
+        <TextInput value={name} onChangeText={onName} placeholder={tr('sub.namePlaceholder')} placeholderTextColor={t.muted} autoFocus={!initial} style={fieldStyle(t)} inputAccessoryViewID="sub-save" />
       </Field>
       <Field label={tr('sub.type')} t={t}>
-        <View style={st.chips}>
-          {SUB_TYPES.map((x) => (
-            <Chip key={x.key} label={subLabel(x.key)} icon={x.icon as IconName} color={subTypeColor(x.key, t)} active={type === x.key} onPress={() => pickType(x.key, true)} t={t} />
-          ))}
-        </View>
-      </Field>
-      <Field label={tr('common.amountField', { sym: symbolOf(cur) })} t={t}>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={tr('common.amountPlaceholder')} placeholderTextColor={t.muted} style={inputStyle(t, true)} inputAccessoryViewID="sub-save" />
-        <CurrencyChips value={cur} onChange={setCur} main={main} rates={rates} t={t} />
-        <ConvertHint amount={value} cur={cur} main={main} rates={rates} t={t} />
+        <TileGrid items={SUB_TYPES.map((x) => ({ key: x.key, label: subLabel(x.key), icon: x.icon as IconName, color: subTypeColor(x.key, t) }))} value={type} onChange={(k) => pickType(k, true)} t={t} />
       </Field>
       <Field label={tr('sub.frequency')} t={t}>
-        <View style={st.chips}>
-          <Chip label={tr('sub.monthly')} active={freq === 'monthly'} onPress={() => setFreq('monthly')} t={t} />
-          <Chip label={tr('sub.yearly')} active={freq === 'yearly'} onPress={() => setFreq('yearly')} t={t} />
+        <View style={sh.pills}>
+          <Pill label={tr('sub.monthly')} active={freq === 'monthly'} onPress={() => setFreq('monthly')} t={t} />
+          <Pill label={tr('sub.yearly')} active={freq === 'yearly'} onPress={() => setFreq('yearly')} t={t} />
         </View>
       </Field>
       <Field label={tr('sub.payDay')} t={t}>
-        <TextInput value={day} onChangeText={setDay} keyboardType="number-pad" maxLength={2} style={inputStyle(t)} inputAccessoryViewID="sub-save" />
+        <TextInput value={day} onChangeText={setDay} keyboardType="number-pad" maxLength={2} style={fieldStyle(t)} inputAccessoryViewID="sub-save" />
       </Field>
       {freq === 'yearly' ? (
         <Field label={tr('sub.payMonth')} t={t}>
-          <View style={st.chips}>
+          <View style={sh.pills}>
             {Array.from({ length: 12 }, (_, i) => (
-              <Chip key={i} label={tr('monthShort.' + i)} active={month === i + 1} onPress={() => setMonth(i + 1)} t={t} />
+              <Pill key={i} label={tr('monthShort.' + i)} active={month === i + 1} onPress={() => setMonth(i + 1)} t={t} />
             ))}
           </View>
         </Field>
@@ -307,9 +450,9 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
         </Text>
         <CatChips value={cat} onChange={(c) => { setCat(c); setCatTouched(true); }} t={t} />
       </Field>
-      <View style={st.actions}>
+      <View style={sh.actions}>
         {initial ? <DeleteButton onDelete={() => onDelete(initial.id)} t={t} /> : null}
-        <Button label={tr('common.save')} onPress={save} disabled={!valid} t={t} style={{ flex: 1 }} />
+        <PrimaryButton label={tr('common.save')} onPress={save} disabled={!valid} t={t} />
       </View>
     </Sheet>
   );
@@ -320,11 +463,15 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
   settings: Settings; focusBudget?: boolean; onChange: (s: Settings) => void; t: Theme;
 }) {
   const [budget, setBudget] = useState(settings.budget ? amountText(settings.budget) : '');
+  const budgetRaw = parseAmount(budget);
+  const saveBudget = () => { if (budgetRaw <= MAX_AMOUNT) onChange({ ...settings, budget: budgetRaw }); };
   const limitTotal = Object.values(settings.catBudgets).reduce((a, b) => a + b, 0);
+  // İki kart: aylık bütçe tutarı ve kategori limitleri; başlıklar kart başlığı biçiminde (16/700)
   return (
-    <View style={{ gap: 22 }}>
-      <Field label={tr('budget.field', { sym: symbolOf(settings.currency) })} t={t}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+    <View style={{ gap: 16 }}>
+      <View style={[cardBase(t), { gap: 12 }]}>
+        <Text style={cardTitle(t)} accessibilityRole="header">{tr('budget.field', { sym: symbolOf(settings.currency) })}</Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           <TextInput
             value={budget}
             onChangeText={setBudget}
@@ -334,22 +481,24 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
             autoFocus={focusBudget}
             selectTextOnFocus
             returnKeyType="done"
-            onSubmitEditing={() => onChange({ ...settings, budget: parseAmount(budget) })}
-            style={[...inputStyle(t), { flex: 1, minWidth: 0 }]}
+            onSubmitEditing={saveBudget}
+            maxLength={AMOUNT_MAXLEN}
+            style={[st.panelInput, { flex: 1, minWidth: 0, backgroundColor: t.bg, borderColor: t.line, color: t.fg }]}
             accessibilityLabel={tr('budget.a11y')}
           />
-          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); onChange({ ...settings, budget: parseAmount(budget) }); }} t={t} style={{ height: 48 }} />
+          <Button label={tr('common.save')} onPress={() => { Keyboard.dismiss(); saveBudget(); }} t={t} style={{ height: 52 }} />
         </View>
-      </Field>
+        <AmountError value={budgetRaw} t={t} />
+      </View>
 
-      <View style={{ gap: 0 }}>
-        <Label t={t}>{tr('budget.limitsTitle')}</Label>
-        <Text style={{ color: t.muted, fontSize: 14, lineHeight: 20, paddingVertical: 6 }}>
+      <View style={[cardBase(t), { gap: 4, paddingBottom: 8 }]}>
+        <Text style={cardTitle(t)} accessibilityRole="header">{tr('budget.limitsTitle')}</Text>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 19, paddingBottom: 8 }}>
           {tr('budget.limitsHint')}
           {limitTotal ? ` ${tr('budget.limitsTotal', { amount: money(limitTotal) })}` : ''}
         </Text>
-        {CATS.map((c) => (
-          <CatLimitRow key={c} cat={c} value={settings.catBudgets[c] || 0} t={t}
+        {CATS.map((c, i) => (
+          <CatLimitRow key={c} cat={c} value={settings.catBudgets[c] || 0} first={i === 0} t={t}
             onChange={(v) => {
               const next = { ...settings.catBudgets };
               if (v) next[c] = v; else delete next[c];
@@ -362,7 +511,7 @@ export function BudgetPanel({ settings, focusBudget, onChange, t }: {
 }
 
 /* ---------- Ayarlar ekranı: ad, görünüm, bildirimler, dışa/içe aktarma ---------- */
-export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
+export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestore, lockAvailable, notifWarn, account, ym, monthLabel, rates, refreshing, failed, onRefresh, t }: {
   settings: Settings;
   rates: Rates | null;
   refreshing: boolean;
@@ -372,6 +521,12 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
   onExport: (ym: string | null) => void;
   onBackup: () => void;
   onRestore: () => void;
+  /** Uygulama kilidi anahtarı görünsün mü (cihazda biyometri/parola varsa; web'de hayır). */
+  lockAvailable?: boolean;
+  /** Hatırlatma anahtarı açık ama bildirim izni yok: uyarı satırı ve düzeltme düğmesi (sorulamıyorsa sistem ayarlarını açar). */
+  notifWarn?: { canAskAgain: boolean; onFix: () => void } | null;
+  /** Hesap ve yasal bölümleri (giriş kapısı sağlar). */
+  account?: ReactNode;
   ym: string;
   monthLabel: string;
   t: Theme;
@@ -402,6 +557,14 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18 }}>{currencyName(settings.currency)} · {tr('settings.currencyHint')}</Text>
       </Field>
       <RatesBox main={settings.currency} rates={rates} refreshing={refreshing} failed={failed} onRefresh={onRefresh} t={t} />
+      <Field label={tr('settings.presets')} t={t}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {PRESETS.map((p) => (
+            <PresetCard key={p.id} colors={p.colors} name={tr('preset.' + p.id)} caption={tr('preset.wada', { n: p.wada })} label={tr('settings.presetA11y', { name: tr('preset.' + p.id) })}
+              selected={presetOf(settings.accent, settings.tint) === p.id} onPress={() => onChange({ ...settings, accent: p.accent, tint: p.tint })} t={t} />
+          ))}
+        </View>
+      </Field>
       <Field label={tr('settings.appearance')} t={t}>
         <View style={st.chips}>
           <Chip label={tr('settings.themeNoir')} icon="moon-outline" active={settings.theme === 'noir'} onPress={() => onChange({ ...settings, theme: 'noir' })} t={t} />
@@ -429,6 +592,15 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
       </Field>
 
       <View style={{ gap: 0 }}>
+        <Label t={t}>{tr('settings.privacy')}</Label>
+        <View style={row}>
+          <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.hideAmounts')}</Text>
+          <Switch value={settings.hideBalance} onValueChange={(v) => onChange({ ...settings, hideBalance: v })} trackColor={{ true: t.accent }} accessibilityLabel={tr('settings.hideAmounts')} testID="hide-amounts-switch" />
+        </View>
+        <Text style={{ color: t.muted, fontSize: 13, lineHeight: 18, paddingTop: 8 }}>{tr('settings.hideAmountsHint')}</Text>
+      </View>
+
+      <View style={{ gap: 0 }}>
         <Label t={t}>{tr('settings.notifications')}</Label>
         <View style={row}>
           <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.eveningReminder')}</Text>
@@ -437,7 +609,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         {settings.remind ? (
           <View style={row}>
             <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.time')}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               <Pressable hitSlop={10} onPress={() => onChange({ ...settings, remindHour: (settings.remindHour + 23) % 24 })} accessibilityLabel={tr('settings.hourEarlier')}>
                 <Text style={[st.stepTxt, { color: t.fg }]}>‹</Text>
               </Pressable>
@@ -452,15 +624,34 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
           <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.subReminder')}</Text>
           <Switch value={settings.subRemind} onValueChange={(v) => onChange({ ...settings, subRemind: v })} trackColor={{ true: t.accent }} />
         </View>
+        <View style={row}>
+          <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.notifAmounts')}</Text>
+          <Switch value={settings.notifAmounts} onValueChange={(v) => onChange({ ...settings, notifAmounts: v })} trackColor={{ true: t.accent }} />
+        </View>
+        {notifWarn ? (
+          <View style={{ gap: 8, paddingTop: 12 }} testID="notif-warn">
+            <Text style={{ color: t.warn, fontSize: 13, lineHeight: 18 }}>{tr(notifWarn.canAskAgain ? 'settings.notifOff' : 'settings.notifOffSystem')}</Text>
+            <Button label={tr(notifWarn.canAskAgain ? 'settings.notifAllow' : 'settings.notifOpenSettings')} kind="ghost" onPress={notifWarn.onFix} t={t} />
+          </View>
+        ) : null}
       </View>
 
-      <View style={{ gap: 10 }}>
+      {lockAvailable ? (
+        <View style={{ gap: 0 }}>
+          <View style={row}>
+            <Text style={[st.rowTxt, { color: t.fg }]}>{tr('settings.lock')}</Text>
+            <Switch value={settings.lock} onValueChange={(v) => onChange({ ...settings, lock: v })} trackColor={{ true: t.accent }} accessibilityLabel={tr('settings.lock')} />
+          </View>
+        </View>
+      ) : null}
+
+      <View style={{ gap: 12 }}>
         <Label t={t}>{tr('settings.excel')}</Label>
         <Button label={tr('settings.exportMonth', { month: monthLabel })} kind="ghost" onPress={() => onExport(ym)} t={t} />
         <Button label={tr('settings.exportAll')} kind="ghost" onPress={() => onExport(null)} t={t} />
       </View>
 
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: 12 }}>
         <Label t={t}>{tr('settings.backup')}</Label>
         <Text style={{ color: t.muted, fontSize: 14, lineHeight: 20 }}>
           {tr('settings.backupHint')}
@@ -468,6 +659,7 @@ export function SettingsPanel({ settings, onChange, onExport, onBackup, onRestor
         <Button label={tr('settings.backupMake')} kind="ghost" onPress={onBackup} t={t} />
         <Button label={tr('settings.backupRestore')} kind="ghost" onPress={onRestore} t={t} />
       </View>
+      {account}
     </View>
   );
 }
@@ -505,17 +697,20 @@ export function RatesBox({ main, rates, refreshing, failed, onRefresh, t }: {
   );
 }
 
-function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; onChange: (v: number) => void; t: Theme }) {
+function CatLimitRow({ cat, value, onChange, first, t }: { cat: string; value: number; onChange: (v: number) => void; first?: boolean; t: Theme }) {
+  const narrow = useWindowDimensions().width < 360; // dar ekranda kutu daralır, kategori adına yer kalır
   const [text, setText] = useState(value ? amountText(value) : '');
+  const raw = parseAmount(text);
   const commit = () => {
-    const v = parseAmount(text);
-    if (v !== value) onChange(v);
+    if (raw > MAX_AMOUNT) return; // çok büyük limit kaydedilmez; satırın altında hata görünür
+    if (raw !== value) onChange(raw);
   };
   return (
-    <View style={[st.row, { borderColor: t.line }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-        <CatIcon cat={cat} t={t} size={30} />
-        <Text style={[st.rowTxt, { color: t.fg }]}>{catName(cat)}</Text>
+    <View style={!first && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: t.line }}>
+    <View style={st.limitRow}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+        <CatIcon cat={cat} t={t} size={narrow ? 32 : 36} />
+        <Text style={[st.rowTxt, { color: t.fg, fontSize: narrow ? 14 : 15, fontWeight: '500', minWidth: 0, paddingRight: 0 }]} numberOfLines={1}>{catName(cat)}</Text>
       </View>
       <TextInput
         value={text}
@@ -524,28 +719,34 @@ function CatLimitRow({ cat, value, onChange, t }: { cat: string; value: number; 
         keyboardType="decimal-pad"
         placeholder={tr('budget.limitNone')}
         placeholderTextColor={t.muted}
-        style={[st.limitInput, { backgroundColor: t.bg, borderColor: t.line, color: t.fg }]}
+        style={[st.limitInput, narrow && { width: 88, paddingHorizontal: 12, fontSize: 14 }, { backgroundColor: t.bg, borderColor: value ? t.goldLine : t.line, color: t.fg }]}
+        maxLength={AMOUNT_MAXLEN}
         accessibilityLabel={tr('budget.limitA11y', { cat: catName(cat) })}
       />
+    </View>
+    <AmountError value={raw} t={t} />
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 10, maxWidth: 200 },
-  limitInput: { width: 110, height: 40, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, fontSize: 16, textAlign: 'right' },
+  freq: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, maxWidth: 200 },
+  limitInput: { width: 116, height: 44, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 12, fontSize: 15, textAlign: 'right' },
+  limitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, minHeight: 60, paddingVertical: 8 },
+  panelInput: { height: 52, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 16, fontSize: 17, fontWeight: '600' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, minHeight: 56 },
-  topSave: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 18 },
+  topSave: { borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 16, flexShrink: 1, marginLeft: 12 },
   accessory: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  accessorySave: { flex: 1, maxWidth: 260, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  accessorySave: { flex: 1, maxWidth: 260, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 28, fontFamily: FONTS.display, paddingHorizontal: 20, paddingTop: 4 },
-  body: { padding: 20, gap: 18, paddingBottom: 48 },
-  input: { height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 17 },
-  big: { height: 64, fontSize: 32, fontWeight: '700' },
+  body: { padding: 20, gap: 16, paddingBottom: 48 },
+  input: { height: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, fontSize: 17 },
+  big: { height: 64, fontSize: 32, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  stepper: { height: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
+  swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  stepper: { height: 48, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  dateBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   stepBtn: { width: 40, alignItems: 'center' },
   stepTxt: { fontSize: 24, lineHeight: 28 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth },

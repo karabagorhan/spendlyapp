@@ -1,27 +1,37 @@
-import { PlayfairDisplay_600SemiBold } from '@expo-google-fonts/playfair-display/600SemiBold';
-import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700Bold';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/500Medium';
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
 import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, AppState, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type ScrollViewInstance } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fmtMoney, fmtStamp, needsRates, setMainCurrency, viewData, fromViewSettings } from './src/currency';
+import { Cur, amountsHidden, fmtMoney, fmtShown, fmtStamp, needsRates, setHideAmounts, setMainCurrency, viewData, fromViewSettings } from './src/currency';
 import { BackupFormatError, exportBackup, exportExcel, pickBackup } from './src/files';
-import { LanguageProvider, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
+import { LanguageProvider, deviceLanguage, fmtPercent, fmtTime, lower, setLanguage, t as tr, upper } from './src/i18n';
 import {
-  Analysis, Expense, SUB_TYPES, Settings, Sub, addMonths, analyse, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
-  insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
+  Analysis, Expense, Income, SUB_TYPES, Settings, Sub, addMonths, analyse, budgetProgress, catIndex, catName, categoryCompare, dayLabel, money, money0, frequentEntries,
+  MAX_AMOUNT, balanceFor, incomeCatName, insights, iso, monthLabel, monthName, monthOnly, monthShortName, monthlyCost, parseAmount, recentTransactions, shortDay, subLabel, subStatus, sum, todayIso, uid, weekdayAverages,
 } from './src/lib';
-import { ensurePermission, reschedule } from './src/notify';
-import { BudgetPanel, ExpenseSheet, SettingsPanel, SubSheet } from './src/sheets';
+import { LockLayer, authenticate, useAppLock, useLockSupported } from './src/lock';
+import { PermInfo, ensurePermission, permissionInfo, reschedule } from './src/notify';
+import { BudgetPanel, ExpenseSheet, IncomeSheet, SettingsPanel, SubSheet } from './src/sheets';
 import { merge, useAppData } from './src/store';
 import { FONTS, Theme, useTheme } from './src/theme';
 import { useRates } from './src/useRates';
-import { Amount, Bars, Button, CatIcon, SubTypeIcon, subTypeColor, DailyChart, InsightList, Ionicons, Label, MenuSection, Pill, Progress, SideMenu } from './src/ui';
+import { AccountSection } from './src/auth/AccountSection';
+import { useAccount } from './src/auth/AccountProvider';
+import { Gate } from './src/auth/Gate';
+import { Intro } from './src/intro';
+import { Amount, Bars, Button, CatIcon, EmptyState, IconBox, IconName, InsightList, Ionicons, MenuSection, Pill, PillButton, Progress, RingsChart, Segmented, SideMenu, SoftPill, SubTypeIcon, Tone, TxnRow, catIconName, DailyChart, fitWidth, subTypeColor } from './src/ui';
+import {
+  BalanceCard, BudgetCard, BudgetOverview, CardHead, CategoriesCard, CurrencyMenu, DASH_MAX, DashHeader, DashboardSkeleton, ErrorState, HomeBrand, IncomeIcon, InlineNotice, Pair, QuickActions,
+  RecentCard, SpendingCard, SubsCard, SubsHero, TabBar, tabBarSpace,
+} from './src/dashboard';
+import { RADIUS, SPACE, bigAmount, cardBase, cardShadow, selectedFill, selectedLine, trackOf } from './src/design';
 
 /** Web: tarayıcının kenardan "geri git" kaydırması uygulamanın kendi geri hareketiyle çakışmasın. */
 function useWebOverscroll() {
@@ -34,14 +44,27 @@ function useWebOverscroll() {
   }, []);
 }
 
+// Yerel açılış ekranı, açılış animasyonu ilk karesini çizene kadar ekranda kalır (Intro onu görünmez biçimde devralır)
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Açılış animasyonu telefonlarda her açılışta oynar; web'de (testler) yalnızca adreste `?intro` varsa. */
+const introOnStart = () => Platform.OS !== 'web' || (typeof location !== 'undefined' && /[?&]intro\b/.test(location.search));
+
 export default function App() {
   useWebOverscroll();
+  const [intro, setIntro] = useState(introOnStart);
   // Yazı tipi yüklenemezse sistem yazı tipiyle devam edilir
-  const [fontsLoaded, fontError] = useFonts({ PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold });
-  if (!fontsLoaded && !fontError) return null;
+  const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold });
+  const ready = fontsLoaded || !!fontError;
+  // Animasyon yoksa açılış ekranı uygulama hazır olunca doğrudan kalkar
+  useEffect(() => { if (ready && !intro) SplashScreen.hideAsync().catch(() => {}); }, [ready, intro]);
+  if (!ready) return null;
   return (
     <SafeAreaProvider>
-      <Main />
+      <Gate>
+        <Main />
+      </Gate>
+      {intro ? <Intro onDone={() => setIntro(false)} /> : null}
     </SafeAreaProvider>
   );
 }
@@ -56,6 +79,7 @@ const SWIPE_DIST = 60;
 type Screen = 'ozet' | 'harcamalar' | 'raporlar' | 'abonelikler' | 'butce' | 'ayarlar';
 type ExpenseSheetState = { key: number; initial: Expense | null; prefill?: { amount?: number; cat?: string } } | null;
 type SubSheetState = { key: number; initial: Sub | null } | null;
+type IncomeSheetState = { key: number; initial: Income | null } | null;
 
 const screenTitle = (screen: Screen) => tr('title.' + screen);
 
@@ -96,14 +120,20 @@ const SLUG: Record<string, string> = {
 
 function Main() {
   const insets = useSafeAreaInsets();
-  const { data, update } = useAppData();
+  const narrow = useWindowDimensions().width < 360;
+  const { data, update, status, reload, recovered, saveFailed } = useAppData();
+  const { notice, setNotice } = useAccount();
   const rs = useRates();
+  const lock = useAppLock(!!data?.settings.lock);
+  const lockSupported = useLockSupported();
   // Dil çizim sırasında (alt bileşenlerden önce) ayarlanır; değişince <LanguageProvider> ağacı yeniden çizdirir.
-  const lang = data?.settings.language ?? 'tr';
+  const lang = data?.settings.language ?? deviceLanguage();
   setLanguage(lang);
   // Ana para birimi de aynı şekilde çizim sırasında ayarlanır; ekranlar `money()` ile bu birimde gösterir.
   const main = data?.settings.currency ?? 'TRY';
   setMainCurrency(main);
+  // Gizlilik kipi de çizim sırasında ayarlanır: açıkken bütün ekranlardaki tutarlar maskelenir (veri ve dışa aktarım etkilenmez).
+  setHideAmounts(data?.settings.hideBalance ?? false);
   // Saklanan kayıtlar girildikleri para biriminde kalır; ekranlar için güncel kurla ana birime çevrilmiş görünüm üretilir.
   const view = useMemo(() => (data ? viewData(data, main, rs.rates) : null), [data, main, rs.rates]);
   const t = useTheme(data?.settings.theme, data?.settings.tint, data?.settings.accent);
@@ -117,11 +147,18 @@ function Main() {
   const [filterDay, setFilterDay] = useState<string | null>(null);
   const [expSheet, setExpSheet] = useState<ExpenseSheetState>(null);
   const [subSheet, setSubSheet] = useState<SubSheetState>(null);
+  const [incSheet, setIncSheet] = useState<IncomeSheetState>(null);
+  const [curMenu, setCurMenu] = useState(false);
+  const [recoveredSeen, setRecoveredSeen] = useState(false);
+  const [txnTab, setTxnTab] = useState<'expenses' | 'income'>('expenses');
   const [toastMsg, setToastMsg] = useState('');
   const [toastAction, setToastAction] = useState<{ label: string; run: () => void } | null>(null);
   const [query, setQuery] = useState('');
+  // Bildirim izninin gerçek durumu (web'de yerel bildirim yok: null). İzin değişince `permTick` bildirimleri yeniden kurdurur.
+  const [perm, setPerm] = useState<PermInfo | null>(null);
+  const [permTick, setPermTick] = useState(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const toast = (m: string, action?: { label: string; run: () => void }) => {
     setToastMsg(m);
@@ -136,6 +173,7 @@ function Main() {
     p.catch(() => {});
   };
   const openAdd = () => setExpSheet({ key: Date.now(), initial: null });
+  const openAddIncome = () => setIncSheet({ key: Date.now(), initial: null });
 
   /* ---------- Kaydırma hareketleri ----------
    * Ekranın sol kenarından sağa kaydırma = geri (önceki ekran; ana ekranda yan menüyü açar).
@@ -143,7 +181,7 @@ function Main() {
   const slide = useRef(new Animated.Value(0)).current;
   const [swiping, setSwiping] = useState(false); // geri oku yalnızca kaydırma sırasında çizilir
   const nav = useRef({ screen, history, blocked: false, canBack: false });
-  nav.current = { screen, history, blocked: menuOpen || !!expSheet || !!subSheet, canBack: history.length > 0 || screen !== 'ozet' };
+  nav.current = { screen, history, blocked: menuOpen || curMenu || !!expSheet || !!subSheet || !!incSheet, canBack: history.length > 0 || screen !== 'ozet' };
   const swipeBack = () => {
     const { screen: cur, history: hist } = nav.current;
     if (hist.length) {
@@ -157,30 +195,37 @@ function Main() {
   };
   const swipeBackRef = useRef(swipeBack);
   swipeBackRef.current = swipeBack;
-  // PanResponder'ın x0/dx değerleri hareket yakalanınca sıfırlanır; bu yüzden dokunuşun başladığı yeri kendimiz tutarız
-  const touchX = useRef({ start: 0, last: 0 });
-  const shouldSwipe = (pageX: number, dy: number, capture: boolean) => {
-    const dx = pageX - touchX.current.start;
+  // PanResponder'ın x0/dx/dy/vx değerleri hareket yakalanınca sıfırlanır ya da önceki hareketlerden kalıntı taşıyabilir; bu yüzden dokunuşu kendimiz izleriz
+  const touchX = useRef({ start: 0, startY: 0, last: 0, lastY: 0, prev: 0, prevT: 0, lastT: 0 });
+  const shouldSwipe = (pageX: number, pageY: number, capture: boolean) => {
+    const dx = pageX - touchX.current.start, dy = pageY - touchX.current.startY;
     if (nav.current.blocked || dx < 14 || dx < Math.abs(dy) * 2.2) return false;
     return capture ? touchX.current.start <= EDGE : nav.current.canBack;
   };
   const edgePan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponderCapture: (e) => {
-        touchX.current = { start: e.nativeEvent.pageX, last: e.nativeEvent.pageX };
+        const { pageX, pageY } = e.nativeEvent, now = Date.now();
+        touchX.current = { start: pageX, startY: pageY, last: pageX, lastY: pageY, prev: pageX, prevT: now, lastT: now };
         return false;
       },
       // Kenardan başlayan hareket iç içe kaydırıcılardan önce yakalanır; ekranın başka yerinde yalnızca gidecek bir ekran varsa ve iç öğe (ör. yatay çipler) almadıysa
-      onMoveShouldSetPanResponderCapture: (e, g) => shouldSwipe(e.nativeEvent.pageX, g.dy, true),
-      onMoveShouldSetPanResponder: (e, g) => shouldSwipe(e.nativeEvent.pageX, g.dy, false),
+      onMoveShouldSetPanResponderCapture: (e) => shouldSwipe(e.nativeEvent.pageX, e.nativeEvent.pageY, true),
+      onMoveShouldSetPanResponder: (e) => shouldSwipe(e.nativeEvent.pageX, e.nativeEvent.pageY, false),
       onPanResponderGrant: () => setSwiping(true),
       onPanResponderMove: (e) => {
-        touchX.current.last = e.nativeEvent.pageX;
-        slide.setValue(Math.max(0, Math.min(touchX.current.last - touchX.current.start, 140)) * 0.5);
+        const c = touchX.current, now = Date.now();
+        if (now - c.lastT > 0) { c.prev = c.last; c.prevT = c.lastT; }
+        c.last = e.nativeEvent.pageX; c.lastY = e.nativeEvent.pageY; c.lastT = now;
+        slide.setValue(Math.max(0, Math.min(c.last - c.start, 140)) * 0.5);
       },
-      onPanResponderRelease: (_e, g) => {
+      onPanResponderRelease: () => {
         Animated.spring(slide, { toValue: 0, bounciness: 0, useNativeDriver: true }).start(() => setSwiping(false));
-        if (touchX.current.last - touchX.current.start > SWIPE_DIST || g.vx > 0.6) swipeBackRef.current();
+        const c = touchX.current, dx = c.last - c.start, dy = c.lastY - c.startY;
+        const vx = (c.last - c.prev) / Math.max(1, c.lastT - c.prevT);
+        // Tüm hareket boyunca yatay baskın olmalı; hız kestirmesi de yalnızca sağa doğru ve yeterince yatay harekette geçerli
+        const horizontal = dx > Math.abs(dy) * 1.5;
+        if (horizontal && (dx > SWIPE_DIST || (dx > 24 && vx > 0.6))) swipeBackRef.current();
       },
       onPanResponderTerminate: () => Animated.spring(slide, { toValue: 0, bounciness: 0, useNativeDriver: true }).start(() => setSwiping(false)),
     }),
@@ -196,7 +241,7 @@ function Main() {
           const q = Linking.parse(u!).queryParams ?? {};
           // Kestirme bağlantılarının biçimi (tutar=125,50) uygulama dilinden bağımsızdır: her zaman Türkçe kurallarla okunur
           const amount = parseAmount(String(q.tutar ?? ''), 'tr');
-          prefill = { amount: amount || undefined, cat: SLUG[String(q.kategori ?? '').toLowerCase()] };
+          prefill = { amount: amount && amount <= MAX_AMOUNT ? amount : undefined, cat: SLUG[String(q.kategori ?? '').toLowerCase()] };
         } catch {}
         setMenuOpen(false);
         setExpSheet({ key: Date.now(), initial: null, prefill });
@@ -222,25 +267,67 @@ function Main() {
     return () => sub.remove();
   }, []);
 
-  // Bildirimleri veri değiştikçe yeniden kur (art arda değişikliklerde bir kez)
+  // Bildirimleri veri ya da izin değiştikçe yeniden kur (art arda değişikliklerde bir kez)
   useEffect(() => {
     if (!data) return;
     const h = setTimeout(() => reschedule(data.settings, data.subs, data.items), 1200);
     return () => clearTimeout(h);
-  }, [data]);
+  }, [data, permTick]);
 
-  if (!data || !view) {
-    return (
-      <View style={[st.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </View>
-    );
-  }
+  const refreshPerm = async () => {
+    if (Platform.OS === 'web') return;
+    setPerm(await permissionInfo());
+    setPermTick((n) => n + 1);
+  };
+  // İzin durumunu aç; sistem ayarlarından dönüldüğünde de güncelle
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    permissionInfo().then(setPerm);
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') refreshPerm(); });
+    return () => sub.remove();
+  }, []);
+  // Daha önce abonelik eklenmiş ama izin hiç sorulmamışsa (varsayılan açık uyarı) açılışta bir kez sor; aboneliği olmayana sorulmaz
+  const askedOnStart = useRef(false);
+  useEffect(() => {
+    if (!data || !perm || askedOnStart.current) return;
+    askedOnStart.current = true;
+    if (perm.state === 'undetermined' && data.settings.subRemind && data.subs.length) ensurePermission().then(refreshPerm);
+  }, [data, perm]);
+
+  // Hesap akışından gelen başarı durumları (e-posta doğrulandı, parola güncellendi) uygulamaya geçince bildirilir
+  useEffect(() => {
+    if (!data || !notice) return;
+    if (notice.kind === 'verified') toast(tr('auth.notice.verified'));
+    else if (notice.kind === 'resetDone') toast(tr('auth.notice.resetDone'));
+    else return;
+    setNotice(null);
+  }, [data, notice]);
+
+  // Kilitlenince açık sayfa/menüler kapanır (yerel Modal'lar kilit katmanının üstünde kalmasın)
+  useEffect(() => {
+    if (!lock.locked) return;
+    setExpSheet(null); setSubSheet(null); setIncSheet(null); setCurMenu(false); setMenuOpen(false);
+  }, [lock.locked]);
+
+  const lockLayer = <LockLayer locked={lock.locked} covered={lock.covered} onUnlock={lock.unlock} t={t} />;
+  if (status === 'error') return <LanguageProvider value={lang}><ErrorState t={t} onRetry={reload} topInset={insets.top} /></LanguageProvider>;
+  if (!data || !view) return <LanguageProvider value={lang}><DashboardSkeleton t={t} topInset={insets.top} /></LanguageProvider>;
 
   const { items, subs, settings } = view;
+  const incomes = view.incomes ?? [];
+  // Kur yokken çevrilemeyen kayıtlar toplamlara girmez (items/subs/incomes yalnızca çevrilenleri içerir); yalnızca listelerde özgün tutar/birimle gösterilir.
+  // Abonelik "ödendi" denetimi ise çevrilemeyen ödemeleri de görmelidir (yoksa aynı dönem yeniden ödenebilir görünür).
+  const un = view.unconverted;
+  const payItems = items.concat(un.items);
+  const amountOf = (x: { amount: number; cur?: Cur; unconv?: true }) => (x.unconv ? fmtShown(x.amount, x.cur ?? 'TRY') : money(x.amount));
+  // Ekran okuyucu etiketi: gizliyken "gizli tutar"; arama ise her zaman gerçek tutar metniyle eşleşir (yazılan şey zaten görünür)
+  const amountA11y = (x: { amount: number; cur?: Cur; unconv?: true }) => (amountsHidden() ? tr('amount.hidden') : amountOf(x));
+  const amountRaw = (x: { amount: number; cur?: Cur; unconv?: true }) => fmtMoney(x.amount, x.unconv ? x.cur ?? 'TRY' : main);
+  const convSum = (xs: { amount: number; unconv?: true }[]) => sum(xs.filter((x) => !x.unconv));
   const stored = {
     item: (id: string) => data.items.find((x) => x.id === id),
     sub: (id: string) => data.subs.find((x) => x.id === id),
+    income: (id: string) => data.incomes.find((x) => x.id === id),
   };
   const converting = needsRates(data, main);
   const a = analyse(items, ym);
@@ -269,7 +356,7 @@ function Main() {
     setExpSheet(null);
     setYm(e.date.slice(0, 7));
     buzz('success');
-    toast(isNew ? tr('toast.added', { amount: fmtMoney(e.amount, e.cur ?? main), cat: catName(e.cat) }) : tr('toast.updated'));
+    toast(isNew ? tr('toast.added', { amount: fmtShown(e.amount, e.cur ?? main), cat: catName(e.cat) }) : tr('toast.updated'));
   };
   const deleteExpense = (id: string) => {
     const removed = stored.item(id);
@@ -281,17 +368,42 @@ function Main() {
       run: () => update((d) => ({ ...d, items: d.items.filter((x) => x.id !== removed.id).concat([removed]) })),
     } : undefined);
   };
+  const saveIncome = (x: Income) => {
+    const isNew = !data.incomes.some((i) => i.id === x.id);
+    update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== x.id).concat([x]) }));
+    setIncSheet(null);
+    setYm(x.date.slice(0, 7));
+    buzz('success');
+    toast(isNew ? tr('toast.incomeAdded', { amount: fmtShown(x.amount, x.cur ?? main) }) : tr('toast.incomeUpdated'));
+  };
+  const deleteIncome = (id: string) => {
+    const removed = stored.income(id);
+    update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== id) }));
+    setIncSheet(null);
+    buzz('warn');
+    toast(tr('toast.incomeDeleted'), removed ? {
+      label: tr('toast.undo'),
+      run: () => update((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== removed.id).concat([removed]) })),
+    } : undefined);
+  };
   const saveSub = (s: Sub) => {
     update((d) => ({ ...d, subs: d.subs.filter((x) => x.id !== s.id).concat([s]) }));
     setSubSheet(null);
     buzz('success');
+    // Ödeme günü uyarısı varsayılan açıktır ama izin yoktur: ilk abonelik kaydında (tam gerektiği anda) izin istenir. Kalıcı reddedildiyse sorulmaz; Ayarlar'da uyarı görünür.
+    if (settings.subRemind && Platform.OS !== 'web') {
+      permissionInfo().then(async (p) => {
+        if (p.state === 'undetermined' || (p.state === 'denied' && p.canAskAgain)) await ensurePermission();
+        await refreshPerm();
+      });
+    }
   };
   const deleteSub = (id: string) => {
     update((d) => ({ ...d, subs: d.subs.filter((x) => x.id !== id) }));
     setSubSheet(null);
   };
   const paySub = (s: Sub) => {
-    const sst = subStatus(s, items);
+    const sst = subStatus(s, payItems);
     // Ödeme, aboneliğin kendi para biriminde ve tutarıyla yazılır (çevrilmiş değerle değil)
     const own = stored.sub(s.id) ?? s;
     const e: Expense = { id: uid(), amount: own.amount, cat: s.cat, note: s.name, date: iso(sst.due), ts: Date.now(), sub: s.id, period: sst.period, cur: own.cur ?? 'TRY' };
@@ -300,21 +412,38 @@ function Main() {
     toast(tr('toast.subAdded', { name: s.name }));
   };
   const skipSub = (s: Sub) => {
-    const period = subStatus(s, items).period;
+    const period = subStatus(s, payItems).period;
     update((d) => ({ ...d, subs: d.subs.map((x) => (x.id === s.id ? { ...x, skip: period } : x)) }));
   };
   const changeSettings = async (next: Settings) => {
+    // Uygulama kilidi açılmadan önce doğrulama başarılı olmalı (kilitli kalıp çıkamama riskine karşı)
+    if (next.lock && !settings.lock) {
+      if ((await authenticate()) !== 'ok') { toast(tr('toast.lockFailed')); return; }
+      lock.markUnlocked();
+    }
     const turnedOn = (next.remind && !settings.remind) || (next.subRemind && !settings.subRemind);
     update((d) => ({ ...d, settings: fromViewSettings(next, d.settings, settings) }));
     if (next.budget !== settings.budget) toast(next.budget ? tr('toast.budgetSaved') : tr('toast.budgetRemoved'));
-    if (turnedOn && !(await ensurePermission())) {
-      toast(tr('toast.noNotifPermission'));
+    if (turnedOn) {
+      const granted = await ensurePermission();
+      await refreshPerm();
+      if (!granted) toast(tr('toast.noNotifPermission'));
     }
+  };
+  // Ayarlar'daki izin uyarısı: sorulabiliyorsa izin iste, kalıcı reddedilmişse sistem ayarlarını aç
+  const fixNotifPermission = async () => {
+    if (perm && !perm.canAskAgain) {
+      Linking.openSettings().catch(() => toast(tr('toast.noNotifPermission')));
+      return;
+    }
+    const granted = await ensurePermission();
+    await refreshPerm();
+    if (!granted) toast(tr('toast.noNotifPermission'));
   };
   const doExport = async (which: string | null) => {
     try {
       const note = converting && rs.rates ? tr('xl.ratesNote', { cur: main, time: fmtStamp(rs.rates.fetchedAt, fmtTime, monthShortName) }) : null;
-      const ok = await exportExcel(items, subs, which, main, note);
+      const ok = await exportExcel(items, subs, which, main, note, incomes);
       if (!ok) toast(which ? tr('toast.exportNoMonth') : tr('toast.exportNoData'));
     } catch {
       toast(tr('toast.excelFail'));
@@ -345,14 +474,24 @@ function Main() {
 
   /* ---------- Ortak parçalar ---------- */
   const monthSwitcher = (
-    <View style={st.months}>
-      <Pressable style={st.mBtn} onPress={() => changeMonth(-1)} accessibilityLabel={tr('month.prev')}>
-        <Ionicons name="chevron-back" size={20} color={t.fg} />
-      </Pressable>
-      <Text style={st.mLabel}>{monthLabel(ym)}</Text>
-      <Pressable style={[st.mBtn, { opacity: a.isCur ? 0.35 : 1 }]} disabled={a.isCur} onPress={() => changeMonth(1)} accessibilityLabel={tr('month.next')}>
-        <Ionicons name="chevron-forward" size={20} color={t.fg} />
-      </Pressable>
+    <View style={{ gap: 8 }}>
+      <View style={st.months}>
+        <Pressable style={st.mBtn} onPress={() => changeMonth(-1)} accessibilityLabel={tr('month.prev')}>
+          <Ionicons name="chevron-back" size={20} color={t.fg} />
+        </Pressable>
+        <Text style={st.mLabel}>{monthLabel(ym)}</Text>
+        <Pressable style={[st.mBtn, { opacity: a.isCur ? 0.35 : 1 }]} disabled={a.isCur} onPress={() => changeMonth(1)} accessibilityLabel={tr('month.next')}>
+          <Ionicons name="chevron-forward" size={20} color={t.fg} />
+        </Pressable>
+      </View>
+      {/* Seçili ay içinde bulunulan ay değilse: tek dokunuşla bu aya dön */}
+      {a.isCur ? null : (
+        <Pressable testID="month-today" onPress={() => { setYm(todayIso().slice(0, 7)); setFilterDay(null); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={tr('month.backToCurrent')}
+          style={st.monthNow}>
+          <Ionicons name="return-up-back-outline" size={16} color={t.muted} />
+          <Text style={{ color: t.fg, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{tr('month.backToCurrent')}</Text>
+        </Pressable>
+      )}
     </View>
   );
 
@@ -366,131 +505,199 @@ function Main() {
     </Pressable>
   ) : null;
 
-  const expenseRow = (x: Expense, i: number, showDate = false) => (
-    <Pressable
-      key={x.id}
+  // İşlem satırı (ortak TxnRow): başlık not ya da kategori, alt yazı kategori (not varsa) ve abonelik etiketi; başka birimde girilmişse özgün tutar tutarın altında
+  const expenseRow = (x: Expense, i: number) => (
+    <TxnRow key={x.id} t={t} kind="expense" cat={x.cat} first={i === 0}
+      title={x.note || catName(x.cat)}
+      subtitle={[x.note ? catName(x.cat) : '', x.sub ? tr('expense.subscriptionTag') : ''].filter(Boolean).join(' · ')}
+      amount={amountOf(x)} orig={x.orig ? fmtShown(x.orig.amount, x.orig.cur) : undefined}
       onPress={() => setExpSheet({ key: Date.now(), initial: stored.item(x.id) ?? x })}
-      style={({ pressed }) => [st.item, i > 0 && st.topLine, pressed && { backgroundColor: t.bg }]}
-      accessibilityLabel={tr('expense.rowA11y', { cat: catName(x.cat), amount: money(x.amount) })}
-    >
-      <CatIcon cat={x.cat} t={t} />
-      <View style={{ flex: 1 }}>
-        <Text style={st.itemCat} numberOfLines={1}>{x.note || catName(x.cat)}</Text>
-        <Text style={st.meta} numberOfLines={1}>{[x.note ? catName(x.cat) : '', showDate ? dayLabel(x.date) : '', x.sub ? tr('expense.subscriptionTag') : '', x.orig ? fmtMoney(x.orig.amount, x.orig.cur) : ''].filter(Boolean).join(' · ') || catName(x.cat)}</Text>
+      a11y={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountA11y(x) })} />
+  );
+  // Gün kartı: üstte "Bugün · ₺540" düzeninde gün adı (solda) ve gün toplamı (sağda), altında o günün satırları
+  const dayCard = (d: string, total: string | null, rows: ReactNode) => (
+    <View key={d} style={st.dayCard}>
+      <View style={st.dayHead}>
+        <Text style={st.dayLbl} numberOfLines={1}>{dayLabel(d)}</Text>
+        {total !== null ? <Text style={st.dayTot}>{total}</Text> : null}
       </View>
-      <Text style={st.itemAmt}>{money(x.amount)}</Text>
-      <Ionicons name="chevron-forward" size={16} color={t.muted} />
-    </Pressable>
+      {rows}
+    </View>
+  );
+  // Ay özeti kartı: işlem sayısı + toplam (iri tutar), solda gider/gelir simgesi
+  const summaryCard = (kind: 'expense' | 'income', label: string, total: string) => (
+    <View style={st.sumCard} testID={`txn-summary-${kind}`}>
+      <IconBox icon={kind === 'income' ? 'arrow-down' : 'arrow-up'} rotate color={kind === 'income' ? t.good : t.warn} t={t} size={44} />
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={st.sumLbl}>{label}</Text>
+        <Amount text={total} style={st.sumVal} symbolColor={t.accent} />
+      </View>
+    </View>
   );
 
-  const ctx: Ctx = { t, st, a, ym, items, subs, monthItems, budget, settings };
+  const curYm = todayIso().slice(0, 7);
+  const curItems = items.filter((x) => x.date.slice(0, 7) === curYm);
+  const curTotal = sum(curItems);
+  const byCat: Record<string, number> = {};
+  curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
+  const pendingSubs = subs.concat(un.subs).filter((x) => subStatus(x, payItems).state === 'pending').length; // rozet: çevrilemeyen abonelikler de ödeme bekler
+  const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
+
+  const txnToggle = (
+    <Segmented t={t} value={txnTab} onChange={setTxnTab}
+      items={[{ key: 'expenses', label: tr('txn.expenses'), testID: 'txn-tab-expenses' }, { key: 'income', label: tr('txn.income'), testID: 'txn-tab-income' }]} />
+  );
+  const incomeRow = (x: Income, i: number) => (
+    <TxnRow key={x.id} t={t} kind="income" cat={x.cat} first={i === 0} testID={`income-row-${i}`}
+      title={x.note || incomeCatName(x.cat)}
+      subtitle={x.note ? incomeCatName(x.cat) : ''}
+      amount={amountOf(x)} orig={x.orig ? fmtShown(x.orig.amount, x.orig.cur) : undefined}
+      onPress={() => setIncSheet({ key: Date.now(), initial: stored.income(x.id) ?? x })}
+      a11y={tr('income.rowA11y', { cat: incomeCatName(x.cat), amount: amountA11y(x) })} />
+  );
+
+  const ctx: Ctx = { t, st, a, ym, items, payItems, subs, monthItems, budget, settings };
   const notes = insights(items, ym, settings);
 
   let body: ReactNode = null;
   if (screen === 'ozet') {
-    const pending = subs.map((s) => ({ s, x: subStatus(s, items) })).filter((r) => r.x.state === 'pending');
-    const recent = [...items].sort((p, q) => (p.date < q.date ? 1 : p.date > q.date ? -1 : q.ts - p.ts)).slice(0, 5);
+    const pending = subs.map((s) => ({ s, x: subStatus(s, payItems) })).filter((r) => r.x.state === 'pending');
+    const bal = balanceFor(items, incomes, ym);
+    const todayAmount = a.isCur ? sum(items.filter((x) => x.date === todayIso())) : null;
+    const slices = recentTransactions(items, incomes, 4);
     body = (
-      <>
+      <View style={st.dashBody}>
+        <DashHeader t={t} initials={initials(settings.name)} currency={main} onCurrency={() => setCurMenu(true)} onMenu={() => setMenuOpen(true)} onSettings={() => go('ayarlar')} alertDot={!!(pendingSubs || limitAlerts)} />
         {monthSwitcher}
-        <Hero ctx={ctx} onBudget={() => { go('butce'); setBudgetFocusKey(Date.now()); }} />
-        <Tiles ctx={ctx} />
-        {rateNote}
-        {notes.length ? (
-          <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.highlights')}</Label>
-              {notes.length > 3 ? <Pressable onPress={() => go('raporlar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
-            </View>
-            <InsightList list={notes.slice(0, 3)} t={t} />
-          </View>
-        ) : null}
+        <BalanceCard t={t} bal={bal} hidden={settings.hideBalance} vsLabel={tr('bal.vsLast')} onAddIncome={openAddIncome} budget={budget}
+          onToggle={() => changeSettings({ ...settings, hideBalance: !settings.hideBalance })} />
+        <QuickActions t={t} onExpense={openAdd} onIncome={openAddIncome} onReports={() => go('raporlar')} onBudgets={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
+        {converting && (rs.failed || (!rs.rates && (un.count > 0 || un.limits > 0))) ? (
+          <>
+            <InlineNotice t={t} kind="warn" text={rs.rates ? tr('dash.ratesFailed') : un.count > 0 ? tr('dash.unconverted', { n: un.count }) + (un.limits > 0 ? ' ' + tr('dash.limitsUnavailable', { n: un.limits }) : '') : un.limits > 0 ? tr('dash.limitsUnavailable', { n: un.limits }) : tr('dash.ratesNone')} action={rs.refreshing ? undefined : tr('state.retry')}
+              onAction={async () => { const ok = await rs.refresh(); toast(ok ? tr('rates.refreshed') : tr('rates.refreshFailed')); }} />
+            {rs.rates ? rateNote : null}
+          </>
+        ) : rateNote}
+        <Pair>
+          <SpendingCard t={t} a={a} ym={ym} todayAmount={todayAmount} monthTitle={monthLabel(ym)} />
+          <CategoriesCard t={t} monthItems={monthItems} monthTitle={monthLabel(ym)} />
+        </Pair>
+        <Pair>
+          <BudgetCard t={t} spent={a.total} budget={budget} periodLabel={monthLabel(ym)} onBudget={() => { go('butce'); setBudgetFocusKey(budget ? 0 : Date.now()); }} />
+          <SubsCard t={t} subs={subs} items={payItems} onAll={() => go('abonelikler')} onAdd={() => setSubSheet({ key: Date.now(), initial: null })} onOpen={(x) => setSubSheet({ key: Date.now(), initial: stored.sub(x.id) ?? x })} />
+        </Pair>
         {pending.length ? (
           <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('section.pendingSubs')}</Label>
-              <Pressable onPress={() => go('abonelikler')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable>
-            </View>
+            <CardHead t={t} title={tr('section.pendingSubs')} action={tr('common.all')} onAction={() => go('abonelikler')} />
             {pending.map(({ s }, i) => (
               <SubRow key={s.id} s={s} ctx={ctx} first={i === 0} onEdit={() => setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s })} onPay={() => paySub(s)} onSkip={() => skipSub(s)} />
             ))}
           </View>
         ) : null}
-        <View style={st.card}>
-          <View style={st.cardHead}>
-            <Label t={t}>{tr('section.recent')}</Label>
-            {recent.length ? <Pressable onPress={() => go('harcamalar')} hitSlop={8}><Text style={st.link}>{tr('common.all')}</Text></Pressable> : null}
+        {notes.length ? (
+          <View style={st.card}>
+            <CardHead t={t} title={tr('section.highlights')} action={notes.length > 3 ? tr('common.all') : undefined} onAction={() => go('raporlar')} />
+            <InsightList list={notes.slice(0, 3)} t={t} />
           </View>
-          {recent.length ? <View style={st.items}>{recent.map((x, i) => expenseRow(x, i, true))}</View> : <Text style={st.meta}>{tr('recent.empty')}</Text>}
-        </View>
+        ) : null}
+        <Tiles ctx={ctx} />
+        <RecentCard t={t} list={slices} onAll={() => go('harcamalar')}
+          onOpen={(r) => (r.kind === 'income' ? setIncSheet({ key: Date.now(), initial: stored.income(r.x.id) ?? r.x }) : setExpSheet({ key: Date.now(), initial: stored.item(r.x.id) ?? r.x }))} />
+        <HomeBrand t={t} />
+      </View>
+    );
+  } else if (screen === 'harcamalar' && txnTab === 'income') {
+    const monthIncomes = incomes.concat(un.incomes).filter((x) => x.date.slice(0, 7) === ym);
+    const groups: Record<string, Income[]> = {};
+    monthIncomes.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
+    const days = Object.keys(groups).sort().reverse();
+    body = (
+      <>
+        {txnToggle}
+        {monthSwitcher}
+        {rateNote}
+        {monthIncomes.length ? summaryCard('income', tr('list.count', { n: monthIncomes.length }), money0(convSum(monthIncomes))) : null}
+        {days.length ? (
+          <>
+            <Text style={st.hint}>{tr('txn.incomeHint')}</Text>
+            {days.map((d) => {
+              const its = groups[d].sort((p, q) => q.ts - p.ts);
+              return dayCard(d, its.some((x) => !x.unconv) ? money(convSum(its)) : null, its.map((x, i) => incomeRow(x, i)));
+            })}
+          </>
+        ) : (
+          <EmptyState t={t} testID="income-empty" icon="cash-outline" title={tr('txn.incomeEmpty')} hint={tr('txn.incomeEmptyHint')} action={tr('qa.income')} onAction={openAddIncome} />
+        )}
       </>
     );
   } else if (screen === 'harcamalar') {
     const q = lower(query.trim());
     // Arama tüm aylarda yapılır; arama yokken seçili ay listelenir
-    const pool = q ? items : monthItems;
+    const listMonth = monthItems.concat(un.items.filter((x) => x.date.slice(0, 7) === ym));
+    const pool = q ? payItems : listMonth;
     const shown = pool.filter((x) => (!filterCat || x.cat === filterCat) && (!filterDay || x.date === filterDay) &&
-      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || money(x.amount).includes(q)));
+      (!q || lower(x.note).includes(q) || lower(x.cat).includes(q) || lower(catName(x.cat)).includes(q) || amountRaw(x).includes(q)));
     const groups: Record<string, Expense[]> = {};
     shown.forEach((x) => (groups[x.date] = groups[x.date] || []).push(x));
     const days = Object.keys(groups).sort().reverse();
-    const cats = Array.from(new Set(monthItems.map((x) => x.cat)));
+    const cats = Array.from(new Set(listMonth.map((x) => x.cat)));
     body = (
       <>
+        {txnToggle}
         <View style={st.search}>
           <Ionicons name="search" size={18} color={t.muted} />
           <TextInput value={query} onChangeText={setQuery} placeholder={tr('search.placeholder')} placeholderTextColor={t.muted}
-            style={st.searchInput} returnKeyType="search" clearButtonMode="while-editing" accessibilityLabel={tr('search.a11y')} />
+            style={[st.searchInput, narrow && { fontSize: 14 }]} returnKeyType="search" accessibilityLabel={tr('search.a11y')} />
+          {query ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={tr('search.clear')} style={st.searchClear}>
+              <Ionicons name="close" size={14} color={t.surface} />
+            </Pressable>
+          ) : null}
         </View>
         {q ? null : monthSwitcher}
         {rateNote}
-        <View style={st.summaryRow}>
-          <Text style={st.meta}>{q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length })}</Text>
-          <Amount text={money(sum(shown))} style={st.summaryVal} symbolColor={t.gold} />
-        </View>
+        {/* Boş ayda özet kartı yok (boş durum kartı anlatır); arama ya da filtre sonucu 0 olsa da gösterilir */}
+        {q || listMonth.length ? summaryCard('expense', q ? tr('search.results', { n: shown.length }) : tr('list.count', { n: shown.length }), money0(convSum(shown))) : null}
         {cats.length > 1 ? (
           <View onStartShouldSetResponderCapture={() => { touchX.current.start = 99999; return false; }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {cats.map((c) => (
-              <Pressable key={c} onPress={() => setFilterCat(filterCat === c ? null : c)}
-                style={[st.catChip, { backgroundColor: filterCat === c ? t.accentSoft : t.surface, borderColor: filterCat === c ? t.gold : t.line }]}>
-                <CatIcon cat={c} t={t} size={22} />
-                <Text style={{ color: filterCat === c ? t.gold : t.fg, fontSize: 14 }}>{catName(c)}</Text>
-              </Pressable>
-            ))}
+            {[null, ...cats].map((c) => {
+              const on = c === filterCat;
+              return (
+                <Pressable key={c ?? '_all'} onPress={() => setFilterCat(c === null || on ? null : c)} accessibilityRole="button" accessibilityState={{ selected: on }} aria-selected={on}
+                  style={({ pressed }) => [st.catChip, on ? { backgroundColor: selectedFill(t), borderColor: selectedLine(t) } : { backgroundColor: t.surface, borderColor: t.line }, pressed && { opacity: 0.8 }, !c && { paddingLeft: 16 }]}>
+                  {c ? <IconBox icon={catIconName(c)} color={t.cats[catIndex(c)]} t={t} size={24} /> : null}
+                  <Text style={{ color: t.fg, fontSize: 14, lineHeight: 18, fontFamily: on ? FONTS.bold : FONTS.semi }}>{c ? catName(c) : tr('common.all')}</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
           </View>
         ) : null}
         {filterDay ? (
           <View style={st.filters}>
-            <Label t={t}>{tr('filter.day')}</Label>
-            <Pressable style={st.fchip} onPress={() => setFilterDay(null)}><Text style={st.fchipTxt}>{shortDay(filterDay)} ✕</Text></Pressable>
+            <Text style={st.filterLbl}>{tr('filter.day')}</Text>
+            <Pressable style={st.fchip} onPress={() => setFilterDay(null)} accessibilityRole="button" accessibilityLabel={`${tr('filter.clear')}: ${shortDay(filterDay)}`}>
+              <Text style={st.fchipTxt}>{shortDay(filterDay)}</Text>
+              <Ionicons name="close" size={16} color={t.muted} />
+            </Pressable>
           </View>
         ) : null}
         {days.length ? (
           <>
-            <Text style={[st.meta, { paddingHorizontal: 4 }]}>{tr('list.hint')}</Text>
+            <Text style={st.hint}>{tr('list.hint')}</Text>
             {days.map((d) => {
               const its = groups[d].sort((p, q) => q.ts - p.ts);
-              return (
-                <View key={d} style={{ gap: 6 }}>
-                  <View style={st.dayHead}>
-                    <Label t={t}>{dayLabel(d)}</Label>
-                    <Label t={t}>{money(sum(its))}</Label>
-                  </View>
-                  <View style={st.items}>{its.map((x, i) => expenseRow(x, i))}</View>
-                </View>
-              );
+              return dayCard(d, its.some((x) => !x.unconv) ? money(convSum(its)) : null, its.map((x, i) => expenseRow(x, i)));
             })}
           </>
+        ) : q ? (
+          <EmptyState t={t} icon="search" title={tr('empty.noResults')} hint={tr('empty.tryOther')} action={tr('search.clear')} actionIcon="close" onAction={() => setQuery('')} />
+        ) : listMonth.length ? (
+          <EmptyState t={t} icon="funnel-outline" title={tr('empty.noMatch')} hint={tr('empty.removeFilter')} action={tr('filter.clear')} actionIcon="close" onAction={() => { setFilterCat(null); setFilterDay(null); }} />
         ) : (
-          <View style={st.empty}>
-            <Ionicons name={q ? 'search' : 'wallet-outline'} size={40} color={t.muted} />
-            <Text style={st.emptyTitle}>{q ? tr('empty.noResults') : monthItems.length ? tr('empty.noMatch') : tr('empty.noMonth')}</Text>
-            <Text style={[st.meta, { textAlign: 'center' }]}>
-              {q ? tr('empty.tryOther') : monthItems.length ? tr('empty.removeFilter') : tr('empty.useButton')}
-            </Text>
-          </View>
+          <EmptyState t={t} icon="wallet-outline" title={tr('empty.noMonth')} hint={tr('empty.useButton')} action={tr('qa.expense')} onAction={openAdd} />
         )}
       </>
     );
@@ -512,76 +719,70 @@ function Main() {
   } else if (screen === 'abonelikler') {
     const rank = { pending: 0, upcoming: 1, paid: 2, skipped: 2 };
     const when = (x: ReturnType<typeof subStatus>) => ('next' in x ? x.next : x.due).getTime();
-    const rows = subs
-      .map((s) => ({ s, x: subStatus(s, items) }))
+    const rows = subs.concat(un.subs)
+      .map((s) => ({ s, x: subStatus(s, payItems) }))
       .sort((p, q) => rank[p.x.state] - rank[q.x.state] || when(p.x) - when(q.x));
-    const monthly = subs.reduce((s, x) => s + monthlyCost(x), 0);
+    const monthly = subs.reduce((s, x) => s + monthlyCost(x), 0); // yalnızca çevrilebilenler
     // Türlere göre grupla; en pahalı tür üstte
     const groups = SUB_TYPES.map((tp) => {
       const list = rows.filter((r) => r.s.type === tp.key);
-      return { tp, list, total: list.reduce((m, r) => m + monthlyCost(r.s), 0) };
+      return { tp, list, total: list.reduce((m, r) => m + (r.s.unconv ? 0 : monthlyCost(r.s)), 0) };
     }).filter((g) => g.list.length).sort((p, q) => q.total - p.total);
     const pendingCount = rows.filter((r) => r.x.state === 'pending').length;
     body = (
       <>
         {rateNote}
         {subs.length ? (
-          <View style={st.subSum}>
-            <View><Amount text={money(monthly)} style={st.subSumVal} symbolColor={t.gold} /><Text style={st.tileSub}>{tr('subs.monthly')}</Text></View>
-            <View><Amount text={money0(monthly * 12)} style={st.subSumVal} symbolColor={t.gold} /><Text style={st.tileSub}>{tr('subs.yearly')}</Text></View>
-            {budget ? <View><Text style={st.subSumVal}>{fmtPercent(Math.round((monthly / budget) * 100))}</Text><Text style={st.tileSub}>{tr('subs.ofBudget')}</Text></View> : null}
-          </View>
+          <SubsHero t={t} monthly={money0(monthly)} yearly={money0(monthly * 12)} share={budget ? fmtPercent(Math.round((monthly / budget) * 100)) : null} pending={pendingCount} />
         ) : null}
-        {groups.length > 1 ? (
-          <View style={st.card}>
-            <View style={st.cardHead}>
-              <Label t={t}>{tr('subs.byType')}</Label>
-              {pendingCount ? <Pill kind="up" label={tr('subs.pendingCount', { n: pendingCount })} t={t} /> : null}
-            </View>
+        {groups.length > 1 && monthly > 0 ? (
+          <View style={st.card} testID="subs-types">
+            <CardHead t={t} title={tr('subs.byType')} />
             <View style={st.stack}>
-              {groups.map((g) => <View key={g.tp.key} style={{ flex: g.total, backgroundColor: subTypeColor(g.tp.key, t) }} />)}
+              {groups.filter((g) => g.total > 0).map((g) => <View key={g.tp.key} style={{ flex: g.total, borderRadius: 99, backgroundColor: subTypeColor(g.tp.key, t) }} />)}
             </View>
-            {groups.map((g, i) => (
-              <View key={g.tp.key} style={[st.catRow, i > 0 && st.topLine]}>
-                <SubTypeIcon type={g.tp.key} t={t} size={30} />
-                <View style={{ flex: 1 }}>
-                  <Text style={st.itemCat}>{subLabel(g.tp.key)}</Text>
-                  <Text style={st.meta}>{tr('subs.countShare', { n: g.list.length, pct: Math.round((g.total / monthly) * 100) })}</Text>
+            <View style={{ marginBottom: -8 }}>
+              {groups.map((g, i) => (
+                <View key={g.tp.key} style={[st.catRow, i > 0 && st.topLine]}>
+                  <SubTypeIcon type={g.tp.key} t={t} size={40} />
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <View style={st.nameLine}>
+                      <Text style={[st.itemCat, { flex: 1, minWidth: 0 }]}>{subLabel(g.tp.key)}</Text>
+                      <Amount text={money0(g.total)} style={st.itemAmt} />
+                    </View>
+                    <Text style={st.meta}>{tr('subs.countShare', { n: g.list.length, pct: Math.round((g.total / monthly) * 100) })}</Text>
+                  </View>
                 </View>
-                <Text style={st.itemAmt}>{money(g.total)}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
         ) : null}
         {groups.length ? (
           groups.map((g) => (
-            <View key={g.tp.key} style={{ gap: 6 }}>
+            <View key={g.tp.key} style={st.dayCard}>
               <View style={st.dayHead}>
-                <Label t={t}>{subLabel(g.tp.key)}</Label>
-                <Label t={t}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Label>
+                <Text style={st.dayLbl} numberOfLines={1}>{subLabel(g.tp.key)}</Text>
+                {g.list.some((r) => !r.s.unconv) ? <Text style={st.dayTot}>{tr('subs.perMonthTotal', { amount: money(g.total) })}</Text> : null}
               </View>
-              <View style={[st.card, { paddingVertical: 6 }]}>
-                {g.list.map(({ s }, i) => (
-                  <SubRow key={s.id} s={s} ctx={ctx} first={i === 0} onEdit={() => setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s })} onPay={() => paySub(s)} onSkip={() => skipSub(s)} />
-                ))}
-              </View>
+              {g.list.map(({ s }, i) => (
+                <SubRow key={s.id} s={s} ctx={ctx} first={i === 0} onEdit={() => setSubSheet({ key: Date.now(), initial: stored.sub(s.id) ?? s })} onPay={() => paySub(s)} onSkip={() => skipSub(s)} />
+              ))}
             </View>
           ))
         ) : (
-          <View style={st.card}>
-            <Text style={st.meta}>{tr('subs.empty')}</Text>
-          </View>
+          <EmptyState t={t} icon="repeat-outline" title={tr('subs.emptyTitle')} hint={tr('subs.empty')} action={tr('sub.newTitle')} onAction={() => setSubSheet({ key: Date.now(), initial: null })} />
         )}
-        <Button label={tr('subs.add')} kind="ghost" onPress={() => setSubSheet({ key: Date.now(), initial: null })} t={t} />
+        {groups.length ? <Button label={tr('subs.add')} kind="ghost" onPress={() => setSubSheet({ key: Date.now(), initial: null })} t={t} /> : null}
       </>
     );
   } else if (screen === 'butce') {
     body = (
-      <View style={{ gap: 14 }}>
+      <View style={{ gap: SPACE.gap }}>
       {rateNote}
-      <View style={st.card}>
-        <BudgetPanel key={budgetFocusKey} focusBudget={budgetFocusKey > 0} settings={settings} onChange={changeSettings} t={t} />
-      </View>
+      {/* Üstte bu ayın ilerlemesi (görünüm verisi: ana para biriminde, çevrilemeyenler yok); altta form */}
+      <BudgetOverview t={t} p={budgetProgress(items, settings, todayIso().slice(0, 7))} periodLabel={monthLabel(todayIso().slice(0, 7))} />
+      <Text style={st.section} accessibilityRole="header">{tr('budget.editTitle')}</Text>
+      <BudgetPanel key={budgetFocusKey} focusBudget={budgetFocusKey > 0} settings={settings} onChange={changeSettings} t={t} />
       </View>
     );
   } else {
@@ -593,6 +794,9 @@ function Main() {
           onExport={doExport}
           onBackup={doBackup}
           onRestore={doRestore}
+          lockAvailable={lockSupported || settings.lock}
+          notifWarn={perm && perm.state !== 'granted' && (settings.remind || settings.subRemind) ? { canAskAgain: perm.canAskAgain, onFix: fixNotifPermission } : null}
+          account={<AccountSection t={t} />}
           ym={ym}
           monthLabel={monthOnly(ym)}
           rates={rs.rates}
@@ -605,16 +809,10 @@ function Main() {
     );
   }
 
-  const showFab = screen === 'ozet' || screen === 'harcamalar' || screen === 'raporlar';
+  // Ekleme artık sekme çubuğunun ortasındaki "+" ile (her ekranda; Harcama / Gelir seçimi); ayrı ekran düğmesi yok
+  const barH = tabBarSpace(insets.bottom);
 
   /* ---------- Yan menü verisi (her zaman içinde bulunulan ay) ---------- */
-  const curYm = todayIso().slice(0, 7);
-  const curItems = items.filter((x) => x.date.slice(0, 7) === curYm);
-  const curTotal = sum(curItems);
-  const byCat: Record<string, number> = {};
-  curItems.forEach((x) => (byCat[x.cat] = (byCat[x.cat] || 0) + x.amount));
-  const pendingSubs = subs.filter((x) => subStatus(x, items).state === 'pending').length;
-  const limitAlerts = Object.keys(settings.catBudgets).filter((c) => (byCat[c] || 0) >= settings.catBudgets[c] * 0.8).length;
   const menuSections: MenuSection[] = [
     { title: tr('menu.general'), items: [
       { key: 'ozet', label: tr('menu.home'), icon: 'grid-outline' },
@@ -629,7 +827,7 @@ function Main() {
     ] },
   ];
   const menuPins = Object.keys(byCat).sort((p, q) => byCat[q] - byCat[p]).slice(0, 3).map((c) => ({ cat: c, amount: money0(byCat[c]) }));
-  const lastTs = items.reduce((m, x) => Math.max(m, x.ts || 0), 0);
+  const lastTs = payItems.reduce((m, x) => Math.max(m, x.ts || 0), 0);
   const curMonthName = monthOnly(curYm);
 
   return (
@@ -637,23 +835,26 @@ function Main() {
     <View style={st.root}>
       <StatusBar style={t.statusBar} />
       <Animated.View style={{ flex: 1, transform: [{ translateX: slide }] }} {...edgePan.panHandlers}>
-      <View style={[st.topBar, { paddingTop: insets.top + 6 }]}>
-        <Pressable onPress={() => setMenuOpen(true)} style={st.menuBtn} hitSlop={8} accessibilityLabel={tr('menu.open')} accessibilityRole="button">
-          <Ionicons name="menu" size={24} color={t.fg} />
-          {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
-        </Pressable>
-        <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{screenTitle(screen)}</Text>
-      </View>
-      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + (showFab ? 110 : 40) }]} keyboardShouldPersistTaps="handled">
-        {body}
-      </ScrollView>
-
-      {showFab ? (
-        <View style={[st.fabBar, { paddingBottom: insets.bottom + 10 }]}>
-          <Button label={tr('fab.add')} kind="primary" onPress={openAdd} t={t} style={st.fab} />
+      {screen !== 'ozet' ? (
+        <View style={[st.topBar, { paddingTop: insets.top + 6 }]}>
+          <Pressable onPress={() => setMenuOpen(true)} style={st.menuBtn} hitSlop={8} accessibilityLabel={tr('menu.open')} accessibilityRole="button" testID="menu-open">
+            <Ionicons name="menu" size={24} color={t.fg} />
+            {pendingSubs || limitAlerts ? <View style={[st.menuDot, { borderColor: t.bg }]} /> : null}
+          </Pressable>
+          <Text style={[st.h1, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit accessibilityRole="header" testID="screen-title">{screenTitle(screen)}</Text>
         </View>
       ) : null}
+      <ScrollView ref={scrollRef} contentContainerStyle={[st.scroll, screen === 'ozet' && { paddingTop: insets.top + 8 }, { paddingBottom: barH + 32 }]} keyboardShouldPersistTaps="handled">
+        <View style={st.wrap}>
+          {/* Veri sorunları kalıcı bandla bildirilir (kısa bir bildirim gözden kaçabilir): kurtarılan bozuk kayıt / yazılamayan değişiklik */}
+          {recovered && !recoveredSeen ? <InlineNotice t={t} kind="warn" text={tr('state.recovered')} action={tr('state.dismiss')} onAction={() => setRecoveredSeen(true)} /> : null}
+          {saveFailed ? <InlineNotice t={t} kind="warn" text={tr('state.saveFailed')} /> : null}
+          {body}
+        </View>
+      </ScrollView>
+
       </Animated.View>
+      <TabBar t={t} current={screen} onSelect={(k) => go(k)} bottomInset={insets.bottom} onAddExpense={openAdd} onAddIncome={openAddIncome} />
       {/* Geri hareketi sırasında kenardan beliren ok: bırakınca ne olacağını gösterir (geri ya da ana ekranda menü) */}
       {swiping ? (
       <Animated.View pointerEvents="none" style={[st.backHint, {
@@ -665,11 +866,11 @@ function Main() {
       ) : null}
 
       {toastMsg ? (
-        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: insets.bottom + (showFab ? 82 : 24) }]}>
+        <View pointerEvents={toastAction ? 'auto' : 'none'} style={[st.toast, { bottom: barH + 36 }]}>
           <Text style={{ color: t.fg, fontSize: 14, flexShrink: 1 }}>{toastMsg}</Text>
           {toastAction ? (
             <Pressable hitSlop={10} onPress={() => { toastAction.run(); setToastMsg(''); setToastAction(null); buzz(); }}>
-              <Text style={{ color: t.gold, fontSize: 14, fontWeight: '700' }}>{toastAction.label}</Text>
+              <Text style={{ color: t.gold, fontSize: 14, fontWeight: '600' }}>{toastAction.label}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -699,12 +900,19 @@ function Main() {
         t={t}
       />
 
-      {expSheet ? (
-        <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
+      <CurrencyMenu visible={curMenu && !lock.locked} t={t} current={main} rates={rs.rates} onClose={() => setCurMenu(false)}
+        onPick={(c) => { setCurMenu(false); if (c !== main) changeSettings({ ...settings, currency: c }); }} />
+      {/* Kilitliyken yerel Modal sayfaları çizilmez (kilit katmanının üstünde açılıp veriyi göstermesinler; ör. kilitliyken gelen derin bağlantı) */}
+      {incSheet && !lock.locked ? (
+        <IncomeSheet key={incSheet.key} visible initial={incSheet.initial} main={main} rates={rs.rates} onSave={saveIncome} onDelete={deleteIncome} onClose={() => setIncSheet(null)} t={t} />
       ) : null}
-      {subSheet ? (
+      {expSheet && !lock.locked ? (
+        <ExpenseSheet key={expSheet.key} visible initial={expSheet.initial} prefill={expSheet.prefill} frequent={frequentEntries(items)} lastCat={items.reduce<Expense | null>((a, e) => (!a || e.ts > a.ts ? e : a), null)?.cat} main={main} rates={rs.rates} onSave={saveExpense} onDelete={deleteExpense} onClose={() => setExpSheet(null)} t={t} />
+      ) : null}
+      {subSheet && !lock.locked ? (
         <SubSheet key={subSheet.key} visible initial={subSheet.initial} main={main} rates={rs.rates} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubSheet(null)} t={t} />
       ) : null}
+      {lockLayer}
     </View>
     </LanguageProvider>
   );
@@ -712,48 +920,7 @@ function Main() {
 
 /* ---------- Ekran parçaları ---------- */
 type Styles = ReturnType<typeof makeStyles>;
-type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
-
-/** Özet kartı: koyu metal kart görünümü, şampanya altını ayrıntılar. */
-function Hero({ ctx, onBudget }: { ctx: Ctx; onBudget: () => void }) {
-  const { t, st, a, ym, items, budget } = ctx;
-  const left = budget - a.total;
-  return (
-    <LinearGradient colors={t.heroGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.hero}>
-      <View style={st.heroTop}>
-        <Text style={st.heroBrand}>{upper(tr('app.name'))}</Text>
-        <Text style={st.heroBrand}>{upper(monthLabel(ym))}</Text>
-      </View>
-      <View>
-        <Text style={st.heroLabel}>{a.isCur ? tr('hero.today') : tr('hero.avgDaily')}</Text>
-        <Amount text={a.isCur ? money(sum(items.filter((x) => x.date === todayIso()))) : money(a.avg)} style={st.heroBig} symbolColor={t.heroLabel} />
-      </View>
-      <View style={st.heroRule} />
-      <View style={st.heroRow}>
-        <View>
-          <Text style={st.heroLabel}>{a.isCur ? tr('hero.thisMonth') : tr('hero.monthTotal')}</Text>
-          <Amount text={money(a.total)} style={st.heroMid} symbolColor={t.heroLabel} />
-        </View>
-        <Pressable onPress={onBudget} hitSlop={8} style={st.heroBudget}>
-          <Text style={st.heroBudgetTxt}>{budget ? tr('hero.budget', { amount: money0(budget) }) : tr('hero.setBudget')}</Text>
-        </Pressable>
-      </View>
-      {budget ? (
-        <View style={{ gap: 8 }}>
-          <View style={st.track}>
-            <View style={[st.fill, { width: `${Math.min(100, (a.total / budget) * 100)}%`, backgroundColor: a.total > budget ? t.warn : t.heroFill }]} />
-          </View>
-          <View style={st.heroRow}>
-            <Text style={st.heroSmall}>{left >= 0 ? tr('hero.left', { amount: money0(left) }) : tr('hero.over', { amount: money0(-left) })}</Text>
-            <Text style={st.heroSmall}>
-              {a.isCur && left > 0 ? tr('hero.perDay', { amount: money0(left / (a.dim - a.elapsed + 1)) }) : tr('hero.used', { pct: Math.round((a.total / budget) * 100) })}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-    </LinearGradient>
-  );
-}
+type Ctx = { t: Theme; st: Styles; a: Analysis; ym: string; items: Expense[]; payItems: Expense[]; subs: Sub[]; monthItems: Expense[]; budget: number; settings: Settings };
 
 function Tiles({ ctx }: { ctx: Ctx }) {
   const { t, st, a, monthItems, budget } = ctx;
@@ -787,8 +954,8 @@ function Tiles({ ctx }: { ctx: Ctx }) {
     <View style={st.tiles}>
       {tiles.map((x) => (
         <View key={x.label} style={st.tile}>
-          <Label t={t}>{x.label}</Label>
-          <Amount text={x.value} style={st.tileVal} symbolColor={t.gold} />
+          <Text style={st.tileLbl}>{x.label}</Text>
+          <Amount text={x.value} style={st.tileVal} symbolColor={t.muted} />
           {x.sub}
         </View>
       ))}
@@ -796,34 +963,44 @@ function Tiles({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/**
+ * Abonelik satırı: tür simgesi, ad, ödeme takvimi ve sağda tutar; altında durum hapı (bekliyor: uyarı, yaklaşan: nötr,
+ * ödendi: iyi, atlandı: soluk). Ödeme bekliyorsa tek satırda iki küçük hap düğme: "Ödendi" (vurgu) ve "Atla" (hayalet).
+ */
 function SubRow({ s, ctx, first, onEdit, onPay, onSkip }: { s: Sub; ctx: Ctx; first: boolean; onEdit: () => void; onPay: () => void; onSkip: () => void }) {
-  const { t, st, items } = ctx;
-  const x = subStatus(s, items);
+  const { t, st, payItems } = ctx;
+  const x = subStatus(s, payItems);
+  const chip: { tone: Tone; icon: IconName; label: string } =
+    x.state === 'pending' ? { tone: 'warn', icon: 'time-outline', label: tr('sub.pendingOn', { date: shortDay(iso(x.due)) }) }
+      : x.state === 'upcoming' ? { tone: 'neutral', icon: 'calendar-clear-outline', label: tr('sub.inDays', { n: x.days }) }
+      : x.state === 'paid' ? { tone: 'good', icon: 'checkmark-circle-outline', label: tr('sub.paidNext', { date: shortDay(iso(x.next)) }) }
+      : { tone: 'muted', icon: 'play-skip-forward-outline', label: tr('sub.skippedNext', { date: shortDay(iso(x.next)) }) };
   return (
     <View style={[st.subWrap, !first && st.topLine]}>
-      <Pressable onPress={onEdit} style={st.subRow} accessibilityLabel={tr('sub.rowA11y', { name: s.name })}>
-        <SubTypeIcon type={s.type} t={t} />
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={st.itemCat}>{s.name}</Text>
-          <View style={st.metaRow}>
-            <Text style={st.meta}>{s.freq === 'yearly' ? tr('sub.yearlyOn', { day: s.day, month: monthName(s.month - 1) }) : tr('sub.everyMonth', { day: s.day })}</Text>
-            {x.state === 'pending' ? <Pill kind="up" label={tr('sub.pendingOn', { date: shortDay(iso(x.due)) })} t={t} /> : null}
-            {x.state === 'upcoming' ? <Pill kind="flat" label={tr('sub.inDays', { n: x.days })} t={t} /> : null}
-            {x.state === 'paid' || x.state === 'skipped' ? (
-              <Pill kind={x.state === 'paid' ? 'down' : 'flat'} label={tr(x.state === 'paid' ? 'sub.paidNext' : 'sub.skippedNext', { date: shortDay(iso(x.next)) })} t={t} />
-            ) : null}
+      <Pressable onPress={onEdit} style={({ pressed }) => [st.subRow, pressed && { opacity: 0.75 }]} accessibilityRole="button" accessibilityLabel={tr('sub.rowA11y', { name: s.name })}>
+        <SubTypeIcon type={s.type} t={t} size={44} />
+        {/* Tutar ad satırında; takvim satırı tutarın altına da uzanır (dar ekranda ve uzun dillerde gereksiz kırılmasın) */}
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <View style={st.nameLine}>
+            <Text style={[st.itemCat, { flex: 1, minWidth: 0 }]} numberOfLines={2}>{s.name}</Text>
+            <Text style={{ textAlign: 'right', flexShrink: 0 }}>
+              <Amount text={s.unconv ? fmtShown(s.amount, s.cur ?? 'TRY') : money(s.amount)} style={st.itemAmt} />
+              <Text style={st.meta}>/{tr(s.freq === 'yearly' ? 'sub.perYear' : 'sub.perMonth')}</Text>
+            </Text>
+          </View>
+          <View style={st.nameLine}>
+            <Text style={[st.meta, { flex: 1, minWidth: 0 }]}>{s.freq === 'yearly' ? tr('sub.yearlyOn', { day: s.day, month: monthName(s.month - 1) }) : tr('sub.everyMonth', { day: s.day })}</Text>
+            {s.orig ? <Text style={[st.meta, { fontSize: 12, fontVariant: ['tabular-nums'] }]}>{fmtShown(s.orig.amount, s.orig.cur)}</Text> : null}
           </View>
         </View>
-        <Text style={st.itemAmt}>
-          {money(s.amount)}
-          <Text style={st.meta}>/{tr(s.freq === 'yearly' ? 'sub.perYear' : 'sub.perMonth')}</Text>
-          {s.orig ? <Text style={st.meta}>{'\n'}{fmtMoney(s.orig.amount, s.orig.cur)}</Text> : null}
-        </Text>
       </Pressable>
+      <View style={st.subFoot}>
+        <SoftPill tone={chip.tone} icon={chip.icon} label={chip.label} t={t} />
+      </View>
       {x.state === 'pending' ? (
-        <View style={[st.subAct, { paddingLeft: 46 }]}>
-          <Button label={tr('sub.markPaid')} onPress={onPay} t={t} style={st.smallBtn} />
-          <Button label={tr('sub.skip')} kind="ghost" onPress={onSkip} t={t} style={st.smallBtn} />
+        <View style={st.subFoot}>
+          <PillButton label={tr('sub.paidShort')} a11y={tr('sub.markPaid')} icon="checkmark" onPress={onPay} t={t} testID={`sub-pay-${s.id}`} />
+          <PillButton label={tr('sub.skipShort')} a11y={tr('sub.skip')} icon="play-skip-forward-outline" kind="ghost" onPress={onSkip} t={t} testID={`sub-skip-${s.id}`} />
         </View>
       ) : null}
     </View>
@@ -835,6 +1012,8 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
   onMonth: (ym: string) => void; onExport: () => void; monthSwitcher: ReactNode; rateNote: ReactNode;
 }) {
   const { t, st, a, ym, items, monthItems, budget, settings } = ctx;
+  const { width } = useWindowDimensions();
+  const [ringW, setRingW] = useState(0);
   const { cur, prev } = categoryCompare(items, ym);
   const week = weekdayAverages(items, ym);
   const busiest = week.reduce((m, d) => (d.value > m.value ? d : m), week[0]);
@@ -856,36 +1035,78 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
   const catRows = Object.keys(by).sort((p, q) => by[q] - by[p]);
   const top = [...monthItems].sort((p, q) => q.amount - p.amount).slice(0, 5);
 
+  // Eşmerkezli yaylar: en çok 4 kategori halka olur; kalanlar açıklamada "Diğerleri" satırında toplanır
+  const ringTop = catRows.slice(0, 4);
+  const restTotal = catRows.slice(4).reduce((m, c) => m + by[c], 0);
+  const legend = [
+    ...ringTop.map((c) => ({ key: c, label: catName(c), value: by[c], color: t.cats[catIndex(c)] })),
+    ...(restTotal ? [{ key: '_o', label: tr('dash.others'), value: restTotal, color: t.muted }] : []),
+  ];
+  // Geniş ekranda grafik solda, açıklama sağda; dar ekranda alt alta
+  const side = width >= 360;
+  const ringSize = side ? Math.min(156, Math.max(132, Math.round((ringW || 280) * 0.5))) : Math.min(184, ringW || 184);
+  const ringStroke = ringSize >= 170 ? 10 : 9;
+  const ringGap = 3;
+  const hole = 2 * (ringSize / 2 - ringStroke - (ringTop.length - 1) * (ringStroke + ringGap));
+  const totalText = money0(a.total);
+
   return (
     <>
       {monthSwitcher}
       {rateNote}
+      <View style={st.card} testID="reports-rings">
+        <CardHead t={t} title={tr('reports.overview')} sub={monthLabel(ym)} />
+        {catRows.length ? (
+          <View style={[{ gap: 20, alignItems: 'center' }, side && { flexDirection: 'row' }]} onLayout={(e) => setRingW(e.nativeEvent.layout.width)}>
+            <RingsChart rings={ringTop.map((c) => ({ key: c, share: a.total ? by[c] / a.total : 0, color: t.cats[catIndex(c)] }))} size={ringSize} stroke={ringStroke} gap={ringGap}
+              track={trackOf(t)} a11y={tr('dash.donutA11y')}>
+              <Text style={{ color: t.muted, fontSize: 11, lineHeight: 14 }} numberOfLines={1}>{tr('dash.totalSpent')}</Text>
+              <Amount fit text={totalText} style={{ color: t.fg, fontSize: fitWidth(totalText, 18, hole - 14, -0.3), fontFamily: FONTS.display }} symbolColor={t.muted} />
+            </RingsChart>
+            <View style={[{ gap: 12, alignSelf: 'stretch', justifyContent: 'center' }, side ? { flex: 1, minWidth: 0 } : { paddingHorizontal: 4 }]}>
+              {legend.map((r) => (
+                <View key={r.key} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: r.color, marginTop: 4 }} />
+                  <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                    <Text style={{ color: t.fg, fontSize: 13, lineHeight: 18, fontWeight: '600' }}>{r.label}</Text>
+                    <Text style={{ color: t.muted, fontSize: 12, lineHeight: 16, fontVariant: ['tabular-nums'] }}>
+                      {money0(r.value)} · {fmtPercent(Math.round((r.value / a.total) * 100))}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <View style={st.cardEmpty}>
+            <IconBox icon="pie-chart-outline" color={t.muted} t={t} size={48} />
+            <Text style={[st.meta, { textAlign: 'center' }]}>{tr('reports.noExpenses')}</Text>
+          </View>
+        )}
+      </View>
+
       {notes.length ? (
         <View style={st.card}>
-          <Label t={t}>{tr('section.highlights')}</Label>
+          <CardHead t={t} title={tr('section.highlights')} />
           <InsightList list={notes} t={t} />
         </View>
       ) : null}
+
       <View style={st.card}>
-        <View style={st.cardHead}>
-          <Label t={t}>{tr('reports.last6')}</Label>
-          {avg6 ? <Text style={st.meta}>{tr('tile.average', { amount: money0(avg6) })}</Text> : null}
-        </View>
+        <CardHead t={t} title={tr('reports.last6')} sub={avg6 ? tr('tile.average', { amount: money0(avg6) }) : undefined} />
         <Bars data={months} selected={ym} onSelect={onMonth} t={t} />
       </View>
 
       <View style={st.card}>
-        <View style={st.cardHead}>
-          <Label t={t}>{tr('reports.daily')}</Label>
-          <View style={st.legend}>
-            <View style={st.legendItem}><View style={[st.dash, { borderColor: t.muted }]} /><Text style={st.legendTxt}>{tr('reports.legendAvg')}</Text></View>
-            {budget ? <View style={st.legendItem}><View style={[st.dash, { borderColor: t.warn }]} /><Text style={st.legendTxt}>{tr('reports.legendBudget')}</Text></View> : null}
-          </View>
+        <CardHead t={t} title={tr('reports.daily')} />
+        <View style={st.legend}>
+          <View style={st.legendItem}><View style={[st.dash, { borderColor: t.muted }]} /><Text style={st.legendTxt}>{tr('reports.legendAvg')}</Text></View>
+          {budget ? <View style={st.legendItem}><View style={[st.dash, { borderColor: t.warn }]} /><Text style={st.legendTxt}>{tr('reports.legendBudget')}</Text></View> : null}
         </View>
         <DailyChart a={a} ym={ym} budget={budget} selected={filterDay} onSelect={onDay} t={t} />
         {filterDay ? (
-          <Pressable onPress={onShowDay} style={st.metaRow}>
-            <Text style={st.meta}>{tr('reports.dayTotal', { day: dayLabel(filterDay), amount: money(a.perDay[filterDay] || 0) })}</Text>
+          <Pressable onPress={onShowDay} style={[st.metaRow, { justifyContent: 'space-between' }]} accessibilityRole="button">
+            <Text style={[st.meta, { flexShrink: 1 }]}>{tr('reports.dayTotal', { day: dayLabel(filterDay), amount: money(a.perDay[filterDay] || 0) })}</Text>
             <Text style={st.link}>{tr('reports.showExpenses')}</Text>
           </Pressable>
         ) : (
@@ -895,32 +1116,26 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
 
       {monthItems.length ? (
         <View style={st.card}>
-          <View style={st.cardHead}>
-            <Label t={t}>{tr('reports.weekday')}</Label>
-            <Text style={st.meta}>{tr('reports.perDayAvg')}</Text>
-          </View>
-          <Bars data={week} selected={busiest.value ? busiest.key : undefined} t={t} height={130} />
+          <CardHead t={t} title={tr('reports.weekday')} sub={tr('reports.perDayAvg')} />
+          <Bars data={week} selected={busiest.value ? busiest.key : undefined} t={t} height={136} />
           {busiest.value ? <Text style={st.meta}>{tr('reports.busiestDay', { day: busiest.label, amount: money0(busiest.value) })}</Text> : null}
         </View>
       ) : null}
 
-      <View style={st.card}>
-        <View style={st.cardHead}>
-          <Label t={t}>{tr('reports.byCategory')}</Label>
-          {monthItems.length ? <Label t={t}>{tr('list.count', { n: monthItems.length })}</Label> : null}
-        </View>
+      <View style={[st.card, { gap: 8 }]}>
+        <CardHead t={t} title={tr('reports.byCategory')} sub={monthItems.length ? tr('list.count', { n: monthItems.length }) : undefined} />
         {catRows.length ? (
-          <>
-            <View style={st.stack}>
-              {catRows.map((c) => <View key={c} style={{ flex: by[c], backgroundColor: t.cats[catIndex(c)] }} />)}
-            </View>
+          <View>
             {catRows.map((c, i) => (
-              <Pressable key={c} onPress={() => onCat(c)} style={[st.catRow, i > 0 && st.topLine]}>
-                <CatIcon cat={c} t={t} />
-                <View style={{ flex: 1, gap: 4 }}>
-                  <View style={st.metaRow}>
-                    <Text style={st.itemCat}>{catName(c)}</Text>
-                    <CatChange cur={cur[c] || 0} prev={prev[c] || 0} t={t} />
+              <Pressable key={c} onPress={() => onCat(c)} accessibilityRole="button" style={({ pressed }) => [st.catRow, i > 0 && st.topLine, pressed && { opacity: 0.75 }]}>
+                <CatIcon cat={c} t={t} size={44} />
+                <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                  <View style={st.nameLine}>
+                    <View style={[st.metaRow, { flex: 1, minWidth: 0 }]}>
+                      <Text style={st.itemCat}>{catName(c)}</Text>
+                      <CatChange cur={cur[c] || 0} prev={prev[c] || 0} t={t} />
+                    </View>
+                    <Amount text={money0(by[c])} style={st.itemAmt} />
                   </View>
                   <Text style={st.meta}>
                     {tr('reports.catLine', { pct: Math.round((by[c] / a.total) * 100), n: cnt[c] })}
@@ -928,30 +1143,24 @@ function Reports({ ctx, notes, filterDay, onDay, onCat, onShowDay, onMonth, onEx
                   </Text>
                   {settings.catBudgets[c] ? <Progress value={by[c]} max={settings.catBudgets[c]} t={t} /> : null}
                 </View>
-                <Text style={st.itemAmt}>{money(by[c])}</Text>
-                <Ionicons name="chevron-forward" size={16} color={t.muted} />
               </Pressable>
             ))}
-          </>
+          </View>
         ) : (
           <Text style={st.meta}>{tr('reports.noExpenses')}</Text>
         )}
       </View>
 
       {top.length ? (
-        <View style={st.card}>
-          <Label t={t}>{tr('reports.top')}</Label>
-          {top.map((x, i) => (
-            <View key={x.id} style={[st.catRow, i > 0 && st.topLine]}>
-              <Text style={st.rank}>{i + 1}</Text>
-              <CatIcon cat={x.cat} t={t} size={30} />
-              <View style={{ flex: 1 }}>
-                <Text style={st.itemCat}>{x.note || catName(x.cat)}</Text>
-                <Text style={st.meta}>{catName(x.cat)} · {shortDay(x.date)}</Text>
-              </View>
-              <Text style={st.itemAmt}>{money(x.amount)}</Text>
-            </View>
-          ))}
+        <View style={[st.card, { gap: 8 }]}>
+          <CardHead t={t} title={tr('reports.top')} />
+          <View>
+            {top.map((x, i) => (
+              <TxnRow key={x.id} t={t} kind="expense" cat={x.cat} first={i === 0} title={x.note || catName(x.cat)}
+                subtitle={x.note ? `${catName(x.cat)} · ${shortDay(x.date)}` : shortDay(x.date)} amount={money(x.amount)}
+                a11y={tr('expense.rowA11y', { cat: catName(x.cat), amount: amountsHidden() ? tr('amount.hidden') : money(x.amount) })} />
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -971,70 +1180,59 @@ function CatChange({ cur, prev, t }: { cur: number; prev: number; t: Theme }) {
 function makeStyles(t: Theme) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: t.bg },
-    topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 8, backgroundColor: t.bg },
+    topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SPACE.edge, paddingBottom: 8, backgroundColor: t.bg },
     menuDot: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: t.gold, borderWidth: 2 },
-    menuBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
-    scroll: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
-    h1: { fontSize: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.3 },
-    link: { color: t.gold, fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
+    menuBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
+    scroll: { paddingHorizontal: SPACE.edge, paddingTop: 8 },
+    wrap: { width: '100%', maxWidth: DASH_MAX, alignSelf: 'center', gap: 16 },
+    dashBody: { gap: SPACE.gap },
+    h1: { fontSize: 28, lineHeight: 34, fontFamily: FONTS.display, color: t.fg, letterSpacing: -0.5 },
+    link: { color: t.gold, fontSize: 14, fontWeight: '600' },
     months: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    mBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: t.goldLine, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
-    mLabel: { fontSize: 19, fontFamily: FONTS.bold, color: t.fg },
-    hero: { borderRadius: 26, padding: 22, gap: 16, borderWidth: 1, borderColor: 'rgba(201,168,106,0.45)', overflow: 'hidden' },
-    heroTop: { flexDirection: 'row', justifyContent: 'space-between' },
-    heroBrand: { color: t.heroLabel, fontSize: 10, letterSpacing: 2.4, fontWeight: '600' },
-    heroLabel: { color: t.heroMuted, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase' },
-    heroRule: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(201,168,106,0.4)' },
-    heroBudget: { borderWidth: 1, borderColor: 'rgba(201,168,106,0.5)', borderRadius: 99, paddingVertical: 6, paddingHorizontal: 12 },
-    heroBudgetTxt: { color: t.heroLabel, fontSize: 13, fontWeight: '600' },
-    fab: { height: 56, borderRadius: 28, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
-    heroBig: { color: t.heroFg, fontSize: 48, fontFamily: FONTS.display, marginTop: 6, letterSpacing: -0.5 },
-    heroMid: { color: t.heroFg, fontSize: 26, fontFamily: FONTS.bold, marginTop: 2 },
-    heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8 },
-    heroSmall: { color: t.heroMuted, fontSize: 13, fontVariant: ['tabular-nums'] },
-    track: { height: 4, borderRadius: 99, backgroundColor: t.heroTrack, overflow: 'hidden' },
-    fill: { height: '100%', borderRadius: 99 },
-    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    tile: { flexGrow: 1, flexBasis: '45%', backgroundColor: t.surface, borderWidth: 1, borderColor: t.line, borderRadius: 20, padding: 16, gap: 6 },
-    tileVal: { fontSize: 24, fontFamily: FONTS.bold, color: t.fg },
+    mBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', ...cardShadow(t) },
+    monthNow: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1, borderColor: t.line, backgroundColor: trackOf(t) },
+    mLabel: { fontSize: 17, fontFamily: FONTS.bold, color: t.fg },
+    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    tile: { flexGrow: 1, flexBasis: '45%', ...cardBase(t), padding: 16, gap: 8 },
+    tileVal: { fontSize: 22, fontFamily: FONTS.display, color: t.fg, fontVariant: ['tabular-nums'] },
     tileSub: { fontSize: 13, color: t.muted },
-    card: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.line, borderRadius: 22, padding: 18, gap: 14 },
-    cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: 4 },
-    summaryVal: { fontSize: 28, fontFamily: FONTS.display, color: t.fg },
-    catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 12 },
-    subSum: { flexDirection: 'row', gap: 24, paddingHorizontal: 4 },
-    subSumVal: { fontSize: 26, fontFamily: FONTS.display, color: t.fg },
-    subWrap: { gap: 10, paddingVertical: 10 },
+    tileLbl: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.muted },
+    card: { ...cardBase(t), gap: 16 },
+    sumCard: { ...cardBase(t), flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16 },
+    sumLbl: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted },
+    sumVal: { ...bigAmount, fontSize: 24, lineHeight: 31, color: t.fg },
+    catChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: RADIUS.pill, minHeight: 40, paddingVertical: 4, paddingLeft: 8, paddingRight: 16 },
+    subWrap: { gap: 12, paddingVertical: 12 },
     subRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    subAct: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingLeft: 20 },
-    smallBtn: { height: 38, borderRadius: 12, paddingHorizontal: 12 },
+    nameLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    subFoot: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingLeft: 56 },
     backHint: { position: 'absolute', left: 0, top: '45%', width: 40, height: 40, borderRadius: 20, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-    rateNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
+    rateNote: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
     metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
     topLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.line },
     legend: { flexDirection: 'row', gap: 12 },
-    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     legendTxt: { fontSize: 12, color: t.muted },
-    dash: { width: 14, height: 0, borderTopWidth: 2, borderStyle: 'dashed' },
-    stack: { flexDirection: 'row', height: 14, borderRadius: 99, overflow: 'hidden', gap: 2 },
-    catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 2 },
-    dot: { width: 10, height: 10, borderRadius: 3 },
+    dash: { width: 16, height: 0, borderTopWidth: 2, borderStyle: 'dashed' },
+    stack: { flexDirection: 'row', height: 12, borderRadius: RADIUS.pill, overflow: 'hidden', gap: 4 },
+    catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+    cardEmpty: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 16 },
     filters: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-    fchip: { backgroundColor: t.accent, borderRadius: 99, paddingVertical: 6, paddingHorizontal: 12 },
-    fchipTxt: { color: t.accentFg, fontSize: 14, fontWeight: '600' },
-    dayHead: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
-    items: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.line, borderRadius: 20, overflow: 'hidden' },
-    item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 },
-    itemCat: { fontSize: 16, fontWeight: '500', color: t.fg },
-    itemAmt: { textAlign: 'right', fontSize: 16, fontWeight: '500', color: t.fg, fontVariant: ['tabular-nums'] },
-    meta: { fontSize: 13, color: t.muted },
-    empty: { alignItems: 'center', paddingVertical: 28, gap: 4 },
-    emptyTitle: { fontSize: 22, fontFamily: FONTS.bold, color: t.fg, marginTop: 6 },
-    fabBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 10, backgroundColor: 'transparent' },
-    toast: { position: 'absolute', alignSelf: 'center', maxWidth: '92%', backgroundColor: t.raised, borderWidth: 1, borderColor: t.goldLine, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
-    search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 23, borderWidth: 1, borderColor: t.line, backgroundColor: t.surface, paddingHorizontal: 12 },
-    searchInput: { flex: 1, fontSize: 16, color: t.fg, height: '100%' },
-    rank: { width: 16, fontSize: 15, color: t.muted, fontFamily: FONTS.bold, textAlign: 'center' },
+    filterLbl: { fontSize: 13, fontWeight: '600', color: t.muted },
+    fchip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: selectedFill(t), borderWidth: 1, borderColor: selectedLine(t), borderRadius: RADIUS.pill, paddingVertical: 4, paddingLeft: 12, paddingRight: 8 },
+    fchipTxt: { color: t.fg, fontSize: 14, fontFamily: FONTS.semi },
+    dayCard: { ...cardBase(t), paddingTop: 16, paddingBottom: 4 },
+    dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 },
+    dayLbl: { flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted },
+    dayTot: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: t.muted, fontVariant: ['tabular-nums'], textAlign: 'right' },
+    itemCat: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: t.fg },
+    itemAmt: { textAlign: 'right', fontSize: 15, fontWeight: '600', color: t.fg, fontVariant: ['tabular-nums'] },
+    meta: { fontSize: 13, lineHeight: 18, color: t.muted },
+    hint: { fontSize: 13, lineHeight: 18, color: t.muted, paddingHorizontal: 4 },
+    section: { fontSize: 18, lineHeight: 24, fontFamily: FONTS.bold, color: t.fg, paddingHorizontal: 4, marginTop: 4 },
+    toast: { position: 'absolute', alignSelf: 'center', maxWidth: '92%', backgroundColor: t.raised, borderWidth: 1, borderColor: t.goldLine, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
+    search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, borderRadius: 12, backgroundColor: t.surface, paddingHorizontal: 16, ...cardShadow(t) },
+    searchInput: { flex: 1, minWidth: 0, fontSize: 15, color: t.fg, height: '100%' },
+    searchClear: { width: 22, height: 22, borderRadius: 11, backgroundColor: t.muted, alignItems: 'center', justifyContent: 'center' },
   });
 }

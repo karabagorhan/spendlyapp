@@ -7,10 +7,11 @@
  */
 import {
   CURRENCIES, Cur, PROVIDERS, RatesError, Rates, convert, excelMoneyFormat, fetchRates, fmtMoney, fromViewSettings, isStale, needsRates,
-  normalizeRates, round2, setMainCurrency, toMain, validateRates, viewData,
+  normalizeRates, round2, setHideAmounts, amountsHidden, maskedMoney, fmtShown, money, money0, moneyA11y, MASK, setMainCurrency, toMain, validateRates, viewData,
 } from '../src/currency';
 import { LANGS, Lang, fmtNumber, parseAmount, setLanguage, t } from '../src/i18n';
 import { Expense, Settings, Sub, analyse, insights, MIN_CHANGE, sum } from '../src/lib';
+import { buildExcel } from '../src/excel';
 import { Data, defaultSettings, merge, normalize } from '../src/store';
 
 let fail = 0, pass = 0;
@@ -166,10 +167,25 @@ const NOW = 1_800_000_000_000;
   // Ay analizi dönüştürülmüş veriyle tutarlı
   const a = analyse(viewData(stored, 'TRY', R).items, '2026-10');
   near('analiz: ay toplamı', a.total, 400 + 4000 * 3);
-  // Kur yokken: ana birimdeki kayıtlar aynen, diğerleri özgün birimiyle işaretli kalır
+  // Kur yokken (F-06): ana birimdeki kayıtlar aynen; diğerleri toplamlara GİRMEZ, `unconverted` altında özgün tutar/birimle kalır
   const nr = viewData(stored, 'TRY', null);
-  eq('kur yok: ₺ kayıtlar aynı', [nr.items[0].amount, nr.items[4].amount, nr.items[0].cur], [400, 12.34, 'TRY']);
-  eq('kur yok: USD kayıt çevrilmez, birimi korunur', [nr.items[1].amount, nr.items[1].cur, nr.items[1].orig ?? null], [100, 'USD', null]);
+  eq('kur yok: yalnız ₺ kayıtlar items içinde', nr.items.map((x) => [x.id, x.amount, x.cur]), [['a', 400, 'TRY'], ['e', 12.34, 'TRY']]);
+  eq('kur yok: USD/EUR/GBP kayıtlar unconverted altında özgün tutar ve birimle', nr.unconverted.items.map((x) => [x.id, x.amount, x.cur, x.unconv]), [['b', 100, 'USD', true], ['c', 90, 'EUR', true], ['d', 80, 'GBP', true]]);
+  eq('kur yok: abonelik s2 (USD) unconverted', [nr.subs.map((x) => x.id), nr.unconverted.subs.map((x) => [x.id, x.amount, x.cur])], [['s1'], [['s2', 9.99, 'USD']]]);
+  eq('kur yok: unconverted sayısı (3 harcama + 1 abonelik)', nr.unconverted.count, 4);
+  near('kur yok: toplam yalnız ₺ kayıtları (35 € gibi kayıtlar ₺35 diye eklenmez)', sum(nr.items), 400 + 12.34);
+  eq('kur yok: ay analizi yabancı kayıtları saymaz', analyse(nr.items, '2026-10').total, 400);
+  eq('kur yok: ₺ bütçe korunur, ₺ olmayan limit (Eğlence USD) görünümde yok, sayılır', [nr.settings.budget, nr.settings.catBudgets, nr.unconverted.limits], [10000, { Market: 3000 }, 1]);
+  const nrE = viewData(stored, 'EUR', null);
+  eq('kur yok, ana birim EUR: ₺ bütçe ve limitler kullanılamaz (0 / yok)', [nrE.settings.budget, nrE.settings.catBudgets, nrE.unconverted.limits], [0, {}, 3]);
+  eq('kur yok, EUR: yalnız EUR kayıt items içinde', nrE.items.map((x) => x.id), ['c']);
+  eq('kur varken unconverted boş', [v.unconverted.count, v.unconverted.limits], [0, 0]);
+  // Kullanılamayan limit ayar yazılırken kaybolmaz
+  const nrView = nrE.settings;
+  let kept = fromViewSettings({ ...nrView, name: 'x' }, stored.settings, nrView);
+  eq('kur yok: ayar değişince çevrilemeyen bütçe/limitler saklı kalır', [kept.budget, kept.budgetCur, kept.catBudgets, kept.catBudgetCur], [10000, 'TRY', { Market: 3000, Eğlence: 50 }, { Market: 'TRY', Eğlence: 'USD' }]);
+  kept = fromViewSettings({ ...nrView, catBudgets: { Market: 70 } }, stored.settings, nrView);
+  eq('kur yok: kullanıcı yeni limit girerse o kategori yeni birimde, diğeri saklı', [kept.catBudgets, kept.catBudgetCur], [{ Market: 70, Eğlence: 50 }, { Market: 'EUR', Eğlence: 'USD' }]);
   truthy('kur gerekli mi: evet', needsRates(stored, 'TRY'));
   truthy('kur gerekli mi: yalnız ₺ veri → hayır', !needsRates({ items: [ex('x', 1, 'Market', '2026-10-01')], subs: [], settings: { ...defaultSettings } }, 'TRY'));
   truthy('kur gerekli mi: ₺ veri + EUR ana birim → evet', needsRates({ items: [ex('x', 1, 'Market', '2026-10-01')], subs: [], settings: { ...defaultSettings } }, 'EUR'));
@@ -255,6 +271,36 @@ const NOW = 1_800_000_000_000;
   const warns = (c: Cur) => insights(pair, '2026-10', mk(c)).filter((i) => i.kind === 'warn').length;
   eq('10 birim artış: TRY yorumsuz, EUR uyarılı', [warns('TRY'), warns('EUR')], [0, 1]);
   setMainCurrency('TRY');
+
+  /* ===== 8. Gizlilik kipi (Tutarları gizle): yalnızca ekrandaki tutarlar maskelenir ===== */
+  for (const l of ['tr', 'en', 'es', 'it', 'zh'] as Lang[]) {
+    setLanguage(l);
+    setMainCurrency('EUR');
+    setHideAmounts(false);
+    eq(`${l} gizlilik kapalı: money gerçek tutarı gösterir`, [money(1250.5), money0(1250.5)], [fmtMoney(1250.5, 'EUR'), fmtMoney(1250.5, 'EUR', 0)]);
+    setHideAmounts(true);
+    const sym = l === 'es' || l === 'it' ? `${MASK} €` : `€${MASK}`;
+    eq(`${l} gizlilik açık: money/money0 maskeli (simge yeri dile göre)`, [money(1250.5), money0(1250.5), money(-40, 0)], [sym, sym, sym]);
+    eq(`${l} gizlilik açık: gerçek rakam sızmaz`, /\d/.test(money(1250.5) + money0(99)), false);
+    eq(`${l} gizlilik açık: fmtShown özgün birimle maskeler`, fmtShown(5, 'USD'), maskedMoney('USD'));
+    eq(`${l} gizlilik açık: fmtMoney (bildirim/giriş/dışa aktarım yolu) maskelenmez`, fmtMoney(1250.5, 'EUR'), new Intl.NumberFormat(LANGS.find((x) => x.code === l)!.locale, { style: 'currency', currency: 'EUR', currencyDisplay: 'narrowSymbol' }).format(1250.5).replace('-', '−').replace(/ /g, ' '));
+    eq(`${l} gizlilik açık: ekran okuyucu "gizli tutar" der`, moneyA11y(5), t('amount.hidden'));
+    truthy(`${l} gizli tutar etiketi çevrilmiş`, t('amount.hidden') !== 'amount.hidden' && t('amount.hidden').length > 3);
+  }
+  setLanguage('en');
+  setMainCurrency('TRY');
+  setHideAmounts(true);
+  eq('gizlilik açık: ₺ ana birimi', [money(1250.5), money0(3)], ['₺••••', '₺••••']);
+  eq('gizlilik açık: bayrak okunur', amountsHidden(), true);
+  // Yorum metinleri (insights) maskeli tutar içerir, gerçek sayı içermez
+  const hiddenNotes = insights([ex('h1', 400, 'Market', '2026-10-02'), ex('h2', 100, 'Ulaşım', '2026-10-03')], '2026-10', { ...defaultSettings, catBudgets: { Market: 300 } });
+  truthy('gizlilik açık: yorum metinlerinde tutar maskeli', hiddenNotes.length > 0 && hiddenNotes.some((n) => n.text.includes('₺••••')) && hiddenNotes.every((n) => !/400|100\b/.test(n.text)));
+  // Excel dışa aktarımı gizlilik kipinden etkilenmez
+  const xl = JSON.stringify(buildExcel([ex('x1', 1250.5, 'Market', '2026-10-02')], [], '2026-10', 'TRY', null));
+  truthy('gizlilik açık: Excel hücreleri gerçek tutarı taşır, maske yok', xl.includes('1250.5') && !xl.includes(MASK));
+  setHideAmounts(false);
+  eq('gizlilik kapalı: money normale döner', money(1250.5), '₺1,250.50');
+  eq('gizlilik varsayılan olarak kapalıdır', amountsHidden(), false);
 
   console.log(`${pass} geçti, ${fail} başarısız`);
   process.exit(fail ? 1 : 0);
