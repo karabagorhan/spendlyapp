@@ -90,32 +90,32 @@ export const TINT_COLORS: Record<Tint, Record<Mode, Surfaces>> = {
     noir:  { bg: '#100b12', surface: '#171119', raised: '#1e1722', line: '#2c2231' },
     ivory: { bg: '#f6eff3', surface: '#fffbfd', raised: '#faf3f7', line: '#e8d9e1' },
   },
-  // Hazır temaların zeminleri (Wada): tonu kombinasyonun bir renginden (koyuda zemin rengi, açıkta açık ya da zemin rengi) alınır,
-  // açıklık ve doygunluk ise role göre sabittir (koyu: L* 3.6 / 7.4 / 11 / 16.5, C* ≈ 3–8; açık: L* 95 / 99 / 97 / 88, C* ≈ 2–8).
-  // Böylece zemin renkli görünmez, yalnızca kombinasyonun sıcaklığını/soğukluğunu taşır.
+  // Hazır temaların zeminleri (Wada): temanın rengi zeminde belirgin. Koyuda tonu kombinasyonun zemin renginden (L* 7 / 12 / 16.5 / 23,
+  // C* ≈ 9–20: koyu petrol, gece mavisi, koyu erik, çivit, yosun, arduvaz); açıkta kitabın kâğıt/krem tonlarından ya da zemin renginin
+  // soluk tonundan (L* 93.5 / 98.5 / 96 / 85, C* ≈ 6–12: Naples sarısı, somon krem, fildişi buff…). Yazı/vurgu kontrastı testlerle korunur.
   midnight: { // No. 238: Cotinga Purple / Ochraceous Salmon
-    noir:  { bg: '#110b10', surface: '#1a1519', raised: '#221c20', line: '#2f262d' },
-    ivory: { bg: '#f9f0ea', surface: '#fffcfa', raised: '#fef6f1', line: '#ebdcd2' },
+    noir:  { bg: '#250c20', surface: '#2f172a', raised: '#392133', line: '#473041' },
+    ivory: { bg: '#ffe8d8', surface: '#fff9f4', raised: '#fff1e7', line: '#e5d1c2' },
   },
   deepsea: { // No. 193: Light Porcelain Green
-    noir:  { bg: '#040f0e', surface: '#0f1817', raised: '#151f1f', line: '#1d2c2a' },
-    ivory: { bg: '#e9f4f3', surface: '#f9fefd', raised: '#f0faf9', line: '#cfe2e0' },
+    noir:  { bg: '#001d19', surface: '#002523', raised: '#002f2d', line: '#133d3b' },
+    ivory: { bg: '#f4ecd5', surface: '#fefbf3', raised: '#f9f3e6', line: '#dbd4c0' },
   },
   cobaltnight: { // No. 333: Blue
-    noir:  { bg: '#080d15', surface: '#12171f', raised: '#181e28', line: '#212937' },
-    ivory: { bg: '#eef2fa', surface: '#fbfdff', raised: '#f4f8ff', line: '#d8dfed' },
+    noir:  { bg: '#001730', surface: '#07213a', raised: '#152a42', line: '#263850' },
+    ivory: { bg: '#e4edfd', surface: '#f8fbff', raised: '#eff4fe', line: '#cdd5e3' },
   },
   indigo: { // No. 126: Deep Lyons Blue / Ivory Buff
-    noir:  { bg: '#0c0c14', surface: '#15161d', raised: '#1c1d26', line: '#262834' },
-    ivory: { bg: '#f8f0e4', surface: '#fffdf8', raised: '#fdf7ec', line: '#e8ddc9' },
+    noir:  { bg: '#09142f', surface: '#161e39', raised: '#212841', line: '#30364f' },
+    ivory: { bg: '#f7ebd5', surface: '#fffaf3', raised: '#faf3e6', line: '#ded3c0' },
   },
   sage: { // No. 137: Pistachio Green
-    noir:  { bg: '#060f0b', surface: '#111814', raised: '#171f1b', line: '#202b26' },
-    ivory: { bg: '#ebf4ef', surface: '#fafefc', raised: '#f2f9f5', line: '#d3e2da' },
+    noir:  { bg: '#001b0e', surface: '#092419', raised: '#152e23', line: '#243c31' },
+    ivory: { bg: '#ddf1e7', surface: '#f5fcf9', raised: '#eaf6f0', line: '#c7d9cf' },
   },
   slate: { // No. 27: Slate Color
-    noir:  { bg: '#050e12', surface: '#10181b', raised: '#161f23', line: '#1e2b30' },
-    ivory: { bg: '#ebf3f7', surface: '#fafeff', raised: '#f2f9fc', line: '#d2e1e7' },
+    noir:  { bg: '#02181f', surface: '#102229', raised: '#1a2b32', line: '#293940' },
+    ivory: { bg: '#e0eff5', surface: '#f6fcfe', raised: '#ecf5f9', line: '#cad6dc' },
   },
 };
 
@@ -222,18 +222,20 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
   if (isDefault) return base;
   const surf = TINT_COLORS[tint][mode];
   // Şampanya altınının açık moddaki özgün tonu yumuşak zeminlerde 4.5:1'in altında kalır; farklı zemin tonlarında biraz koyusu kullanılır
-  const a = accent === 'gold' && mode === 'ivory' ? '#7b5c22' : ACCENT_COLORS[accent][mode];
-  const heroA = ACCENT_COLORS[accent].noir;
   const dark = mode === 'noir';
+  const softOf = (c: string) => mix(c, surf.bg, dark ? 0.84 : 0.9);
+  // Renkli zeminlerde vurgu okunur kalsın: gerekirse koyuda biraz açılır, açıkta biraz koyulaştırılır (ton değişmez)
+  const a = readable(accent === 'gold' && mode === 'ivory' ? '#7b5c22' : ACCENT_COLORS[accent][mode], dark, (c) => [surf.bg, surf.surface, surf.raised, softOf(c)]);
+  const heroA = ACCENT_COLORS[accent].noir;
   const sec = SECONDARY[accent];
   const heroL = sec?.label ?? heroA;
-  return {
+  const out: Theme = {
     ...base,
     ...surf,
     accent: a,
     gold: a,
     accentFg: dark ? '#0b0b0d' : '#ffffff',
-    accentSoft: mix(a, surf.bg, dark ? 0.84 : 0.9),
+    accentSoft: softOf(a),
     bar: rgba(a, dark ? 0.32 : 0.28),
     goldLine: rgba(a, 0.35),
     heroGrad: sec ? sec.k.map((k) => mix(sec.color, '#000000', k)) as [string, string, string]
@@ -245,6 +247,16 @@ export function makeTheme(mode: Mode, tint: Tint = 'classic', accent: Accent = '
     // Kırmızı/turuncu vurgularda uyarı rengi vurguyla karışmasın (aşılan bütçe ile normal çubuk ayırt edilsin): kehribar kullanılır
     ...(WARM_ACCENTS.includes(accent) ? warnFor(accent === 'copper' ? 'red' : 'amber', dark, surf.bg) : {}),
   };
+  // Uyarı rengi de zemin tonunda okunur kalsın
+  out.warn = readable(out.warn, dark, () => [surf.bg, surf.surface]);
+  return out;
+}
+
+/** Rengi, verilen zeminlerin hepsine karşı ≥ 4.5:1 olana dek koyu modda beyaza, açık modda siyaha doğru adım adım kaydırır. */
+function readable(c: string, dark: boolean, against: (c: string) => string[]) {
+  let x = c;
+  for (let i = 0; i < 24 && Math.min(...against(x).map((b) => contrast(x, b))) < 4.5; i++) x = mix(x, dark ? '#ffffff' : '#000000', 0.05);
+  return x;
 }
 
 /** Kehribar (kırmızı/pembe vurgular için) ya da kırmızı (bakır için) uyarı tonu. */

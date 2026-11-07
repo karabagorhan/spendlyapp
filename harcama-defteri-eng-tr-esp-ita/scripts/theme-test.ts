@@ -136,10 +136,11 @@ for (const p of PRESETS) {
     check(`Wada ${p.id}: ${role} ${c} kombinasyondan (${near.w.name})`, Math.abs(dL) <= 13 && dab <= 6, `ΔL ${dL.toFixed(1)} Δab ${dab.toFixed(1)}`);
     if (near.d > 0.5) wadaRows.push(`No. ${String(p.wada).padEnd(4)} ${p.id.padEnd(7)} ${role.padEnd(13)} ${near.w.name} ${near.w.hex} → ${c}  ΔE ${near.d.toFixed(1)} (ΔL* ${dL >= 0 ? '+' : ''}${dL.toFixed(1)})`);
   }
-  // Zemin tonu sakin: koyu zeminler C* ≤ 8, açık zeminler C* ≤ 7; tonu kombinasyonun bir renginden (±20°)
+  // Zemin temanın rengini belirgin taşır ama bağırmaz: koyu zemin C* 6–24, açık zemin C* 4–16; tonu kombinasyonun bir renginden (±20°)
   for (const mode of ['noir', 'ivory'] as Mode[]) {
     const surf = TINT_COLORS[p.tint][mode];
-    for (const k of ['bg', 'surface', 'raised'] as const) check(`Wada ${p.id}: ${mode} ${k} nötre yakın`, chroma(surf[k]) <= (mode === 'noir' ? 8 : 7), `C* ${chroma(surf[k]).toFixed(1)}`);
+    for (const k of ['bg', 'surface', 'raised'] as const) check(`Wada ${p.id}: ${mode} ${k} renkli ama ölçülü`, chroma(surf[k]) <= (mode === 'noir' ? 24 : 16), `C* ${chroma(surf[k]).toFixed(1)}`);
+    check(`Wada ${p.id}: ${mode} zemin temanın rengini belirgin taşır`, chroma(surf.bg) >= (mode === 'noir' ? 6 : 4), `C* ${chroma(surf.bg).toFixed(1)}`);
     const hd = cs.map((w) => { const d = Math.abs(hueDeg(surf.bg) - hueDeg(w.hex)); return Math.min(d, 360 - d); });
     check(`Wada ${p.id}: ${mode} zemin tonu kombinasyondan`, Math.min(...hd) <= 20, `${surf.bg} ${hueDeg(surf.bg).toFixed(0)}°`);
   }

@@ -72,9 +72,11 @@ Hazır temalar, kategori renkleri ve varsayılan temanın motif rengi Sanzo Wada
   vurgu (ana düğme, seçili öğe), motif rengi (özet kartındaki geometrik parça), açık zeminin tonu.
 
 Uygulama kuralları (unslop ile birlikte): kitaptaki renk **aynen** kullanılır; yalnızca WCAG kontrastı için açıklık (L*)
-ayarlanır ve not edilir. Yüzeyler renkli görünmez: zeminin **tonu** kombinasyondan gelir, açıklığı ve doygunluğu role göre
-sabittir (koyu: L* 3.6 / 7.4 / 11 / 16.5, C* ≈ 3–10; açık: L* 95 / 99 / 97 / 88, C* ≈ 1–9). Zengin renk "anlarda" kalır:
-özet kartı ve motifi, kategori halkaları, bütçe çubukları.
+ayarlanır ve not edilir. **Zemin temanın rengini belirgin taşır** (kullanıcı kararı, 7 Kasım 2026): koyuda ton kombinasyonun zemin
+renginden (L* 7 / 12 / 16.5 / 23, C* ≈ 9–20: koyu petrol, gece mavisi, koyu erik, çivit, yosun, arduvaz), açıkta kitabın kâğıt/krem
+tonlarından ya da zemin renginin soluk tonundan (L* 93.5 / 98.5 / 96 / 85, C* ≈ 6–12). Vurgu ve uyarı rengi her zeminde ≥ 4.5:1 kalacak
+biçimde otomatik açılır/koyulaşır (`readable()` in `src/palette.ts`). Zengin renk yine "anlarda" yoğunlaşır: özet kartı ve motifi,
+kategori halkaları, bütçe çubukları.
 
 ### Hazır temalar
 
