@@ -12,6 +12,20 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Tarayıcı yolu: PW_CHROMIUM, yoksa /opt/pw-browsers altındaki en son chromium (bulunamazsa undefined; playwright karar verir)
+function findChromium() {
+  if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
+  try {
+    const hits = [];
+    for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => n.startsWith('chromium-')).sort())
+      for (const s of fs.readdirSync(`/opt/pw-browsers/${d}`).filter((n) => n.startsWith('chrome-linux')).sort())
+        if (fs.existsSync(`/opt/pw-browsers/${d}/${s}/chrome`)) hits.push(`/opt/pw-browsers/${d}/${s}/chrome`);
+    return hits.pop();
+  } catch {
+    return undefined;
+  }
+}
+
 const lang = process.argv[2] || 'en';
 const WEB_DIR = process.env.WEB_DIR || '/tmp/web-out';
 const PORT = 8900 + Math.floor(Math.random() * 100);
@@ -56,7 +70,7 @@ const baseData = (extra = {}) => ({
 (async () => {
   await new Promise((r) => server.listen(PORT, r));
   const base = `http://127.0.0.1:${PORT}/`;
-  const exe = process.env.PW_CHROMIUM || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
+  const exe = findChromium();
   const browser = await chromium.launch(exe ? { executablePath: exe } : {});
   let pass = 0; const errors = [];
   const ok = (name, cond, detail = '') => { if (cond) { pass++; console.log('OK    ' + name); } else { errors.push(name); console.log('HATA  ' + name + (detail ? ' — ' + String(detail).slice(0, 300) : '')); } };
@@ -80,7 +94,7 @@ const baseData = (extra = {}) => ({
     await page.waitForTimeout(1800);
     const text = () => page.evaluate(() => document.body.innerText.replace(/[  ]/g, ' '));
     const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('harcama-defteri:v1')));
-    const menuBtn = () => page.locator('[role="button"][aria-label]').first();
+    const menuBtn = () => page.getByTestId('menu-open');
     const goTo = async (n) => { await menuBtn().click(); await page.waitForTimeout(450); await page.locator('[role="menuitem"]').nth(n).click(); await page.waitForTimeout(600); };
     const chip = (label) => page.getByText(label, { exact: true }).first();
     return { ctx, page, pageErrors, hits, text, stored, goTo, chip, scenario };
@@ -93,7 +107,7 @@ const baseData = (extra = {}) => ({
     const { page } = s;
     ok('[1] açılışta kur API\'sine istek atıldı', s.hits.length >= 1, s.hits.join(','));
     let t = await s.text();
-    ok('[1] TRY: bugün = 400 ₺ + 100 $ (40 kur) = ' + money(4400, 'TRY'), t.includes(money(4400, 'TRY')), t.slice(0, 400));
+    ok('[1] TRY: bugün = 400 ₺ + 100 $ (40 kur) = ' + money(4400, 'TRY', 0), t.includes(money(4400, 'TRY', 0)), t.slice(0, 400));
     ok('[1] TRY: bütçe ' + money(10000, 'TRY', 0), t.includes(money(10000, 'TRY', 0)));
     ok('[1] kur güncelleme zamanı özette görünüyor', t.includes(String(new Date().getFullYear())) && /2026|20\d\d/.test(t));
     await s.goTo(2);
@@ -109,7 +123,7 @@ const baseData = (extra = {}) => ({
     await s.chip('€ EUR').click(); await page.waitForTimeout(700);
     await s.goTo(0);
     t = await s.text();
-    ok('[1] EUR: bugün ' + money(99, 'EUR'), t.includes(money(99, 'EUR')), t.slice(0, 400));
+    ok('[1] EUR: bugün ' + money(99, 'EUR', 0), t.includes(money(99, 'EUR', 0)), t.slice(0, 400));
     ok('[1] EUR: bütçe ' + money(225, 'EUR', 0), t.includes(money(225, 'EUR', 0)));
     ok('[1] EUR: ₺ kayıt çevrilmiş (' + money(9, 'EUR') + ') ve özgün ' + money(400, 'TRY') + ' ipucu olarak görünüyor', t.includes(money(9, 'EUR')) && t.includes(money(400, 'TRY')), t.slice(0, 600));
     await s.goTo(3);
@@ -127,20 +141,20 @@ const baseData = (extra = {}) => ({
     await s.goTo(6);
     await s.chip('$ USD').click(); await page.waitForTimeout(500);
     await s.goTo(0); t = await s.text();
-    ok('[1] USD: bugün ' + money(110, 'USD'), t.includes(money(110, 'USD')), t.slice(0, 300));
+    ok('[1] USD: bugün ' + money(110, 'USD', 0), t.includes(money(110, 'USD', 0)), t.slice(0, 300));
     await s.goTo(6);
     await s.chip('£ GBP').click(); await page.waitForTimeout(500);
     await s.goTo(0); t = await s.text();
-    ok('[1] GBP: bugün ' + money(88, 'GBP'), t.includes(money(88, 'GBP')));
+    ok('[1] GBP: bugün ' + money(88, 'GBP', 0), t.includes(money(88, 'GBP', 0)));
     await s.goTo(6);
     await s.chip('¥ CNY').click(); await page.waitForTimeout(500);
     await s.goTo(0); t = await s.text();
-    ok('[1] CNY: bugün ' + money(770, 'CNY'), t.includes(money(770, 'CNY')), t.slice(0, 300));
+    ok('[1] CNY: bugün ' + money(770, 'CNY', 0), t.includes(money(770, 'CNY', 0)), t.slice(0, 300));
     ok('[1] CNY: bütçe ' + money(1750, 'CNY', 0), t.includes(money(1750, 'CNY', 0)));
     await s.goTo(6);
     await s.chip('₺ TRY').click(); await page.waitForTimeout(500);
     await s.goTo(0); t = await s.text();
-    ok('[1] TRY\'ye dönünce ' + money(4400, 'TRY') + ' ve bütçe ' + money(10000, 'TRY', 0), t.includes(money(4400, 'TRY')) && t.includes(money(10000, 'TRY', 0)));
+    ok('[1] TRY\'ye dönünce ' + money(4400, 'TRY', 0) + ' ve bütçe ' + money(10000, 'TRY', 0), t.includes(money(4400, 'TRY', 0)) && t.includes(money(10000, 'TRY', 0)));
     st = await s.stored();
     ok('[1] 5 değişiklik sonrası saklanan veri birebir aynı', JSON.stringify(st.items.map((x) => [x.amount, x.cur ?? null])) === JSON.stringify([[400, null], [100, 'USD']]) && st.settings.budget === 10000 && st.settings.budgetCur === 'TRY' && st.settings.catBudgets.Market === 3000);
 
@@ -162,7 +176,7 @@ const baseData = (extra = {}) => ({
   {
     const s = await open('giriş', { data: baseData(), rates: true });
     const { page } = s;
-    await page.getByText(/^\+\s+/).first().click(); await page.waitForTimeout(800);
+    await page.getByTestId('qa-expense').click(); await page.waitForTimeout(800);
     await s.chip('$ USD').click(); await page.waitForTimeout(300);
     await page.locator('input').first().fill(lang === 'en' ? '10' : '10');
     await page.waitForTimeout(400);
@@ -206,7 +220,7 @@ const baseData = (extra = {}) => ({
     const s = await open('çevrimdışı', { data: baseData({ currency: 'EUR' }), rates: false, ratesCache: old });
     const { page } = s;
     let t = await s.text();
-    ok('[4] çevrimdışıyken kayıtlı kurla çeviriyor: bugün ' + money(99, 'EUR'), t.includes(money(99, 'EUR')), t.slice(0, 300));
+    ok('[4] çevrimdışıyken kayıtlı kurla çeviriyor: bugün ' + money(99, 'EUR', 0), t.includes(money(99, 'EUR', 0)), t.slice(0, 300));
     await s.goTo(6);
     t = await s.text();
     ok('[4] "kurlar güncellenemedi / eski" uyarısı var', t.includes(cat('rates.failed').slice(0, 25)) || t.includes(cat('rates.old').slice(0, 25)), t.slice(0, 600));
