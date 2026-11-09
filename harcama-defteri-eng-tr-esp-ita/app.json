@@ -31,6 +31,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/without-push-entitlement.js",
       "expo-sharing",
       "expo-status-bar",
       "expo-font",
@@ -55,7 +56,8 @@
             "backgroundColor": "#0B0D0F"
           }
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "scheme": "harcama",
     "owner": "karabagorhans-team",
@@ -69,6 +71,13 @@
     },
     "updates": {
       "url": "https://u.expo.dev/065165d8-42b7-447e-9960-e8263cf7d992"
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "tr": "./locales/tr.json",
+      "es": "./locales/es.json",
+      "it": "./locales/it.json",
+      "zh-Hans": "./locales/zh-Hans.json"
     }
   }
 }

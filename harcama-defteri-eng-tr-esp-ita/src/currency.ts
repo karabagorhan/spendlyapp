@@ -17,6 +17,29 @@ export const CURRENCIES: { code: Cur; symbol: string }[] = [
 export const CUR_CODES = CURRENCIES.map((c) => c.code);
 export const isCur = (v: unknown): v is Cur => typeof v === 'string' && CUR_CODES.includes(v as Cur);
 export const symbolOf = (c: Cur) => CURRENCIES.find((x) => x.code === c)!.symbol;
+/** Avro bölgesi ülkeleri (ISO 3166-1 alfa-2). */
+const EURO_REGIONS = new Set(['AT', 'BE', 'HR', 'CY', 'EE', 'FI', 'FR', 'DE', 'GR', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PT', 'SK', 'SI', 'ES', 'AD', 'MC', 'SM', 'VA', 'ME', 'XK']);
+const REGION_CUR: Record<string, Cur> = { TR: 'TRY', US: 'USD', GB: 'GBP', CN: 'CNY' };
+
+/**
+ * İlk kurulumda ana para birimi: cihazın para birimi desteklenen beşten biriyse o, değilse bölgeye göre;
+ * ikisi de bilinmiyorsa ABD doları (uygulamanın kur tabanı).
+ */
+export function pickCurrency(currencyCode?: string | null, region?: string | null): Cur {
+  const c = (currencyCode ?? '').toUpperCase();
+  if (isCur(c)) return c;
+  const r = (region ?? '').toUpperCase();
+  if (REGION_CUR[r]) return REGION_CUR[r];
+  if (EURO_REGIONS.has(r)) return 'EUR';
+  return 'USD';
+}
+
+/** "en-US", "tr_TR", "zh-Hans-CN" gibi bir yerel ayar kimliğinden ülke kodu. */
+export function regionOf(locale: string): string {
+  const parts = locale.split(/[-_]/).slice(1);
+  return parts.find((p) => /^[A-Za-z]{2}$/.test(p))?.toUpperCase() ?? '';
+}
+
 /** Para biriminin seçili dildeki adı ("Euro", "Dólar estadounidense"...). */
 export const currencyName = (c: Cur) => t('currency.' + c);
 
@@ -86,6 +109,14 @@ export const PROVIDERS: Provider[] = [
         : null,
   },
 ];
+
+/**
+ * Atıf isteyen sağlayıcılar: ExchangeRate-API'nin anahtarsız (open access) uç noktası, kurları gösteren her yerde
+ * kendi sitesine "Rates By Exchange Rate API" bağlantısı ister. Frankfurter atıf istemez.
+ */
+export const ATTRIBUTION: Record<string, { label: string; url: string }> = {
+  'ExchangeRate-API': { label: 'Rates By Exchange Rate API', url: 'https://www.exchangerate-api.com' },
+};
 
 export class RatesError extends Error {}
 

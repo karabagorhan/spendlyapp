@@ -1,6 +1,6 @@
 import { ReactNode, useRef, useState } from 'react';
-import { Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtShown, fmtStamp, money, symbolOf, toMain } from './currency';
+import { Keyboard, Linking, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ATTRIBUTION, CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtShown, fmtStamp, money, symbolOf, toMain } from './currency';
 import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
 import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
 import { ACCENTS, ACCENT_COLORS, PRESETS, TINTS, TINT_COLORS, presetOf, rgba } from './palette';
@@ -672,6 +672,12 @@ export function RatesBox({ main, rates, refreshing, failed, onRefresh, t }: {
             {tr('rates.updated', { time: fmtStamp(rates.fetchedAt, fmtTime, monthShortName) })}
             {'\n'}{tr('rates.source', { provider: rates.provider, date: asOf })}
           </Text>
+          {ATTRIBUTION[rates.provider] ? (
+            <Pressable onPress={() => Linking.openURL(ATTRIBUTION[rates.provider].url).catch(() => {})} accessibilityRole="link" hitSlop={8}
+              style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }} testID="rates-attribution">
+              <Text style={{ color: t.accent, fontSize: 13, textDecorationLine: 'underline' }}>{ATTRIBUTION[rates.provider].label}</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : (
         <Text style={{ color: t.warn, fontSize: 14, lineHeight: 20 }}>{tr('rates.none')}</Text>

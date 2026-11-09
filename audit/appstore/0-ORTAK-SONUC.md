@@ -61,3 +61,16 @@ Aşağıdaki P0 maddeleri kapanınca gönderilebilir.
 4. Karar: v1.0 hesaplar kapalı mı (önerilen)?
 
 **Sonra:** `eas build --platform ios --profile production` → TestFlight'ta gerçek cihaz turu → `eas submit` → incelemeye gönder.
+
+## Durum (9 Kasım 2026)
+
+| # | Madde | Durum |
+|---|---|---|
+| — | Form sayfalarında üstteki Kaydet/Vazgeç dokunuşa yanıt vermiyordu (görünmez klavye çubuğu üstüne biniyordu) | ✅ Düzeltildi (`096f1e1`) |
+| 11 | Varsayılan para birimi cihaz bölgesinden (expo-localization; desteklenmeyen bölgede USD). Tarayıcıda doğrulandı: en-US→$, de-DE→€, tr-TR→₺, en-GB→£, ja-JP→$ | ✅ |
+| 8 | 13 paket yama sürümüne (`expo install --check` temiz) | ✅ |
+| 12 | `aps-environment` yetkisi `plugins/without-push-entitlement.js` ile çıkarıldı (prebuild ile doğrulandı) | ✅ |
+| 13 | Kurlar ExchangeRate-API'den geldiğinde Ayarlar › Döviz kurları altında "Rates By Exchange Rate API" bağlantısı | ✅ |
+| 14 | Face ID izin metni 5 dilde (`locales/*.json`; prebuild'de 5 `InfoPlist.strings`). Yan etki: App Store'da uygulama dilleri artık 5 dil olarak listelenir | ✅ |
+| 4, 7 | Privacy manifest; açılış animasyonu kısaltma | Bekliyor |
+| 1, 2 | Yasal bilgiler, gizlilik/destek URL'leri | Sizden bilgi bekleniyor (`check:release`: 7 engel, hepsi bu) |

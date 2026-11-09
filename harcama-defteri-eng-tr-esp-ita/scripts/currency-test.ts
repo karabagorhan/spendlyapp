@@ -7,7 +7,7 @@
  */
 import {
   CURRENCIES, Cur, PROVIDERS, RatesError, Rates, convert, excelMoneyFormat, fetchRates, fmtMoney, fromViewSettings, isStale, needsRates,
-  normalizeRates, round2, setHideAmounts, amountsHidden, maskedMoney, fmtShown, money, money0, moneyA11y, MASK, setMainCurrency, toMain, validateRates, viewData,
+  normalizeRates, pickCurrency, regionOf, round2, setHideAmounts, amountsHidden, maskedMoney, fmtShown, money, money0, moneyA11y, MASK, setMainCurrency, toMain, validateRates, viewData,
 } from '../src/currency';
 import { LANGS, Lang, fmtNumber, parseAmount, setLanguage, t } from '../src/i18n';
 import { Expense, Settings, Sub, analyse, insights, MIN_CHANGE, sum } from '../src/lib';
@@ -301,6 +301,20 @@ const NOW = 1_800_000_000_000;
   setHideAmounts(false);
   eq('gizlilik kapalı: money normale döner', money(1250.5), '₺1,250.50');
   eq('gizlilik varsayılan olarak kapalıdır', amountsHidden(), false);
+
+  /* ===== Varsayılan para birimi: cihaz bölgesinden (App Store incelemesi #11) ===== */
+  eq('cihaz para birimi USD', pickCurrency('USD', 'US'), 'USD');
+  eq('cihaz para birimi TRY', pickCurrency('TRY', 'TR'), 'TRY');
+  eq('cihaz para birimi küçük harf', pickCurrency('eur', 'DE'), 'EUR');
+  eq('desteklenmeyen para birimi, avro bölgesi', pickCurrency('XYZ', 'FR'), 'EUR');
+  eq('para birimi yok, bölge GB', pickCurrency(null, 'GB'), 'GBP');
+  eq('para birimi yok, bölge CN', pickCurrency(undefined, 'cn'), 'CNY');
+  eq('desteklenmeyen (JPY) → USD', pickCurrency('JPY', 'JP'), 'USD');
+  eq('hiçbir bilgi yok → USD', pickCurrency(null, null), 'USD');
+  eq('bölge: en-US', regionOf('en-US'), 'US');
+  eq('bölge: tr_TR', regionOf('tr_TR'), 'TR');
+  eq('bölge: zh-Hans-CN', regionOf('zh-Hans-CN'), 'CN');
+  eq('bölge: yalnız dil', regionOf('en'), '');
 
   console.log(`${pass} geçti, ${fail} başarısız`);
   process.exit(fail ? 1 : 0);

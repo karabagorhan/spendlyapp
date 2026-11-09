@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Cur, isCur } from './currency';
 import { deviceLanguage, isLang } from './i18n';
 import { loadLangPref } from './auth/prefs';
+import { deviceCurrency } from './region';
 import { isAccent, isTint } from './palette';
 import { CATS, Expense, INCOME_CATS, Income, SUB_TYPES, Settings, Sub, guessSubType, isRealDate, validAmount } from './lib';
 
@@ -145,7 +146,11 @@ export function useAppData() {
       .then(async (raw) => {
         if (!live) return;
         // Boş veriyle başlanan her durumda (ilk kurulum, kurtarılan bozuk kayıt) dil: tanıtımda seçilen dil ya da cihaz dili
-        const fresh = async (): Promise<Data> => ({ ...empty, settings: { ...defaultSettings, language: (await loadLangPref()) ?? deviceLanguage() } });
+        const fresh = async (): Promise<Data> => {
+          // Ana para birimi cihazın bölgesinden (ABD'de $, Almanya'da €, Türkiye'de ₺); bütçe de aynı birimde başlar
+          const cur = deviceCurrency();
+          return { ...empty, settings: { ...defaultSettings, language: (await loadLangPref()) ?? deviceLanguage(), currency: cur, budgetCur: cur } };
+        };
         if (raw) {
           try {
             setData(normalize(JSON.parse(raw)));
