@@ -1,5 +1,5 @@
 import { ReactNode, useRef, useState } from 'react';
-import { InputAccessoryView, Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Keyboard, PanResponder, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { CURRENCIES, Cur, OLD_MS, Rates, convert, currencyName, fmtMoney, fmtShown, fmtStamp, money, symbolOf, toMain } from './currency';
 import { LANGS, Lang, fmtNumber, fmtTime, t as tr } from './i18n';
 import { CATS, Expense, INCOME_CATS, Income, MAX_AMOUNT, SUB_TYPES, Settings, Sub, addDays, amountText, catIndex, catName, dayLabel, incomeCatIndex, incomeCatName, guessSubType, monthShortName, parseAmount, subLabel, subType, todayIso, uid } from './lib';
@@ -14,11 +14,13 @@ import { bigAmount, selectedFill, selectedLine } from './design';
 type SheetAction = { label: string; headerLabel?: string; onPress: () => void; disabled?: boolean };
 
 /**
- * Alt sayfa: üstte Vazgeç / başlık / Kaydet hapı, klavye açılınca içerik yukarı kayar,
- * klavyenin hemen üstünde tam genişlikte bir Kaydet çubuğu durur (iOS).
+ * Alt sayfa: üstte Vazgeç / başlık / Kaydet hapı, klavye açılınca içerik yukarı kayar.
+ * Not: klavye üstü Kaydet çubuğu (InputAccessoryView) Modal içinde klavyeye bağlanamıyor; bağlanamayınca sayfanın
+ * sol üst köşesinde görünmez bir kutu olarak kalıp üstteki Vazgeç/Kaydet dokunuşlarını yutuyordu. Bu yüzden kullanılmıyor;
+ * üstteki Kaydet klavye açıkken de görünür kalır.
  */
-function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
-  visible: boolean; title: string; onClose: () => void; action?: SheetAction; accessoryId?: string; children: ReactNode; t: Theme;
+function Sheet({ visible, title, onClose, action, children, t }: {
+  visible: boolean; title: string; onClose: () => void; action?: SheetAction; children: ReactNode; t: Theme;
 }) {
   // Sol kenardan sağa kaydırma = geri (sayfayı kapatır); aşağı kaydırarak kapatma iOS'in kendi hareketidir
   const closeRef = useRef(onClose);
@@ -48,7 +50,8 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
           <Text accessibilityRole="header" style={[sh.headTitle, { color: t.fg }]}>{title}</Text>
           {action ? (
             <Pressable onPress={action.onPress} disabled={action.disabled} hitSlop={12} accessibilityRole="button" accessibilityLabel={action.label}
-              style={[sh.headSave, { backgroundColor: action.disabled ? t.surface : t.accent, borderColor: action.disabled ? t.line : t.accent }]}>
+              accessibilityState={{ disabled: !!action.disabled }} testID="sheet-save"
+              style={({ pressed }) => [sh.headSave, { backgroundColor: action.disabled ? t.surface : t.accent, borderColor: action.disabled ? t.line : t.accent, opacity: pressed ? 0.8 : 1 }]}>
               <Text numberOfLines={1} style={{ color: action.disabled ? t.muted : t.accentFg, fontSize: 15, fontFamily: FONTS.bold }}>{action.headerLabel ?? action.label}</Text>
             </Pressable>
           ) : <View style={sh.headSide} />}
@@ -57,19 +60,6 @@ function Sheet({ visible, title, onClose, action, accessoryId, children, t }: {
           {children}
         </ScrollView>
       </KeyboardAvoidingView>
-      {action && accessoryId && Platform.OS === 'ios' ? (
-        <InputAccessoryView nativeID={accessoryId}>
-          <View style={[st.accessory, { backgroundColor: t.raised, borderTopColor: t.line }]}>
-            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={10} accessibilityLabel={tr('sheet.hideKeyboard')}>
-              <Text style={{ color: t.muted, fontSize: 15 }}>{tr('sheet.hideKeyboard')}</Text>
-            </Pressable>
-            <Pressable onPress={action.onPress} disabled={action.disabled} accessibilityRole="button"
-              style={[st.accessorySave, { backgroundColor: t.accent, opacity: action.disabled ? 0.4 : 1 }]}>
-              <Text style={{ color: t.accentFg, fontSize: 16, fontWeight: '600' }}>{action.label}</Text>
-            </Pressable>
-          </View>
-        </InputAccessoryView>
-      ) : null}
     </Modal>
   );
 }
@@ -160,9 +150,9 @@ function inputStyle(t: Theme, big = false) {
 }
 
 /** Ortada iri tutar girişi (44, Plus Jakarta Sans 800) + para birimi simgesi; altında hata, para birimi hapları ve kur ipucu. */
-function AmountHero({ value, onChange, raw, cur, onCur, main, rates, t, label, a11y, testID, autoFocus, accessoryId }: {
+function AmountHero({ value, onChange, raw, cur, onCur, main, rates, t, label, a11y, testID, autoFocus }: {
   value: string; onChange: (s: string) => void; raw: number; cur: Cur; onCur: (c: Cur) => void; main: Cur; rates: Rates | null; t: Theme;
-  label: string; a11y?: string; testID?: string; autoFocus?: boolean; accessoryId: string;
+  label: string; a11y?: string; testID?: string; autoFocus?: boolean;
 }) {
   const { width } = useWindowDimensions();
   const fs = value.length > 13 ? 30 : value.length > 10 ? 36 : 44;
@@ -180,7 +170,6 @@ function AmountHero({ value, onChange, raw, cur, onCur, main, rates, t, label, a
           placeholder={tr('common.amountPlaceholder')}
           placeholderTextColor={rgba(t.fg, 0.28)}
           autoFocus={autoFocus}
-          inputAccessoryViewID={accessoryId}
           maxLength={AMOUNT_MAXLEN}
           accessibilityLabel={a11y ?? label}
           testID={testID}
@@ -300,9 +289,9 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], lastCat
 
   return (
     <Sheet visible={visible} title={initial ? tr('expense.editTitle') : tr('expense.newTitle')} onClose={onClose} t={t}
-      accessoryId="expense-save" action={{ label: saveLabel, headerLabel: tr('common.save'), onPress: save, disabled: !value }}>
+      action={{ label: saveLabel, headerLabel: tr('common.save'), onPress: save, disabled: !value }}>
       <AmountHero value={amount} onChange={setAmount} raw={raw} cur={cur} onCur={setCur} main={main} rates={rates} t={t}
-        label={tr('common.amountField', { sym: symbolOf(cur) })} a11y={tr('expense.amountA11y')} autoFocus={!initial} accessoryId="expense-save" />
+        label={tr('common.amountField', { sym: symbolOf(cur) })} a11y={tr('expense.amountA11y')} autoFocus={!initial} />
       {!initial && frequent.length ? (
         <Field label={tr('expense.frequent')} t={t}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="always">
@@ -326,8 +315,7 @@ export function ExpenseSheet({ visible, initial, prefill, frequent = [], lastCat
         <CatChips value={cat} onChange={setCat} t={t} />
       </Field>
       <Field label={tr('expense.note')} t={t}>
-        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={fieldStyle(t)} maxLength={80}
-          inputAccessoryViewID="expense-save" returnKeyType="done" onSubmitEditing={save} />
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('expense.notePlaceholder')} placeholderTextColor={t.muted} style={fieldStyle(t)} maxLength={80} returnKeyType="done" onSubmitEditing={save} />
       </Field>
       <DateField date={date} setDate={setDate} cal={cal} setCal={setCal} t={t} />
       <View style={sh.actions}>
@@ -359,15 +347,14 @@ export function IncomeSheet({ visible, initial, main, rates, onSave, onDelete, o
 
   return (
     <Sheet visible={visible} title={initial ? tr('income.editTitle') : tr('income.newTitle')} onClose={onClose} t={t}
-      accessoryId="income-save" action={{ label: saveLabel, headerLabel: tr('common.save'), onPress: save, disabled: !value }}>
+      action={{ label: saveLabel, headerLabel: tr('common.save'), onPress: save, disabled: !value }}>
       <AmountHero value={amount} onChange={setAmount} raw={raw} cur={cur} onCur={setCur} main={main} rates={rates} t={t}
-        label={tr('common.amountField', { sym: symbolOf(cur) })} a11y={tr('income.amountA11y')} testID="income-amount" autoFocus={!initial} accessoryId="income-save" />
+        label={tr('common.amountField', { sym: symbolOf(cur) })} a11y={tr('income.amountA11y')} testID="income-amount" autoFocus={!initial} />
       <Field label={tr('common.category')} t={t}>
         <TileGrid items={INCOME_CATS.map((c) => ({ key: c, label: incomeCatName(c), icon: incomeIcon(c), color: t.cats[incomeCatIndex(c)] }))} value={cat} onChange={setCat} t={t} />
       </Field>
       <Field label={tr('expense.note')} t={t}>
-        <TextInput value={note} onChangeText={setNote} placeholder={tr('income.notePlaceholder')} placeholderTextColor={t.muted} style={fieldStyle(t)} maxLength={80}
-          inputAccessoryViewID="income-save" returnKeyType="done" onSubmitEditing={save} />
+        <TextInput value={note} onChangeText={setNote} placeholder={tr('income.notePlaceholder')} placeholderTextColor={t.muted} style={fieldStyle(t)} maxLength={80} returnKeyType="done" onSubmitEditing={save} />
       </Field>
       <DateField date={date} setDate={setDate} cal={cal} setCal={setCal} t={t} />
       <View style={sh.actions}>
@@ -417,11 +404,11 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
 
   return (
     <Sheet visible={visible} title={initial ? tr('sub.editTitle') : tr('sub.newTitle')} onClose={onClose} t={t}
-      accessoryId="sub-save" action={{ label: tr('common.save'), onPress: save, disabled: !valid }}>
+      action={{ label: tr('common.save'), onPress: save, disabled: !valid }}>
       <AmountHero value={amount} onChange={setAmount} raw={raw} cur={cur} onCur={setCur} main={main} rates={rates} t={t}
-        label={tr('common.amountField', { sym: symbolOf(cur) })} accessoryId="sub-save" />
+        label={tr('common.amountField', { sym: symbolOf(cur) })} />
       <Field label={tr('sub.name')} t={t}>
-        <TextInput value={name} onChangeText={onName} placeholder={tr('sub.namePlaceholder')} placeholderTextColor={t.muted} autoFocus={!initial} style={fieldStyle(t)} inputAccessoryViewID="sub-save" />
+        <TextInput value={name} onChangeText={onName} placeholder={tr('sub.namePlaceholder')} placeholderTextColor={t.muted} autoFocus={!initial} style={fieldStyle(t)} />
       </Field>
       <Field label={tr('sub.type')} t={t}>
         <TileGrid items={SUB_TYPES.map((x) => ({ key: x.key, label: subLabel(x.key), icon: x.icon as IconName, color: subTypeColor(x.key, t) }))} value={type} onChange={(k) => pickType(k, true)} t={t} />
@@ -433,7 +420,7 @@ export function SubSheet({ visible, initial, main, rates, onSave, onDelete, onCl
         </View>
       </Field>
       <Field label={tr('sub.payDay')} t={t}>
-        <TextInput value={day} onChangeText={setDay} keyboardType="number-pad" maxLength={2} style={fieldStyle(t)} inputAccessoryViewID="sub-save" />
+        <TextInput value={day} onChangeText={setDay} keyboardType="number-pad" maxLength={2} style={fieldStyle(t)} />
       </Field>
       {freq === 'yearly' ? (
         <Field label={tr('sub.payMonth')} t={t}>
@@ -736,8 +723,6 @@ const st = StyleSheet.create({
   panelInput: { height: 52, borderWidth: 1, borderRadius: RADIUS.inner, paddingHorizontal: 16, fontSize: 17, fontWeight: '600' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, minHeight: 56 },
   topSave: { borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 16, flexShrink: 1, marginLeft: 12 },
-  accessory: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  accessorySave: { flex: 1, maxWidth: 260, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 28, fontFamily: FONTS.display, paddingHorizontal: 20, paddingTop: 4 },
   body: { padding: 20, gap: 16, paddingBottom: 48 },
   input: { height: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, fontSize: 17 },
